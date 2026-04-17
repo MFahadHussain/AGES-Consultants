@@ -25,7 +25,7 @@ export function Projects() {
   const { toast } = useToast()
 
   const fetchData = async () => { const res = await fetch('/api/projects'); setData(await res.json()) }
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   const handleCreate = async () => {
     if (!form.code || !form.name) { toast({ title: 'Error', description: 'Code and name required', variant: 'destructive' }); return }
@@ -94,7 +94,7 @@ export function Donors() {
   const { toast } = useToast()
 
   const fetchData = async () => { const res = await fetch('/api/donors'); setData(await res.json()) }
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   const handleCreate = async () => {
     if (!form.code || !form.name) { toast({ title: 'Error', description: 'Code and name required', variant: 'destructive' }); return }
@@ -159,7 +159,7 @@ export function Locations() {
   const { toast } = useToast()
 
   const fetchData = async () => { const res = await fetch('/api/locations'); setData(await res.json()) }
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   const handleCreate = async () => {
     if (!form.code || !form.name) { toast({ title: 'Error', description: 'Code and name required', variant: 'destructive' }); return }

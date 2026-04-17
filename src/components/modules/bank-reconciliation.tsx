@@ -19,12 +19,12 @@ export function BankReconciliation() {
   const { toast } = useToast()
 
   const fetchData = async () => {
-    setLoading(true)
+
     try { const res = await fetch('/api/bank-reconciliation'); setStatements(await res.json()) } catch (e) { console.error(e) }
     setLoading(false)
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   const handleMatch = async (statementItemId: string, voucherId: string) => {
     await fetch('/api/bank-reconciliation', {

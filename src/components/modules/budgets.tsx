@@ -27,12 +27,12 @@ export function BudgetManagement() {
   const { toast } = useToast()
 
   const fetchData = async () => {
-    setLoading(true)
+
     try { const res = await fetch('/api/budgets'); setBudgets(await res.json()) } catch (e) { console.error(e) }
     setLoading(false)
   }
 
-  useEffect(() => { fetchData(); fetch('/api/accounts?accountType=EXPENSE').then(r => r.json()).then(setAccounts) }, [])
+  useEffect(() => { queueMicrotask(() => { fetchData(); fetch('/api/accounts?accountType=EXPENSE').then(r => r.json()).then(d => setAccounts(d)) }) }, [])
 
   const handleCreate = async () => {
     if (!form.name || !form.financialYearId) { toast({ title: 'Error', description: 'Name and financial year required', variant: 'destructive' }); return }

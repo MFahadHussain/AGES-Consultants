@@ -34,11 +34,12 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/dashboard')
-      .then(r => r.json())
-      .then(d => setData(d))
-      .catch(console.error)
-      .finally(() => setLoading(false))
+    queueMicrotask(() => {
+      fetch('/api/dashboard')
+        .then(r => r.json())
+        .then(d => { setData(d); setLoading(false) })
+        .catch(() => setLoading(false))
+    })
   }, [])
 
   if (loading || !data) {

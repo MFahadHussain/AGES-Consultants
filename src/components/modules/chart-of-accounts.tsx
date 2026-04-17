@@ -52,7 +52,7 @@ export function ChartOfAccounts() {
   const { toast } = useToast()
 
   const fetchData = async () => {
-    setLoading(true)
+
     try {
       const res = await fetch('/api/accounts')
       const data = await res.json()
@@ -63,7 +63,7 @@ export function ChartOfAccounts() {
     setLoading(false)
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   useEffect(() => {
     let result = accounts

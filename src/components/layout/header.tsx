@@ -35,7 +35,7 @@ export function Header() {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => setMounted(true), [])
+  useEffect(() => { queueMicrotask(() => setMounted(true)) }, [])
 
   return (
     <header className="border-b bg-card px-4 py-3 flex items-center justify-between shrink-0">

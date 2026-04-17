@@ -29,7 +29,7 @@ export function Taxation() {
     setTaxRates(await res.json())
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   const handleCreate = async () => {
     if (!form.name) { toast({ title: 'Error', description: 'Name required', variant: 'destructive' }); return }

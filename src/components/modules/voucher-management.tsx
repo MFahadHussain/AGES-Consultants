@@ -66,7 +66,7 @@ export function VoucherManagement() {
   })
 
   const fetchData = async () => {
-    setLoading(true)
+
     try {
       const params = new URLSearchParams()
       if (typeFilter !== 'all') params.set('voucherType', typeFilter)
@@ -88,8 +88,8 @@ export function VoucherManagement() {
     setAccounts(data.filter((a: Account) => a.accountType))
   }
 
-  useEffect(() => { fetchData() }, [page, typeFilter, statusFilter])
-  useEffect(() => { fetchAccounts() }, [])
+  useEffect(() => { queueMicrotask(() => fetchData()) }, [page, typeFilter, statusFilter])
+  useEffect(() => { queueMicrotask(() => fetchAccounts()) }, [])
 
   const handleStatusChange = async (voucherId: string, action: string) => {
     try {

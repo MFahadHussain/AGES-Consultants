@@ -28,7 +28,7 @@ export function Customers() {
     setData(await res.json())
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   const handleCreate = async () => {
     if (!form.code || !form.name) { toast({ title: 'Error', description: 'Code and name required', variant: 'destructive' }); return }
@@ -107,7 +107,7 @@ export function Suppliers() {
     setData(await res.json())
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   const handleCreate = async () => {
     if (!form.code || !form.name) { toast({ title: 'Error', description: 'Code and name required', variant: 'destructive' }); return }

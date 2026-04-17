@@ -23,11 +23,13 @@ export function Ledgers() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    fetch('/api/accounts?isActive=true').then(r => r.json()).then(setAccounts)
+    queueMicrotask(() => {
+      fetch('/api/accounts?isActive=true').then(r => r.json()).then(d => setAccounts(d))
+    })
   }, [])
 
   const fetchData = async () => {
-    setLoading(true)
+
     const params = new URLSearchParams({ type: ledgerType })
     if (selectedAccount) params.set('accountId', selectedAccount)
     try {
@@ -37,7 +39,7 @@ export function Ledgers() {
     setLoading(false)
   }
 
-  useEffect(() => { fetchData() }, [ledgerType])
+  useEffect(() => { queueMicrotask(() => fetchData()) }, [ledgerType])
 
   const renderGeneralLedger = () => (
     <div className="space-y-4">
