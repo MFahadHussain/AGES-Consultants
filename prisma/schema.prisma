@@ -1,0 +1,507 @@
+// Accounting & Financial Management System - Complete Database Schema
+// Supports: Chart of Accounts, Vouchers, Ledgers, Bank Reconciliation,
+// Project/Segment Accounting, Budgets, Taxation, Aging, Financial Years,
+// Integration with Payroll & Fixed Assets
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// CORE: Users & Roles
+// ============================================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      String   @default("viewer") // admin, accountant, auditor, viewer
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditLogs       AuditLog[]
+  voucherActions  VoucherApproval[]
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String   // CREATE, UPDATE, DELETE, APPROVE, REJECT
+  entity    String   // Account, Voucher, Budget, etc.
+  entityId  String
+  details   String?  // JSON string with change details
+  createdAt DateTime @default(now())
+}
+
+// ============================================================
+// CHART OF ACCOUNTS
+// ============================================================
+
+model Account {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  name          String
+  accountType   String    // ASSET, LIABILITY, EQUITY, INCOME, EXPENSE
+  subType       String?   // CURRENT_ASSET, FIXED_ASSET, CURRENT_LIABILITY, etc.
+  parentId      String?   // For hierarchical accounts
+  parent        Account?  @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children      Account[] @relation("AccountHierarchy")
+  level         Int       @default(0)
+  isActive      Boolean   @default(true)
+  isSystem      Boolean   @default(false) // System accounts cannot be deleted
+  allowPosting  Boolean   @default(true) // Whether direct postings allowed
+  openingBalance Float    @default(0)
+  description   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  voucherEntries    VoucherEntry[]
+  budgetEntries   BudgetLine[]
+  taxAccounts     TaxRate[]
+  bankStatements  BankStatement[]
+  depExpenseEntries FixedAssetDepreciation[] @relation("DepExpense")
+  accumDepEntries   FixedAssetDepreciation[] @relation("AccumDep")
+}
+
+// ============================================================
+// FINANCIAL YEAR
+// ============================================================
+
+model FinancialYear {
+  id          String   @id @default(cuid())
+  name        String   @unique // e.g., "FY 2024-25"
+  startDate   DateTime
+  endDate     DateTime
+  status      String   @default("open") // open, closing, closed
+  closedBy    String?
+  closedAt    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vouchers    Voucher[]
+  budgets     Budget[]
+}
+
+// ============================================================
+// PROJECTS & SEGMENTS
+// ============================================================
+
+model Project {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  status      String   @default("active") // active, completed, on-hold
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vouchers    Voucher[]
+  budgets     Budget[]
+}
+
+model Donor {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  contactPerson String?
+  email       String?
+  phone       String?
+  address     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vouchers    Voucher[]
+  budgets     Budget[]
+}
+
+model Location {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  address     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vouchers    Voucher[]
+}
+
+// ============================================================
+// CUSTOMERS & SUPPLIERS (Sub-Ledger Masters)
+// ============================================================
+
+model Customer {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  contactPerson String?
+  email         String?
+  phone         String?
+  address       String?
+  creditTerms   Int      @default(30) // days
+  creditLimit   Float    @default(0)
+  taxNumber     String?
+  isActive      Boolean  @default(true)
+  openingBalance Float   @default(0) // Receivable opening balance
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  voucherEntries VoucherEntry[]
+}
+
+model Supplier {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  contactPerson String?
+  email         String?
+  phone         String?
+  address       String?
+  creditTerms   Int      @default(30) // days
+  taxNumber     String?
+  bankName      String?
+  bankAccount   String?
+  isActive      Boolean  @default(true)
+  openingBalance Float   @default(0) // Payable opening balance
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  voucherEntries VoucherEntry[]
+  fixedAssets    FixedAsset[]
+}
+
+// ============================================================
+// VOUCHER MANAGEMENT
+// ============================================================
+
+model Voucher {
+  id              String    @id @default(cuid())
+  voucherNumber   String    @unique
+  voucherType     String    // BP, CP, BR, CR, JV, BILL
+  voucherTypeName String    // Bank Payment, Cash Payment, Bank Receipt, Cash Receipt, Journal Voucher, Bill
+  date            DateTime
+  narration       String
+  reference       String?
+  chequeNumber    String?
+  chequeDate      DateTime?
+  status          String    @default("draft") // draft, reviewed, approved, posted, rejected
+  financialYearId String
+  financialYear   FinancialYear @relation(fields: [financialYearId], references: [id])
+  projectId       String?
+  project         Project?  @relation(fields: [projectId], references: [id])
+  donorId         String?
+  donor           Donor?    @relation(fields: [donorId], references: [id])
+  locationId      String?
+  location        Location? @relation(fields: [locationId], references: [id])
+  totalDebit      Float     @default(0)
+  totalCredit     Float     @default(0)
+  isPayrollPosted Boolean   @default(false) // INTEGRATION: Payroll → GL
+  isAssetPosted   Boolean   @default(false) // INTEGRATION: Fixed Assets → GL
+  createdBy       String
+  reviewedBy      String?
+  approvedBy      String?
+  postedBy        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  entries       VoucherEntry[]
+  approvals     VoucherApproval[]
+  attachments   VoucherAttachment[]
+  bankRecon     BankReconciliationItem[]
+}
+
+model VoucherEntry {
+  id          String  @id @default(cuid())
+  voucherId   String
+  voucher     Voucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  lineNumber  Int
+  accountId   String
+  account     Account @relation(fields: [accountId], references: [id])
+  debit       Float   @default(0)
+  credit      Float   @default(0)
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id])
+  supplierId  String?
+  supplier    Supplier? @relation(fields: [supplierId], references: [id])
+  description String?
+  projectId   String? // Override at line level
+  donorId     String? // Override at line level
+  locationId  String? // Override at line level
+
+  // INTEGRATION: Payroll reference
+  payrollRef  String? // Reference to payroll batch
+  // INTEGRATION: Fixed Asset reference
+  assetRef    String? // Reference to fixed asset
+}
+
+model VoucherApproval {
+  id          String   @id @default(cuid())
+  voucherId   String
+  voucher     Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  action      String   // REVIEW, APPROVE, REJECT, POST
+  comments    String?
+  createdAt   DateTime @default(now())
+}
+
+model VoucherAttachment {
+  id          String   @id @default(cuid())
+  voucherId   String
+  voucher     Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  fileName    String
+  filePath    String
+  fileSize    Int?
+  fileType    String?
+  uploadedBy  String
+  createdAt   DateTime @default(now())
+}
+
+// ============================================================
+// BANK RECONCILIATION
+// ============================================================
+
+model BankStatement {
+  id            String   @id @default(cuid())
+  accountId     String
+  account       Account  @relation(fields: [accountId], references: [id])
+  statementDate DateTime
+  openingBalance Float
+  closingBalance Float
+  importedAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  items         BankStatementItem[]
+}
+
+model BankStatementItem {
+  id            String   @id @default(cuid())
+  bankStatementId String
+  bankStatement  BankStatement @relation(fields: [bankStatementId], references: [id], onDelete: Cascade)
+  date          DateTime
+  description   String
+  amount        Float
+  type          String   // DEPOSIT, WITHDRAWAL
+  reference     String?
+  isMatched     Boolean  @default(false)
+
+  reconItems    BankReconciliationItem[]
+}
+
+model BankReconciliationItem {
+  id                  String   @id @default(cuid())
+  bankStatementItemId String? @unique
+  bankStatementItem   BankStatementItem? @relation(fields: [bankStatementItemId], references: [id])
+  voucherId           String
+  voucher             Voucher  @relation(fields: [voucherId], references: [id])
+  reconciliationDate  DateTime @default(now())
+  status              String   @default("matched") // matched, unmatched, outstanding
+  reconciledBy        String
+  createdAt           DateTime @default(now())
+}
+
+// ============================================================
+// BUDGET MANAGEMENT
+// ============================================================
+
+model Budget {
+  id              String   @id @default(cuid())
+  name            String
+  financialYearId String
+  financialYear   FinancialYear @relation(fields: [financialYearId], references: [id])
+  projectId       String?
+  project         Project? @relation(fields: [projectId], references: [id])
+  donorId         String?
+  donor           Donor?   @relation(fields: [donorId], references: [id])
+  period          String?  // MONTHLY, QUARTERLY, ANNUAL
+  status          String   @default("draft") // draft, approved, active
+  totalAmount     Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  lines           BudgetLine[]
+}
+
+model BudgetLine {
+  id          String   @id @default(cuid())
+  budgetId    String
+  budget      Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id])
+  period      String   // "2024-01", "2024-Q1", "2024"
+  budgetAmount Float
+  actualAmount Float    @default(0)
+  commitmentAmount Float @default(0)
+}
+
+// ============================================================
+// TAXATION
+// ============================================================
+
+model TaxRate {
+  id          String   @id @default(cuid())
+  name        String
+  taxType     String   // INCOME_TAX, SALES_TAX, GST, ZAKAT
+  rate        Float
+  accountId   String?  // Default tax account
+  account     Account? @relation(fields: [accountId], references: [id])
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  calculations TaxCalculation[]
+}
+
+model TaxCalculation {
+  id            String   @id @default(cuid())
+  taxRateId     String
+  taxRate       TaxRate  @relation(fields: [taxRateId], references: [id])
+  voucherId     String?
+  baseAmount    Float
+  taxAmount     Float
+  period        String   // "2024-01"
+  calculatedAt  DateTime @default(now())
+  postedToGL    Boolean  @default(false)
+}
+
+// ============================================================
+// FINANCIAL YEAR BALANCES (for carry-forward)
+// ============================================================
+
+model AccountBalance {
+  id              String   @id @default(cuid())
+  accountId       String
+  // Note: AccountBalance references Account but no formal FK to avoid circular issues
+  financialYearId String
+  openingDebit    Float    @default(0)
+  openingCredit   Float    @default(0)
+  periodDebit     Float    @default(0)
+  periodCredit    Float    @default(0)
+  closingDebit    Float    @default(0)
+  closingCredit   Float    @default(0)
+  period          String   // "2024-01", "2024-Q1", "2024"
+
+  @@unique([accountId, financialYearId, period])
+}
+
+// ============================================================
+// INTEGRATION: Fixed Assets (Reference tables for integration)
+// ============================================================
+
+model FixedAsset {
+  id              String   @id @default(cuid())
+  assetCode       String   @unique
+  name            String
+  category        String
+  purchaseDate    DateTime
+  purchaseCost    Float
+  usefulLife      Int      // months
+  salvageValue    Float    @default(0)
+  depreciationMethod String @default("straight_line")
+  locationId      String?
+  projectId       String?
+  donorId         String?
+  supplierId      String?
+  supplier        Supplier? @relation(fields: [supplierId], references: [id])
+  isDonorFunded   Boolean  @default(false) // Donor-funded: zero depreciation
+  status          String   @default("active") // active, disposed, transferred
+  disposalDate    DateTime?
+  disposalAmount  Float?
+  gainLoss        Float?
+  accumulatedDepreciation Float @default(0)
+  netBookValue    Float
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  depreciationEntries FixedAssetDepreciation[]
+}
+
+model FixedAssetDepreciation {
+  id          String     @id @default(cuid())
+  assetId     String
+  asset       FixedAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  period      String     // "2024-01"
+  amount      Float
+  depExpenseAccountId String
+  depExpenseAccount   Account @relation("DepExpense", fields: [depExpenseAccountId], references: [id])
+  accumDepAccountId   String
+  accumDepAccount     Account @relation("AccumDep", fields: [accumDepAccountId], references: [id])
+  voucherId   String?   // Posted JV reference
+  postedAt    DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+// ============================================================
+// INTEGRATION: Payroll (Reference for payroll integration)
+// ============================================================
+
+model PayrollBatch {
+  id              String   @id @default(cuid())
+  batchNumber     String   @unique
+  period          String   // "2024-01"
+  totalGross      Float
+  totalDeductions Float
+  totalNetPay     Float
+  totalEmployerCharges Float
+  status          String   @default("draft") // draft, approved, posted
+  postedToGL      Boolean  @default(false)
+  postedVoucherId String?  // Reference to GL voucher
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  lines         PayrollBatchLine[]
+}
+
+model PayrollBatchLine {
+  id              String      @id @default(cuid())
+  batchId        String
+  batch          PayrollBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  employeeName   String
+  employeeId     String
+  grossSalary    Float
+  incomeTax      Float       @default(0)
+  eobiDeduction  Float       @default(0)
+  providentFund  Float       @default(0)
+  loanDeduction  Float       @default(0)
+  otherDeductions Float      @default(0)
+  netPay         Float
+  employerEOBI   Float       @default(0)
+  employerPF     Float       @default(0)
+  projectId      String?     // For cross-charging
+  department     String?
+}
+
+// ============================================================
+// IMPORT/EXPORT LOG
+// ============================================================
+
+model ImportLog {
+  id          String   @id @default(cuid())
+  fileName    String
+  fileType    String   // CSV, XLSX
+  importType  String   // DONOR_INVOICE, CHART_OF_ACCOUNTS, etc.
+  recordCount Int
+  successCount Int
+  failCount   Int
+  errors      String?  // JSON string of error details
+  importedBy  String
+  createdAt   DateTime @default(now())
+}
+
+model ExportLog {
+  id          String   @id @default(cuid())
+  exportType  String   // TRIAL_BALANCE, PNL, BALANCE_SHEET, etc.
+  format      String   // PDF, XLSX, DOCX
+  parameters  String?  // JSON string of export parameters
+  exportedBy  String
+  createdAt   DateTime @default(now())
+}
