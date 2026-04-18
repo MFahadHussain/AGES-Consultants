@@ -107,6 +107,19 @@ function WorkflowSteps({ currentStatus, currentRole }: { currentStatus: string; 
   const currentStep = statusConfig[currentStatus]?.step || 0
   const isRejected = currentStatus === 'rejected'
 
+  // Determine which step the current role can act on
+  const canActOnStep = (step: string): boolean => {
+    if (!currentRole) return false
+    if (step === 'draft' && hasPermission('submit', currentRole)) return true
+    if (step === 'pending' && hasPermission('approve', currentRole)) return true
+    if (step === 'approved' && hasPermission('post', currentRole)) return true
+    return false
+  }
+  const nextActionableStep = steps.find((step, i) => {
+    const stepNum = i + 1
+    return stepNum === currentStep && canActOnStep(step)
+  })
+
   return (
     <div className="space-y-1">
       <div className="flex items-center gap-1">
@@ -115,14 +128,16 @@ function WorkflowSteps({ currentStatus, currentRole }: { currentStatus: string; 
           const isCompleted = currentStep > i + 1 || (currentStatus === 'posted' && i < 3)
           const isCurrent = currentStep === i + 1
           const isRejectedStep = isRejected
+          const isActionable = step === nextActionableStep
           return (
             <div key={step} className="flex items-center gap-1">
               <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold ${
                 isCompleted ? 'bg-emerald-100 text-emerald-800' :
+                isCurrent && isActionable && !isRejectedStep ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-400' :
                 isCurrent && !isRejectedStep ? config.color :
                 'bg-gray-100 text-gray-400'
               }`}>
-                {isCompleted ? <CheckCircle2 className="h-2.5 w-2.5" /> : <span className="h-2.5 w-2.5 rounded-full border flex items-center justify-center text-[7px]">{i + 1}</span>}
+                {isCompleted ? <CheckCircle2 className="h-2.5 w-2.5" /> : isActionable ? <Shield className="h-2.5 w-2.5" /> : <span className="h-2.5 w-2.5 rounded-full border flex items-center justify-center text-[7px]">{i + 1}</span>}
                 <span className="hidden sm:inline">{config.label}</span>
               </div>
               {i < 3 && <div className={`h-px w-3 ${isCompleted ? 'bg-emerald-300' : 'bg-gray-200'}`} />}
@@ -134,7 +149,10 @@ function WorkflowSteps({ currentStatus, currentRole }: { currentStatus: string; 
       <div className="flex items-center gap-1 text-[8px] text-muted-foreground">
         {steps.map((step, i) => (
           <span key={step} className="flex items-center gap-1">
-            <span className={`px-1.5 py-0 rounded ${currentStep === i + 1 && !isRejected ? 'font-semibold text-foreground' : ''}`}>{stepRoles[step]}</span>
+            <span className={`px-1.5 py-0 rounded ${
+              currentStep === i + 1 && !isRejected ? 'font-semibold text-foreground' : '',
+              step === nextActionableStep ? 'text-amber-700 font-semibold' : ''
+            }`}>{stepRoles[step]}</span>
             {i < 3 && <span className="w-3" />}
           </span>
         ))}
@@ -384,7 +402,7 @@ export function VoucherManagement() {
           reference: form.reference || undefined, payeeName: form.payeeName || undefined,
           chequeNumber: form.chequeNumber || undefined, chequeDate: form.chequeDate || undefined,
           voucherNo: form.voucherNo || undefined, amountInWords: form.amountInWords || autoAmountInWords,
-          autoPost: form.autoPost, entries: validEntries, financialYearId: activeFy.id,
+          autoPost: form.autoPost && hasPermission('quick_post', currentRole), entries: validEntries, financialYearId: activeFy.id,
           voucherTypeName: voucherTypes.find(v => v.value === form.voucherType)?.label,
           projectId: form.projectId || undefined, donorId: form.donorId || undefined,
           locationId: form.locationId || undefined, userRole: currentRole,
@@ -407,6 +425,10 @@ export function VoucherManagement() {
   const [saving, setSaving] = useState(false)
 
   const handleEdit = async (voucherId: string) => {
+    if (!hasPermission('edit', currentRole)) {
+      toast({ title: 'Permission Denied', description: `${roleLabels[currentRole]} role cannot edit vouchers.`, variant: 'destructive' })
+      return
+    }
     try {
       const res = await fetch(`/api/vouchers/${voucherId}`)
       const data = await res.json()
@@ -455,7 +477,13 @@ export function VoucherManagement() {
   }
 
   // ==================== DELETE VOUCHER ====================
-  const handleDeleteClick = (voucherId: string, voucherNumber: string) => { setDeleteVoucherId(voucherId); setDeleteVoucherNumber(voucherNumber); setDeleteOpen(true) }
+  const handleDeleteClick = (voucherId: string, voucherNumber: string) => {
+    if (!hasPermission('delete', currentRole)) {
+      toast({ title: 'Permission Denied', description: `${roleLabels[currentRole]} role cannot delete vouchers.`, variant: 'destructive' })
+      return
+    }
+    setDeleteVoucherId(voucherId); setDeleteVoucherNumber(voucherNumber); setDeleteOpen(true)
+  }
   const handleDeleteConfirm = async () => {
     if (!deleteVoucherId) return
     setDeleting(true)
@@ -473,6 +501,10 @@ export function VoucherManagement() {
 
   // ==================== DUPLICATE VOUCHER ====================
   const handleDuplicate = async (voucherId: string) => {
+    if (!hasPermission('edit', currentRole)) {
+      toast({ title: 'Permission Denied', description: `${roleLabels[currentRole]} role cannot create/duplicate vouchers.`, variant: 'destructive' })
+      return
+    }
     try {
       const res = await fetch(`/api/vouchers/${voucherId}`)
       const data = await res.json()
@@ -612,12 +644,21 @@ export function VoucherManagement() {
         </div>
         <Textarea className="text-xs font-medium italic" rows={2} placeholder="Amount in words will be auto-generated..." value={form.amountInWords || autoAmountInWords} onChange={e => setForm(p => ({ ...p, amountInWords: e.target.value }))} />
       </div>
-      {!editOpen && (
+      {!editOpen && hasPermission('quick_post', currentRole) && (
         <div className="flex items-center gap-3 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
           <input type="checkbox" id="autoPost" checked={form.autoPost} onChange={e => setForm(p => ({ ...p, autoPost: e.target.checked }))} className="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500" />
           <div>
             <Label htmlFor="autoPost" className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 cursor-pointer">Auto Post to General Ledger</Label>
-            <p className="text-[10px] text-emerald-600 dark:text-emerald-400">{form.autoPost ? 'Voucher will be immediately posted to GL' : 'Voucher will be saved as draft — submit for approval workflow'}</p>
+            <p className="text-[10px] text-emerald-600 dark:text-emerald-400">{form.autoPost ? 'Voucher will be immediately posted to GL (Admin only)' : 'Voucher will be saved as draft — submit for approval workflow'}</p>
+          </div>
+        </div>
+      )}
+      {!editOpen && !hasPermission('quick_post', currentRole) && (
+        <div className="flex items-center gap-3 p-3 rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+          <Clock className="h-4 w-4 text-blue-600 shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Approval Workflow Required</p>
+            <p className="text-[10px] text-blue-600">Your <strong>{roleLabels[currentRole]}</strong> role requires approval before posting. Voucher will be saved as draft.</p>
           </div>
         </div>
       )}
@@ -677,7 +718,7 @@ export function VoucherManagement() {
           {activeFilterCount > 0 && <Button variant="ghost" size="sm" className="h-8 text-[10px] text-muted-foreground" onClick={clearAllFilters}><X className="h-3 w-3 mr-1" />Clear filters</Button>}
         </div>
         <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) resetForm() }}>
-          <DialogTrigger asChild><Button size="sm" className="h-8 text-xs"><Plus className="h-3.5 w-3.5 mr-1" /> New Voucher</Button></DialogTrigger>
+          {hasPermission('edit', currentRole) && <DialogTrigger asChild><Button size="sm" className="h-8 text-xs"><Plus className="h-3.5 w-3.5 mr-1" /> New Voucher</Button></DialogTrigger>}
           <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle className="text-sm">Create New Voucher</DialogTitle></DialogHeader>
             {renderVoucherForm()}
@@ -749,7 +790,7 @@ export function VoucherManagement() {
                   <div className="flex items-center gap-0.5">
                     <Button variant="ghost" size="icon" className="h-7 w-7" title="View" onClick={async () => { const res = await fetch(`/api/vouchers/${v.id}`); setDetailVoucher(await res.json()); setDetailOpen(true) }}><Eye className="h-3 w-3" /></Button>
                     {(v.status === 'draft' || v.status === 'rejected') && hasPermission('edit', currentRole) && <Button variant="ghost" size="icon" className="h-7 w-7 text-amber-600" title="Edit" onClick={() => handleEdit(v.id)}><Pencil className="h-3 w-3" /></Button>}
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-violet-600" title="Duplicate" onClick={() => handleDuplicate(v.id)}><CopyPlus className="h-3 w-3" /></Button>
+                    {hasPermission('edit', currentRole) && <Button variant="ghost" size="icon" className="h-7 w-7 text-violet-600" title="Duplicate" onClick={() => handleDuplicate(v.id)}><CopyPlus className="h-3 w-3" /></Button>}
                     <Button variant="ghost" size="icon" className="h-7 w-7" title="Print" onClick={async () => { const res = await fetch(`/api/vouchers/${v.id}`); handlePrint(await res.json()) }}><Printer className="h-3 w-3" /></Button>
                     {(v.status === 'draft' || v.status === 'rejected') && hasPermission('delete', currentRole) && <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" title="Delete" onClick={() => handleDeleteClick(v.id, v.voucherNo || v.voucherNumber)}><Trash2 className="h-3 w-3" /></Button>}
                     <Separator orientation="vertical" className="h-5 mx-0.5" />
@@ -872,10 +913,10 @@ export function VoucherManagement() {
                     {detailVoucher.status === 'approved' && hasPermission('post', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-emerald-600" onClick={() => handleStatusChange(detailVoucher.id, 'post')}><Lock className="h-3 w-3 mr-1" />Post to GL<span className="hidden sm:inline ml-1 text-muted-foreground">→ Posted</span></Button>}
                     {(detailVoucher.status === 'draft' || detailVoucher.status === 'pending') && hasPermission('quick_post', currentRole) && <Button variant="default" size="sm" className="h-7 text-[10px]" onClick={() => handleStatusChange(detailVoucher.id, 'quick_post')}><CheckCircle2 className="h-3 w-3 mr-1" />Quick Post<span className="hidden sm:inline ml-1 opacity-70">(Admin Only)</span></Button>}
                     <Separator orientation="vertical" className="h-5" />
-                    {hasPermission('reject', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => { setDetailOpen(false); setRejectVoucherId(detailVoucher.id); setRejectOpen(true) }}><XCircle className="h-3 w-3 mr-1" />Reject</Button>}
+                    {detailVoucher.status !== 'rejected' && detailVoucher.status !== 'posted' && hasPermission('reject', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => { setDetailOpen(false); setRejectVoucherId(detailVoucher.id); setRejectOpen(true) }}><XCircle className="h-3 w-3 mr-1" />Reject</Button>}
                     {(detailVoucher.status === 'draft' || detailVoucher.status === 'rejected') && hasPermission('edit', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-amber-600" onClick={() => { setDetailOpen(false); handleEdit(detailVoucher.id) }}><Pencil className="h-3 w-3 mr-1" />Edit</Button>}
                     {(detailVoucher.status === 'draft' || detailVoucher.status === 'rejected') && hasPermission('delete', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => { setDetailOpen(false); handleDeleteClick(detailVoucher.id, detailVoucher.voucherNo || detailVoucher.voucherNumber) }}><Trash2 className="h-3 w-3 mr-1" />Delete</Button>}
-                    <Button variant="outline" size="sm" className="h-7 text-[10px] text-violet-600" onClick={() => { setDetailOpen(false); handleDuplicate(detailVoucher.id) }}><CopyPlus className="h-3 w-3 mr-1" />Duplicate</Button>
+                    {hasPermission('edit', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-violet-600" onClick={() => { setDetailOpen(false); handleDuplicate(detailVoucher.id) }}><CopyPlus className="h-3 w-3 mr-1" />Duplicate</Button>}
                   </div>
                   {!hasPermission('submit', currentRole) && !hasPermission('approve', currentRole) && !hasPermission('post', currentRole) && detailVoucher.status !== 'draft' && (
                     <div className="flex items-center gap-2 p-2 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
@@ -893,7 +934,7 @@ export function VoucherManagement() {
                     <Badge className={`text-[8px] ${roleColors[currentRole]}`}>{roleLabels[currentRole]}</Badge>
                     <Separator orientation="vertical" className="h-5" />
                     {hasPermission('revoke', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-amber-600" onClick={() => handleStatusChange(detailVoucher.id, 'revoke')}><RotateCcw className="h-3 w-3 mr-1" />Revoke<span className="hidden sm:inline ml-1 text-muted-foreground">(Admin Only)</span></Button>}
-                    <Button variant="outline" size="sm" className="h-7 text-[10px] text-violet-600" onClick={() => { setDetailOpen(false); handleDuplicate(detailVoucher.id) }}><CopyPlus className="h-3 w-3 mr-1" />Duplicate</Button>
+                    {hasPermission('edit', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-violet-600" onClick={() => { setDetailOpen(false); handleDuplicate(detailVoucher.id) }}><CopyPlus className="h-3 w-3 mr-1" />Duplicate</Button>}
                   </div>
                   {!hasPermission('revoke', currentRole) && (
                     <div className="flex items-center gap-2 p-2 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
@@ -912,7 +953,7 @@ export function VoucherManagement() {
                     <Separator orientation="vertical" className="h-5" />
                     {hasPermission('edit', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-amber-600" onClick={() => { setDetailOpen(false); handleEdit(detailVoucher.id) }}><Pencil className="h-3 w-3 mr-1" />Edit & Resubmit</Button>}
                     {hasPermission('delete', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => { setDetailOpen(false); handleDeleteClick(detailVoucher.id, detailVoucher.voucherNo || detailVoucher.voucherNumber) }}><Trash2 className="h-3 w-3 mr-1" />Delete</Button>}
-                    <Button variant="outline" size="sm" className="h-7 text-[10px] text-violet-600" onClick={() => { setDetailOpen(false); handleDuplicate(detailVoucher.id) }}><CopyPlus className="h-3 w-3 mr-1" />Duplicate</Button>
+                    {hasPermission('edit', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-violet-600" onClick={() => { setDetailOpen(false); handleDuplicate(detailVoucher.id) }}><CopyPlus className="h-3 w-3 mr-1" />Duplicate</Button>}
                   </div>
                 </div>
               )}

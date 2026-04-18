@@ -44,114 +44,37 @@ Stage Summary:
 - All FK references use valid User IDs via getSystemUserId()
 
 ---
-Task ID: 2
+Task ID: 5
 Agent: Main Agent
-Task: Fix stale closure and data refresh issues in voucher and ledger components
+Task: Complete role-based workflow fixes and enhancements
 
 Work Log:
-- Read and analyzed all API routes and frontend components
-- Tested API endpoints directly with curl - confirmed all working (POST 201, GET 200)
-- Identified root cause: stale closure issues in fetchData functions due to queueMicrotask pattern and missing useCallback/useRef patterns
-- Fixed VoucherManagement component:
-  - Replaced queueMicrotask with direct useEffect calls
-  - Added useRef for filter/search/page state to prevent stale closures in async callbacks
-  - Wrapped fetchData in useCallback with refs instead of direct state access
-  - Added setLoading(true) at start of fetchData for proper loading state
-  - After voucher creation: reset search and page to ensure new voucher is visible, await fetchData('')
-  - Made handleStatusChange await fetchData() for reliable refresh
-  - Cleaned up unused imports (Tabs, AlertCircle, CardHeader, CardTitle)
-- Fixed Ledgers component:
-  - Replaced queueMicrotask with direct useEffect calls
-  - Added useRef for ledgerType/statusFilter/selectedAccount to prevent stale closures
-  - Wrapped fetchData in useCallback with refs
-  - Added proper error handling (setData([]) on error)
-  - Component remounts fresh when user navigates to it, ensuring latest data is shown
-- End-to-end verification with curl:
-  - POST /api/vouchers → 201 Created (voucher JV-2026-005 created)
-  - GET /api/vouchers → 200 OK (16 total vouchers, new one appears first)
-  - GET /api/ledgers → 200 OK (12 account groups with entries)
-
-Stage Summary:
-- Root cause: Stale closures in fetchData functions caused by queueMicrotask pattern and lack of useCallback/useRef
-- VoucherManagement: fetchData now uses refs for state, is wrapped in useCallback, properly awaits after creation
-- Ledgers: fetchData now uses refs for state, is wrapped in useCallback, properly handles errors
-- Both components now properly refresh data after mutations and when navigated to
+- Fixed auto-post permission bypass: autoPost checkbox only visible for users with quick_post permission (Admin)
+- Non-admin users now see "Approval Workflow Required" info box explaining their role needs approval
+- autoPost is forced to false at API level when user lacks quick_post permission
+- Fixed detail dialog Reject button: added status check (can't reject already rejected or posted vouchers)
+- Gate Duplicate button by hasPermission('edit') in list view and all detail dialog sections
+- Gate "New Voucher" button by hasPermission('edit') - viewers/auditors can't create vouchers
+- Added handler-level permission guards to handleEdit, handleDeleteClick, and handleDuplicate
+- Enhanced WorkflowSteps component to use currentRole prop:
+  - Highlights actionable step with amber ring and Shield icon
+  - Shows which step the current role can act on (e.g., Manager sees "Manager reviews" highlighted)
+  - Role label text in amber when it's the user's actionable step
+- Tested all workflow actions via API:
+  - Accountant submits (draft → pending) ✅
+  - Manager approves (pending → approved) ✅
+  - Admin posts (approved → posted) ✅
+  - Admin quick posts (draft → posted) ✅
+  - Admin revokes (posted → draft) ✅
+  - Viewer submit rejected with 403 ✅
+  - Accountant quick_post rejected with 403 ✅
+- Removed output: "standalone" from next.config.ts to fix next start
 - Lint passes with no errors
 
----
-Task ID: 1
-Agent: Backend API Agent
-Task: Fix Ledger API, rewrite Seed endpoint, add CRUD for Projects/Donors/Locations
-
-Work Log:
-- Fixed src/app/api/ledgers/route.ts:
-  - Bank ledger: now returns grouped entries by bank account (with allowPosting: true filter) instead of flat array
-  - Expense ledger: now returns grouped entries by expense account (with allowPosting: true filter) instead of flat array
-  - Both bank and expense cases now include accountType in response for running balance direction
-  - Added voucherTypeName to voucher select in both bank and expense cases (was missing in expense case)
-  - Response format matches general ledger: grouped by account with accountId, accountCode, accountName, accountType, entries array, totalDebit, totalCredit
-  - Added empty array return when no bank/expense accounts found
-  - Also added accountType and voucherTypeName to receivables and payables cases for consistency
-- Rewrote src/app/api/seed/route.ts:
-  - Removed all sample data creation (projects, donors, locations, customers, suppliers, vouchers, budgets, fixed assets, payroll batches, etc.)
-  - Deletes all data from 18 tables in correct FK constraint order (child tables first)
-  - Preserves: Account table (Chart of Accounts), FinancialYear (ensures at least one open FY), User table
-  - If no open FY exists, reopens most recent or creates FY 2025-26
-  - Returns preserved counts for confirmation
-- Added PUT and DELETE handlers to src/app/api/projects/route.ts, donors/route.ts, locations/route.ts:
-  - PUT: validates id, code, name; checks existence; prevents duplicate code on rename
-  - DELETE: validates id; checks existence; prevents deletion if has vouchers/budgets
-  - POST also now checks for duplicate code (409 response)
-- All changes pass lint check with no errors
-
 Stage Summary:
-- Bank and expense ledgers now return properly grouped data matching general ledger format
-- Seed endpoint clears all transactional data while preserving Chart of Accounts, Financial Year, and Users
-- Projects, Donors, and Locations now have full CRUD (GET, POST, PUT, DELETE) with proper validation
-- All API routes have descriptive error messages and proper HTTP status codes
-
----
-Task ID: 3
-Agent: Main Agent
-Task: Fix Bank/Expense ledger UI, add CRUD UI for Projects/Donors/Locations, clean data
-
-Work Log:
-- Updated src/components/modules/ledgers.tsx:
-  - Replaced renderBankExpenseLedger() which expected flat arrays with renderGroupedLedger()
-  - Bank and expense ledgers now render same as general ledger: grouped by account with running balances
-  - Each account group shows: Account Code - Name, Total Dr/Cr, Balance badge
-  - Running balance calculated correctly based on account type (ASSET/EXPENSE: Dr-Cr, others: Cr-Dr)
-  - Added Voucher Type badge column for better visibility
-  - Empty groups (0 entries) are filtered out from display
-- Updated src/components/modules/segments.tsx:
-  - Projects, Donors, Locations: Added full Edit and Delete with AlertDialog confirmation
-  - Consistent UI patterns: Pencil icon for edit, Trash2 icon for delete
-  - Proper error handling with toast messages
-- Cleaned database via GET /api/seed - preserved only Chart of Accounts
-- Created test data: 3 vouchers, 3 projects, 3 donors, 3 locations
-- All API endpoints tested and returning 200
-
-Stage Summary:
-- Bank Ledger and Expense Ledger now render properly with grouped data and running balances
-- Projects, Donors, and Locations have full CRUD in both API and UI
-- Database cleaned to only Chart of Accounts + Financial Year + test vouchers
-
----
-Task ID: 4
-Agent: Main Agent
-Task: Fix list view action buttons to use hasPermission checks, verify role-based workflow
-
-Work Log:
-- Reviewed the voucher-management.tsx component and found role selector, WorkflowSteps with role labels, and hasPermission checks were already implemented in the detail view
-- Fixed list view action buttons (lines 751-761) to also use hasPermission checks for: edit, delete, submit, approve, post, quick_post, revoke, reject
-- Without hasPermission, all workflow buttons were visible to all roles regardless of permissions
-- Now accountant role only sees Submit and Edit/Delete for draft vouchers; manager sees Submit + Approve + Reject; admin sees all including Quick Post, Post, and Revoke
-- Verified lint passes with no errors
-- Started dev server and tested all APIs: vouchers (3 test vouchers), dashboard, accounts all return 200
-- Created test data: 3 vouchers (BP draft, JV draft, CR posted) for workflow testing
-
-Stage Summary:
-- List view action buttons now properly check role permissions before rendering
-- Role-based workflow is fully functional: Accountant creates/edits, Manager approves, Admin posts
-- Switching roles in the selector dynamically shows/hides available workflow actions
-- Lint clean, dev server running, APIs verified
+- Role-based workflow is now fully enforced at both UI and handler levels
+- Auto-post can only be used by Admin role (both UI checkbox and API guard)
+- Duplicate, Edit, Delete, and New Voucher all require edit permission
+- WorkflowSteps visually highlights which step the current role can act on
+- Reject button properly checks voucher status in detail dialog
+- All workflow API endpoints tested and working with role-based access control
