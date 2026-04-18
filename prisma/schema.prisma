@@ -20,7 +20,7 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String
-  role      String   @default("viewer") // admin, accountant, auditor, viewer
+  role      String   @default("viewer") // admin, manager, accountant, auditor, viewer
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -195,7 +195,7 @@ model Voucher {
   chequeDate      DateTime?
   voucherNo       String?   // Manual/custom voucher number (separate from auto-generated voucherNumber)
   amountInWords   String?   // Total amount expressed in words
-  status          String    @default("draft") // draft, reviewed, approved, posted, rejected
+  status          String    @default("draft") // draft, pending, approved, posted, rejected
   financialYearId String
   financialYear   FinancialYear @relation(fields: [financialYearId], references: [id])
   projectId       String?
@@ -209,9 +209,9 @@ model Voucher {
   isPayrollPosted Boolean   @default(false) // INTEGRATION: Payroll → GL
   isAssetPosted   Boolean   @default(false) // INTEGRATION: Fixed Assets → GL
   createdBy       String
-  reviewedBy      String?
-  approvedBy      String?
-  postedBy        String?
+  reviewedBy      String?   // Manager who moved to Pending
+  approvedBy      String?   // Manager/Admin who approved
+  postedBy        String?   // Admin who posted to GL
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -251,8 +251,11 @@ model VoucherApproval {
   voucher     Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
   userId      String
   user        User     @relation(fields: [userId], references: [id])
-  action      String   // REVIEW, APPROVE, REJECT, POST
+  action      String   // SUBMIT, REVIEW, APPROVE, REJECT, POST, QUICK_POST, REVOKE
+  fromStatus  String?  // Previous status before action
+  toStatus    String?  // New status after action
   comments    String?
+  userRole    String?  // Role of the user at time of action
   createdAt   DateTime @default(now())
 }
 
@@ -261,10 +264,15 @@ model VoucherAttachment {
   voucherId   String
   voucher     Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
   fileName    String
-  filePath    String
+  filePath    String   // Secure storage path (not publicly accessible)
   fileSize    Int?
-  fileType    String?
+  fileType    String?  // MIME type
+  mimeType    String?  // application/pdf, image/jpeg, etc.
+  category    String?  // invoice, receipt, contract, other
+  description String?
   uploadedBy  String
+  uploadedByName String? // Denormalized for display
+  isVerified  Boolean  @default(false) // Verified by manager/admin
   createdAt   DateTime @default(now())
 }
 

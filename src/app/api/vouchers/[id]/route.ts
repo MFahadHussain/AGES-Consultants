@@ -1,6 +1,37 @@
 import { NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 
+// ============================================================
+// Voucher Approval Workflow with Role-Based Access Control
+// Status Flow: Draft → Pending → Approved → Posted
+// Roles: Accountant (create/submit), Manager (review/approve), Admin (post/anything)
+// ============================================================
+
+const VALID_ROLES = ['admin', 'manager', 'accountant', 'auditor', 'viewer'] as const
+type Role = typeof VALID_ROLES[number]
+
+// Role hierarchy for workflow actions
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  submit: ['admin', 'manager', 'accountant'],
+  approve: ['admin', 'manager'],
+  post: ['admin'],
+  reject: ['admin', 'manager'],
+  quick_post: ['admin'],
+  edit: ['admin', 'manager', 'accountant'],
+  revoke: ['admin'],
+}
+
+function hasPermission(action: string, role: string): boolean {
+  const allowed = ROLE_PERMISSIONS[action]
+  if (!allowed) return false
+  return allowed.includes(role)
+}
+
+function validateRole(role: string): string {
+  if ((VALID_ROLES as readonly string[]).includes(role)) return role
+  return 'admin' // Default to admin for backward compatibility
+}
+
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
@@ -29,121 +60,170 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const { id } = await params
     const data = await request.json()
     const systemUserId = await getSystemUserId()
+    const userRole = validateRole(data.userRole || 'admin')
 
-    // Handle status transitions
-    if (data.action === 'review') {
-      const voucher = await db.voucher.update({
-        where: { id },
-        data: { status: 'reviewed', reviewedBy: systemUserId },
-      })
+    // Helper: create approval record with full audit trail
+    const createApproval = async (action: string, fromStatus: string, toStatus: string, comments?: string) => {
       try {
         await db.voucherApproval.create({
-          data: { voucherId: id, userId: systemUserId, action: 'REVIEW', comments: data.comments },
+          data: {
+            voucherId: id,
+            userId: systemUserId,
+            action,
+            fromStatus,
+            toStatus,
+            comments: comments || null,
+            userRole,
+          },
         })
         await db.auditLog.create({
-          data: { userId: systemUserId, action: 'REVIEW', entity: 'Voucher', entityId: id, details: 'Voucher reviewed' },
+          data: {
+            userId: systemUserId,
+            action,
+            entity: 'Voucher',
+            entityId: id,
+            details: `Status: ${fromStatus} → ${toStatus} by ${userRole}`,
+          },
         })
       } catch (auditError) {
         console.error('Audit log error (non-critical):', auditError)
       }
+    }
+
+    // ==================== WORKFLOW ACTIONS ====================
+
+    // SUBMIT: Draft → Pending (Accountant or above)
+    if (data.action === 'submit') {
+      if (!hasPermission('submit', userRole)) {
+        return NextResponse.json({ error: 'Insufficient permissions. Accountant role or above required to submit vouchers.' }, { status: 403 })
+      }
+      const current = await db.voucher.findUnique({ where: { id }, select: { status: true } })
+      if (!current) return NextResponse.json({ error: 'Voucher not found' }, { status: 404 })
+      if (current.status !== 'draft' && current.status !== 'rejected') {
+        return NextResponse.json({ error: `Cannot submit voucher with status "${current.status}". Only draft or rejected vouchers can be submitted.` }, { status: 400 })
+      }
+      const voucher = await db.voucher.update({
+        where: { id },
+        data: { status: 'pending', reviewedBy: systemUserId },
+      })
+      await createApproval('SUBMIT', current.status, 'pending', data.comments)
       return NextResponse.json(voucher)
     }
 
+    // APPROVE: Pending → Approved (Manager or Admin)
     if (data.action === 'approve') {
+      if (!hasPermission('approve', userRole)) {
+        return NextResponse.json({ error: 'Insufficient permissions. Manager role or above required to approve vouchers.' }, { status: 403 })
+      }
+      const current = await db.voucher.findUnique({ where: { id }, select: { status: true } })
+      if (!current) return NextResponse.json({ error: 'Voucher not found' }, { status: 404 })
+      if (current.status !== 'pending') {
+        return NextResponse.json({ error: `Cannot approve voucher with status "${current.status}". Only pending vouchers can be approved.` }, { status: 400 })
+      }
       const voucher = await db.voucher.update({
         where: { id },
         data: { status: 'approved', approvedBy: systemUserId },
       })
-      try {
-        await db.voucherApproval.create({
-          data: { voucherId: id, userId: systemUserId, action: 'APPROVE', comments: data.comments },
-        })
-        await db.auditLog.create({
-          data: { userId: systemUserId, action: 'APPROVE', entity: 'Voucher', entityId: id, details: 'Voucher approved' },
-        })
-      } catch (auditError) {
-        console.error('Audit log error (non-critical):', auditError)
-      }
+      await createApproval('APPROVE', 'pending', 'approved', data.comments)
       return NextResponse.json(voucher)
     }
 
+    // POST: Approved → Posted (Admin only)
     if (data.action === 'post') {
+      if (!hasPermission('post', userRole)) {
+        return NextResponse.json({ error: 'Insufficient permissions. Admin role required to post vouchers to GL.' }, { status: 403 })
+      }
+      const current = await db.voucher.findUnique({ where: { id }, select: { status: true } })
+      if (!current) return NextResponse.json({ error: 'Voucher not found' }, { status: 404 })
+      if (current.status !== 'approved') {
+        return NextResponse.json({ error: `Cannot post voucher with status "${current.status}". Only approved vouchers can be posted.` }, { status: 400 })
+      }
       const voucher = await db.voucher.update({
         where: { id },
         data: { status: 'posted', postedBy: systemUserId },
       })
-      try {
-        await db.voucherApproval.create({
-          data: { voucherId: id, userId: systemUserId, action: 'POST', comments: data.comments },
-        })
-        await db.auditLog.create({
-          data: { userId: systemUserId, action: 'POST', entity: 'Voucher', entityId: id, details: 'Voucher posted to GL' },
-        })
-      } catch (auditError) {
-        console.error('Audit log error (non-critical):', auditError)
-      }
+      await createApproval('POST', 'approved', 'posted', data.comments)
       return NextResponse.json(voucher)
     }
 
-    // Quick Post: skip review/approve and post directly from draft/reviewed
-    if (data.action === 'quick_post') {
+    // REJECT: Any non-posted → Rejected (Manager or Admin)
+    if (data.action === 'reject') {
+      if (!hasPermission('reject', userRole)) {
+        return NextResponse.json({ error: 'Insufficient permissions. Manager role or above required to reject vouchers.' }, { status: 403 })
+      }
       const current = await db.voucher.findUnique({ where: { id }, select: { status: true } })
-      if (!current || current.status === 'posted') {
-        return NextResponse.json({ error: 'Voucher already posted or not found' }, { status: 400 })
+      if (!current) return NextResponse.json({ error: 'Voucher not found' }, { status: 404 })
+      if (current.status === 'posted') {
+        return NextResponse.json({ error: 'Cannot reject a posted voucher. Revoke it first.' }, { status: 400 })
+      }
+      if (current.status === 'rejected') {
+        return NextResponse.json({ error: 'Voucher is already rejected.' }, { status: 400 })
+      }
+      const voucher = await db.voucher.update({
+        where: { id },
+        data: { status: 'rejected' },
+      })
+      await createApproval('REJECT', current.status, 'rejected', data.comments)
+      return NextResponse.json(voucher)
+    }
+
+    // QUICK POST: Draft/Pending → Posted (Admin only, bypasses workflow)
+    if (data.action === 'quick_post') {
+      if (!hasPermission('quick_post', userRole)) {
+        return NextResponse.json({ error: 'Insufficient permissions. Admin role required to quick post vouchers.' }, { status: 403 })
+      }
+      const current = await db.voucher.findUnique({ where: { id }, select: { status: true } })
+      if (!current) return NextResponse.json({ error: 'Voucher not found' }, { status: 404 })
+      if (current.status === 'posted') {
+        return NextResponse.json({ error: 'Voucher already posted.' }, { status: 400 })
       }
       const voucher = await db.voucher.update({
         where: { id },
         data: {
           status: 'posted',
-          reviewedBy: current.status === 'draft' ? systemUserId : undefined,
+          reviewedBy: systemUserId,
           approvedBy: systemUserId,
           postedBy: systemUserId,
         },
       })
-      try {
-        await db.voucherApproval.create({
-          data: { voucherId: id, userId: systemUserId, action: 'QUICK_POST', comments: data.comments || 'Quick posted to GL' },
-        })
-        await db.auditLog.create({
-          data: { userId: systemUserId, action: 'QUICK_POST', entity: 'Voucher', entityId: id, details: 'Voucher quick-posted to GL (skipped review/approve)' },
-        })
-      } catch (auditError) {
-        console.error('Audit log error (non-critical):', auditError)
-      }
+      await createApproval('QUICK_POST', current.status, 'posted', data.comments || 'Quick posted to GL (bypassed workflow)')
       return NextResponse.json(voucher)
     }
 
-    if (data.action === 'reject') {
+    // REVOKE: Posted → Draft (Admin only, reverses posting)
+    if (data.action === 'revoke') {
+      if (!hasPermission('revoke', userRole)) {
+        return NextResponse.json({ error: 'Insufficient permissions. Admin role required to revoke posted vouchers.' }, { status: 403 })
+      }
+      const current = await db.voucher.findUnique({ where: { id }, select: { status: true } })
+      if (!current) return NextResponse.json({ error: 'Voucher not found' }, { status: 404 })
+      if (current.status !== 'posted') {
+        return NextResponse.json({ error: 'Only posted vouchers can be revoked.' }, { status: 400 })
+      }
       const voucher = await db.voucher.update({
         where: { id },
-        data: { status: 'rejected' },
+        data: {
+          status: 'draft',
+          reviewedBy: null,
+          approvedBy: null,
+          postedBy: null,
+        },
       })
-      try {
-        await db.voucherApproval.create({
-          data: { voucherId: id, userId: systemUserId, action: 'REJECT', comments: data.comments },
-        })
-        await db.auditLog.create({
-          data: { userId: systemUserId, action: 'REJECT', entity: 'Voucher', entityId: id, details: 'Voucher rejected' },
-        })
-      } catch (auditError) {
-        console.error('Audit log error (non-critical):', auditError)
-      }
+      await createApproval('REVOKE', 'posted', 'draft', data.comments || 'Voucher revoked from posted status')
       return NextResponse.json(voucher)
     }
 
-    // ============================================================
-    // General Update (Edit Voucher) - only allowed for draft/rejected vouchers
-    // ============================================================
+    // ==================== EDIT VOUCHER ====================
     if (data.action === 'edit' || data.entries) {
-      const current = await db.voucher.findUnique({ where: { id }, select: { status: true } })
-      if (!current) {
-        return NextResponse.json({ error: 'Voucher not found' }, { status: 404 })
+      if (!hasPermission('edit', userRole)) {
+        return NextResponse.json({ error: 'Insufficient permissions to edit vouchers.' }, { status: 403 })
       }
+      const current = await db.voucher.findUnique({ where: { id }, select: { status: true } })
+      if (!current) return NextResponse.json({ error: 'Voucher not found' }, { status: 404 })
       if (current.status !== 'draft' && current.status !== 'rejected') {
         return NextResponse.json({ error: 'Only draft or rejected vouchers can be edited' }, { status: 400 })
       }
 
-      // Validate debits = credits if entries are provided
       if (data.entries?.length) {
         const totalDebit = data.entries.reduce((sum: number, e: any) => sum + (e.debit || 0), 0)
         const totalCredit = data.entries.reduce((sum: number, e: any) => sum + (e.credit || 0), 0)
@@ -152,7 +232,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         }
       }
 
-      // Delete old entries and create new ones
       if (data.entries) {
         await db.voucherEntry.deleteMany({ where: { voucherId: id } })
       }
@@ -206,13 +285,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         include: { entries: { include: { account: true } }, project: true, donor: true, location: true },
       })
 
-      try {
-        await db.auditLog.create({
-          data: { userId: systemUserId, action: 'UPDATE', entity: 'Voucher', entityId: id, details: 'Voucher updated' },
-        })
-      } catch (auditError) {
-        console.error('Audit log error (non-critical):', auditError)
-      }
+      await createApproval('UPDATE', current.status, updateData.status || current.status, 'Voucher edited')
 
       return NextResponse.json(voucher)
     }
@@ -240,7 +313,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       return NextResponse.json({ error: 'Voucher not found' }, { status: 404 })
     }
 
-    // Only allow deletion of draft or rejected vouchers
     if (voucher.status !== 'draft' && voucher.status !== 'rejected') {
       return NextResponse.json(
         { error: `Cannot delete voucher with status "${voucher.status}". Only draft or rejected vouchers can be deleted.` },
@@ -248,7 +320,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       )
     }
 
-    // Delete related records first (cascading should handle this, but let's be explicit)
+    // Delete related records first
     await db.voucherApproval.deleteMany({ where: { voucherId: id } })
     await db.voucherEntry.deleteMany({ where: { voucherId: id } })
     await db.voucherAttachment.deleteMany({ where: { voucherId: id } })

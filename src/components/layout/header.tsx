@@ -92,12 +92,12 @@ export function Header({ onSearchOpen }: HeaderProps) {
         module: 'vouchers' as ModuleKey,
       }))
 
-      const reviewRes = await fetch('/api/vouchers?status=reviewed&limit=5')
+      const reviewRes = await fetch('/api/vouchers?status=pending&limit=5')
       const reviewData = await reviewRes.json()
       const reviewItems = (reviewData.data || []).map((v: any) => ({
         id: v.id,
         text: `${v.voucherNumber} - Awaiting approval`,
-        type: 'reviewed',
+        type: 'pending',
         module: 'vouchers' as ModuleKey,
       }))
 

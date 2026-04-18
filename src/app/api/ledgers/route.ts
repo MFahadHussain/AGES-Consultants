@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     if (statusFilter === 'posted') {
       entryWhere.voucher = { status: { in: ['approved', 'posted'] } }
     } else if (statusFilter === 'approved') {
-      entryWhere.voucher = { status: { in: ['reviewed', 'approved', 'posted'] } }
+      entryWhere.voucher = { status: { in: ['pending', 'approved', 'posted'] } }
     }
     // status='all' => no status filter, show everything including drafts
 
