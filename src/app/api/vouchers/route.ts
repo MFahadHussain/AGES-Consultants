@@ -45,7 +45,7 @@ export async function GET(request: Request) {
           location: { select: { name: true } },
           _count: { select: { entries: true } },
         },
-        orderBy: { date: 'desc' },
+        orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -54,6 +54,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ data: vouchers, total, page, limit })
   } catch (error) {
+    console.error('GET /api/vouchers error:', error)
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
@@ -61,7 +62,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const data = await request.json()
-    const { voucherType, voucherTypeName, date, narration, reference, payeeName, chequeNumber, chequeDate, voucherNo, amountInWords, financialYearId, projectId, donorId, locationId, entries } = data
+    const { voucherType, voucherTypeName, date, narration, reference, payeeName, chequeNumber, chequeDate, voucherNo, amountInWords, financialYearId, projectId, donorId, locationId, entries, autoPost } = data
 
     if (!voucherType || !date || !narration || !entries?.length) {
       return NextResponse.json({ error: 'Voucher type, date, narration, and entries are required' }, { status: 400 })
@@ -74,9 +75,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Debits (${totalDebit}) must equal credits (${totalCredit})` }, { status: 400 })
     }
 
+    // Get system user ID for audit trail
+    const systemUserId = await getSystemUserId()
+
     // Generate voucher number
     const count = await db.voucher.count({ where: { voucherType } })
     const voucherNumber = `${voucherType}-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`
+
+    // Determine initial status - if autoPost is true, create as posted directly
+    const initialStatus = autoPost ? 'posted' : 'draft'
 
     const voucher = await db.voucher.create({
       data: {
@@ -91,14 +98,15 @@ export async function POST(request: Request) {
         chequeDate: chequeDate ? new Date(chequeDate) : null,
         voucherNo: voucherNo || null,
         amountInWords: amountInWords || null,
-        status: 'draft',
+        status: initialStatus,
         financialYearId,
         projectId: projectId || null,
         donorId: donorId || null,
         locationId: locationId || null,
         totalDebit,
         totalCredit,
-        createdBy: 'system',
+        createdBy: systemUserId,
+        ...(autoPost ? { reviewedBy: systemUserId, approvedBy: systemUserId, postedBy: systemUserId } : {}),
         entries: {
           create: entries.map((e: any, i: number) => ({
             lineNumber: i + 1,
@@ -119,12 +127,25 @@ export async function POST(request: Request) {
       include: { entries: { include: { account: true } } },
     })
 
-    await db.auditLog.create({
-      data: { userId: await getSystemUserId(), action: 'CREATE', entity: 'Voucher', entityId: voucher.id, details: `Created ${voucherNumber}` },
-    })
+    // Create audit log (non-blocking - don't fail voucher creation if audit log fails)
+    try {
+      await db.auditLog.create({
+        data: { userId: systemUserId, action: 'CREATE', entity: 'Voucher', entityId: voucher.id, details: `Created ${voucherNumber} (status: ${initialStatus})` },
+      })
+
+      // If auto-posted, also create approval audit trail
+      if (autoPost) {
+        await db.voucherApproval.create({
+          data: { voucherId: voucher.id, userId: systemUserId, action: 'QUICK_POST', comments: 'Auto-posted on creation' },
+        })
+      }
+    } catch (auditError) {
+      console.error('Audit log creation failed (non-critical):', auditError)
+    }
 
     return NextResponse.json(voucher, { status: 201 })
   } catch (error) {
+    console.error('POST /api/vouchers error:', error)
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }

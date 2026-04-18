@@ -10,18 +10,34 @@ export async function GET(request: Request) {
     const dateTo = searchParams.get('dateTo')
     const projectId = searchParams.get('projectId')
     const donorId = searchParams.get('donorId')
+    const statusFilter = searchParams.get('status') || 'posted' // 'posted', 'all', 'approved'
 
     // Build where clause for voucher entries
-    // Show approved and posted vouchers in ledgers (approved = confirmed, posted = final)
-    const entryWhere: any = { voucher: { status: { in: ['approved', 'posted'] } } }
+    // By default, show approved and posted vouchers in ledgers
+    // If status=all, show all vouchers including drafts
+    const entryWhere: any = {}
+    if (statusFilter === 'posted') {
+      entryWhere.voucher = { status: { in: ['approved', 'posted'] } }
+    } else if (statusFilter === 'approved') {
+      entryWhere.voucher = { status: { in: ['reviewed', 'approved', 'posted'] } }
+    }
+    // status='all' => no status filter, show everything including drafts
+
     if (accountId) entryWhere.accountId = accountId
     if (dateFrom || dateTo) {
+      if (!entryWhere.voucher) entryWhere.voucher = {}
       entryWhere.voucher.date = {}
       if (dateFrom) entryWhere.voucher.date.gte = new Date(dateFrom)
       if (dateTo) entryWhere.voucher.date.lte = new Date(dateTo)
     }
-    if (projectId) entryWhere.voucher.projectId = projectId
-    if (donorId) entryWhere.voucher.donorId = donorId
+    if (projectId) {
+      if (!entryWhere.voucher) entryWhere.voucher = {}
+      entryWhere.voucher.projectId = projectId
+    }
+    if (donorId) {
+      if (!entryWhere.voucher) entryWhere.voucher = {}
+      entryWhere.voucher.donorId = donorId
+    }
 
     switch (type) {
       case 'general': {
@@ -30,7 +46,7 @@ export async function GET(request: Request) {
           where: entryWhere,
           include: {
             account: { select: { code: true, name: true, accountType: true } },
-            voucher: { select: { voucherNumber: true, date: true, narration: true, voucherType: true } },
+            voucher: { select: { voucherNumber: true, date: true, narration: true, voucherType: true, status: true } },
           },
           orderBy: [{ voucher: { date: 'asc' } }, { lineNumber: 'asc' }],
         })
@@ -65,7 +81,7 @@ export async function GET(request: Request) {
           include: {
             account: { select: { code: true, name: true } },
             customer: true,
-            voucher: { select: { voucherNumber: true, date: true, narration: true } },
+            voucher: { select: { voucherNumber: true, date: true, narration: true, status: true } },
           },
           orderBy: { voucher: { date: 'asc' } },
         })
@@ -90,7 +106,7 @@ export async function GET(request: Request) {
           include: {
             account: { select: { code: true, name: true } },
             supplier: true,
-            voucher: { select: { voucherNumber: true, date: true, narration: true } },
+            voucher: { select: { voucherNumber: true, date: true, narration: true, status: true } },
           },
           orderBy: { voucher: { date: 'asc' } },
         })
@@ -117,7 +133,7 @@ export async function GET(request: Request) {
           where: entryWhere,
           include: {
             account: { select: { code: true, name: true } },
-            voucher: { select: { voucherNumber: true, date: true, narration: true, voucherType: true } },
+            voucher: { select: { voucherNumber: true, date: true, narration: true, voucherType: true, status: true } },
           },
           orderBy: { voucher: { date: 'asc' } },
         })
@@ -132,7 +148,7 @@ export async function GET(request: Request) {
           where: entryWhere,
           include: {
             account: { select: { code: true, name: true } },
-            voucher: { select: { voucherNumber: true, date: true, narration: true } },
+            voucher: { select: { voucherNumber: true, date: true, narration: true, status: true } },
           },
           orderBy: { voucher: { date: 'asc' } },
         })
@@ -143,6 +159,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Invalid ledger type' }, { status: 400 })
     }
   } catch (error) {
+    console.error('GET /api/ledgers error:', error)
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }

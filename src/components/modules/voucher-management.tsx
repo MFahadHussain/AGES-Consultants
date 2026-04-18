@@ -83,6 +83,7 @@ const defaultForm = {
   projectId: '',
   donorId: '',
   locationId: '',
+  autoPost: true as boolean,
   entries: [{ accountId: '', debit: 0, credit: 0, description: '' }] as any[],
 }
 
@@ -105,7 +106,7 @@ export function VoucherManagement() {
   const [page, setPage] = useState(1)
   const { toast } = useToast()
 
-  const [form, setForm] = useState({ ...defaultForm })
+  const [form, setForm] = useState({ ...defaultForm, entries: [{ accountId: '', debit: 0, credit: 0, description: '' }] })
 
   const totalDebit = form.entries.reduce((s, e) => s + (e.debit || 0), 0)
   const totalCredit = form.entries.reduce((s, e) => s + (e.credit || 0), 0)
@@ -150,16 +151,28 @@ export function VoucherManagement() {
 
   const handleStatusChange = async (voucherId: string, action: string) => {
     try {
-      await fetch(`/api/vouchers/${voucherId}`, {
+      const res = await fetch(`/api/vouchers/${voucherId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
       })
-      toast({ title: 'Status Updated', description: `Voucher ${action}` })
+      if (!res.ok) {
+        const err = await res.json()
+        toast({ title: 'Error', description: err.error || 'Failed to update status', variant: 'destructive' })
+        return
+      }
+      const actionLabels: Record<string, string> = {
+        review: 'Reviewed',
+        approve: 'Approved',
+        post: 'Posted to GL',
+        quick_post: 'Quick Posted to GL',
+        reject: 'Rejected',
+      }
+      toast({ title: 'Status Updated', description: `Voucher ${actionLabels[action] || action}` })
       fetchData()
       if (detailOpen) {
-        const res = await fetch(`/api/vouchers/${voucherId}`)
-        setDetailVoucher(await res.json())
+        const detailRes = await fetch(`/api/vouchers/${voucherId}`)
+        setDetailVoucher(await detailRes.json())
       }
     } catch {
       toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
@@ -194,11 +207,19 @@ export function VoucherManagement() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...form,
+          voucherType: form.voucherType,
+          date: form.date,
+          narration: form.narration,
+          reference: form.reference || undefined,
+          payeeName: form.payeeName || undefined,
+          chequeNumber: form.chequeNumber || undefined,
+          chequeDate: form.chequeDate || undefined,
+          voucherNo: form.voucherNo || undefined,
+          amountInWords: form.amountInWords || autoAmountInWords,
+          autoPost: form.autoPost,
           entries: validEntries,
           financialYearId: activeFy.id,
           voucherTypeName: voucherTypes.find(v => v.value === form.voucherType)?.label,
-          amountInWords: form.amountInWords || autoAmountInWords,
           projectId: form.projectId || undefined,
           donorId: form.donorId || undefined,
           locationId: form.locationId || undefined,
@@ -210,7 +231,7 @@ export function VoucherManagement() {
         setCreating(false)
         return
       }
-      toast({ title: 'Created', description: 'Voucher created successfully' })
+      toast({ title: 'Voucher Created', description: form.autoPost ? 'Voucher created and posted to GL' : 'Voucher created as draft' })
       setCreateOpen(false)
       setForm({ ...defaultForm, entries: [{ accountId: '', debit: 0, credit: 0, description: '' }] })
       fetchData()
@@ -415,11 +436,32 @@ export function VoucherManagement() {
                   onChange={e => setForm(p => ({ ...p, amountInWords: e.target.value }))}
                 />
               </div>
+
+              {/* Auto Post Option */}
+              <div className="flex items-center gap-3 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
+                <input
+                  type="checkbox"
+                  id="autoPost"
+                  checked={form.autoPost}
+                  onChange={e => setForm(p => ({ ...p, autoPost: e.target.checked }))}
+                  className="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <div>
+                  <Label htmlFor="autoPost" className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 cursor-pointer">
+                    Auto Post to General Ledger
+                  </Label>
+                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                    {form.autoPost
+                      ? 'Voucher will be immediately posted to GL and visible in ledgers'
+                      : 'Voucher will be saved as draft — use Review → Approve → Post workflow'}
+                  </p>
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" size="sm" onClick={() => setCreateOpen(false)}>Cancel</Button>
               <Button size="sm" onClick={handleCreate} disabled={!isBalanced || creating}>
-                {creating ? 'Creating...' : 'Create Voucher'}
+                {creating ? 'Creating...' : form.autoPost ? 'Create & Post to GL' : 'Create as Draft'}
               </Button>
             </DialogFooter>
           </DialogContent>

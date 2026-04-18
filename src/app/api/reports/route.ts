@@ -12,7 +12,15 @@ export async function GET(request: Request) {
     const locationId = searchParams.get('locationId')
     const financialYearId = searchParams.get('financialYearId')
 
-    const voucherWhere: any = { status: 'posted' }
+    const statusParam = searchParams.get('status') || 'posted'
+    const voucherWhere: any = {}
+    if (statusParam === 'posted') {
+      voucherWhere.status = { in: ['approved', 'posted'] }
+    } else if (statusParam === 'all') {
+      // No status filter - show all vouchers
+    } else {
+      voucherWhere.status = statusParam
+    }
     if (dateFrom || dateTo) {
       voucherWhere.date = {}
       if (dateFrom) voucherWhere.date.gte = new Date(dateFrom)

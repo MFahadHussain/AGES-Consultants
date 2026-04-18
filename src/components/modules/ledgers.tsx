@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { AlertCircle, BookOpen, FileText } from 'lucide-react'
+import { AlertCircle, BookOpen, RefreshCw } from 'lucide-react'
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
@@ -18,23 +18,23 @@ function EmptyState({ type }: { type: string }) {
   const messages: Record<string, { title: string; description: string }> = {
     general: {
       title: 'No Ledger Entries Found',
-      description: 'Voucher entries will appear here once vouchers are approved or posted. Create a voucher in Voucher Management, then approve and post it to see entries in the General Ledger.'
+      description: 'Create and post vouchers in Voucher Management to see entries here. Use "Auto Post to GL" when creating vouchers, or use "Quick Post" on existing drafts.'
     },
     receivables: {
       title: 'No Receivables Entries',
-      description: 'Receivables ledger entries will appear when vouchers with customer references are approved/posted.'
+      description: 'Receivables ledger entries will appear when vouchers with customer references are posted.'
     },
     payables: {
       title: 'No Payables Entries',
-      description: 'Payables ledger entries will appear when vouchers with supplier references are approved/posted.'
+      description: 'Payables ledger entries will appear when vouchers with supplier references are posted.'
     },
     bank: {
       title: 'No Bank Ledger Entries',
-      description: 'Bank ledger entries will appear when vouchers for bank accounts are approved/posted.'
+      description: 'Bank ledger entries will appear when vouchers for bank accounts are posted.'
     },
     expense: {
       title: 'No Expense Ledger Entries',
-      description: 'Expense ledger entries will appear when vouchers with expense accounts are approved/posted.'
+      description: 'Expense ledger entries will appear when vouchers with expense accounts are posted.'
     }
   }
   const msg = messages[type] || messages.general
@@ -47,7 +47,7 @@ function EmptyState({ type }: { type: string }) {
       <p className="text-xs text-muted-foreground max-w-md">{msg.description}</p>
       <div className="flex items-center gap-2 mt-3 text-[10px] text-amber-600 bg-amber-50 dark:bg-amber-950/20 px-3 py-1.5 rounded-md border border-amber-200 dark:border-amber-800">
         <AlertCircle className="h-3 w-3" />
-        <span>Only <strong>approved</strong> and <strong>posted</strong> vouchers appear in ledgers. Use &quot;Quick Post&quot; in Voucher Management to post immediately.</span>
+        <span>By default, only <strong>approved</strong> and <strong>posted</strong> vouchers appear here. Change the filter to &quot;All&quot; to include drafts.</span>
       </div>
     </div>
   )
@@ -57,6 +57,7 @@ export function Ledgers() {
   const [ledgerType, setLedgerType] = useState('general')
   const [accounts, setAccounts] = useState<any[]>([])
   const [selectedAccount, setSelectedAccount] = useState('')
+  const [statusFilter, setStatusFilter] = useState('posted')
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -68,7 +69,7 @@ export function Ledgers() {
 
   const fetchData = async () => {
     setLoading(true)
-    const params = new URLSearchParams({ type: ledgerType })
+    const params = new URLSearchParams({ type: ledgerType, status: statusFilter })
     if (selectedAccount && selectedAccount !== 'all') params.set('accountId', selectedAccount)
     try {
       const res = await fetch(`/api/ledgers?${params}`)
@@ -78,11 +79,22 @@ export function Ledgers() {
     setLoading(false)
   }
 
-  useEffect(() => { queueMicrotask(() => fetchData()) }, [ledgerType, selectedAccount])
+  useEffect(() => { queueMicrotask(() => fetchData()) }, [ledgerType, selectedAccount, statusFilter])
+
+  const statusBadge = (status: string) => {
+    const colors: Record<string, string> = {
+      draft: 'bg-yellow-100 text-yellow-800',
+      reviewed: 'bg-blue-100 text-blue-800',
+      approved: 'bg-green-100 text-green-800',
+      posted: 'bg-emerald-100 text-emerald-800',
+      rejected: 'bg-red-100 text-red-800',
+    }
+    return <Badge className={`text-[8px] ${colors[status] || 'bg-gray-100 text-gray-800'}`}>{status}</Badge>
+  }
 
   const renderGeneralLedger = () => (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Select value={selectedAccount} onValueChange={v => { setSelectedAccount(v) }}>
           <SelectTrigger className="h-8 w-64 text-xs"><SelectValue placeholder="Filter by account" /></SelectTrigger>
           <SelectContent>
@@ -90,6 +102,17 @@ export function Ledgers() {
             {accounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Select value={statusFilter} onValueChange={v => setStatusFilter(v)}>
+          <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Voucher Status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="posted">Approved & Posted</SelectItem>
+            <SelectItem value="approved">Reviewed & Above</SelectItem>
+            <SelectItem value="all">All (incl. Drafts)</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fetchData}>
+          <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+        </Button>
       </div>
       {loading ? (
         <div className="text-center text-xs py-8 text-muted-foreground">Loading ledger data...</div>
@@ -128,6 +151,7 @@ export function Ledgers() {
                         <TableHead className="text-[10px]">Date</TableHead>
                         <TableHead className="text-[10px]">Voucher</TableHead>
                         <TableHead className="text-[10px]">Description</TableHead>
+                        <TableHead className="text-[10px]">Status</TableHead>
                         <TableHead className="text-[10px] text-right">Debit</TableHead>
                         <TableHead className="text-[10px] text-right">Credit</TableHead>
                         <TableHead className="text-[10px] text-right">Balance</TableHead>
@@ -139,6 +163,7 @@ export function Ledgers() {
                           <TableCell className="text-xs">{new Date(e.voucher.date).toLocaleDateString()}</TableCell>
                           <TableCell className="text-xs font-mono">{e.voucher.voucherNumber}</TableCell>
                           <TableCell className="text-xs">{e.description || e.voucher.narration}</TableCell>
+                          <TableCell>{statusBadge(e.voucher.status)}</TableCell>
                           <TableCell className="text-xs text-right">{e.debit > 0 ? formatCurrency(e.debit) : ''}</TableCell>
                           <TableCell className="text-xs text-right">{e.credit > 0 ? formatCurrency(e.credit) : ''}</TableCell>
                           <TableCell className="text-xs text-right font-semibold">
@@ -159,6 +184,19 @@ export function Ledgers() {
 
   const renderSubLedger = (type: string) => (
     <div className="space-y-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Select value={statusFilter} onValueChange={v => setStatusFilter(v)}>
+          <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Voucher Status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="posted">Approved & Posted</SelectItem>
+            <SelectItem value="approved">Reviewed & Above</SelectItem>
+            <SelectItem value="all">All (incl. Drafts)</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fetchData}>
+          <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+        </Button>
+      </div>
       {loading ? (
         <div className="text-center text-xs py-8 text-muted-foreground">Loading...</div>
       ) : data.length === 0 ? (
@@ -182,6 +220,7 @@ export function Ledgers() {
                   <TableHead className="text-[10px]">Date</TableHead>
                   <TableHead className="text-[10px]">Voucher</TableHead>
                   <TableHead className="text-[10px]">Account</TableHead>
+                  <TableHead className="text-[10px]">Status</TableHead>
                   <TableHead className="text-[10px] text-right">Debit</TableHead>
                   <TableHead className="text-[10px] text-right">Credit</TableHead>
                 </TableRow>
@@ -192,6 +231,7 @@ export function Ledgers() {
                     <TableCell className="text-xs">{new Date(e.voucher.date).toLocaleDateString()}</TableCell>
                     <TableCell className="text-xs font-mono">{e.voucher.voucherNumber}</TableCell>
                     <TableCell className="text-xs">{e.account?.code} - {e.account?.name}</TableCell>
+                    <TableCell>{statusBadge(e.voucher.status)}</TableCell>
                     <TableCell className="text-xs text-right">{e.debit > 0 ? formatCurrency(e.debit) : ''}</TableCell>
                     <TableCell className="text-xs text-right">{e.credit > 0 ? formatCurrency(e.credit) : ''}</TableCell>
                   </TableRow>
@@ -206,6 +246,19 @@ export function Ledgers() {
 
   const renderBankExpenseLedger = () => (
     <div>
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <Select value={statusFilter} onValueChange={v => setStatusFilter(v)}>
+          <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Voucher Status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="posted">Approved & Posted</SelectItem>
+            <SelectItem value="approved">Reviewed & Above</SelectItem>
+            <SelectItem value="all">All (incl. Drafts)</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fetchData}>
+          <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+        </Button>
+      </div>
       {loading ? (
         <div className="text-center text-xs py-8 text-muted-foreground">Loading...</div>
       ) : (Array.isArray(data) ? data : []).length === 0 ? (
@@ -220,6 +273,7 @@ export function Ledgers() {
                   <TableHead className="text-[10px]">Voucher</TableHead>
                   <TableHead className="text-[10px]">Account</TableHead>
                   <TableHead className="text-[10px]">Description</TableHead>
+                  <TableHead className="text-[10px]">Status</TableHead>
                   <TableHead className="text-[10px] text-right">Debit</TableHead>
                   <TableHead className="text-[10px] text-right">Credit</TableHead>
                 </TableRow>
@@ -231,6 +285,7 @@ export function Ledgers() {
                     <TableCell className="text-xs font-mono">{e.voucher?.voucherNumber}</TableCell>
                     <TableCell className="text-xs">{e.account?.code} - {e.account?.name}</TableCell>
                     <TableCell className="text-xs">{e.description || e.voucher?.narration}</TableCell>
+                    <TableCell>{statusBadge(e.voucher?.status)}</TableCell>
                     <TableCell className="text-xs text-right">{e.debit > 0 ? formatCurrency(e.debit) : ''}</TableCell>
                     <TableCell className="text-xs text-right">{e.credit > 0 ? formatCurrency(e.credit) : ''}</TableCell>
                   </TableRow>
