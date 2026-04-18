@@ -23,3 +23,22 @@ Stage Summary:
 - CSV/JSON export for all financial reports
 - All 19 API endpoints verified working
 - Zero lint errors
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Polish and enhance the AcctFin ERP with dynamic notifications, improved RBAC, accessibility fixes
+
+Work Log:
+- Added DialogTitle and DialogDescription to global-search.tsx for accessibility (Radix UI requirement)
+- Enhanced header.tsx with dynamic notification bell - fetches draft/reviewed vouchers from API, shows count badge, has popover with notification items
+- Enhanced header notifications refresh every 30 seconds automatically
+- Rewrote settings.tsx with full User Management (CRUD, activate/deactivate), Permission Matrix (showing access per module per role), and Data Validation Status section
+- Verified all 20 API endpoints still return HTTP 200
+- Lint passes clean
+
+Stage Summary:
+- Dynamic notification system showing pending voucher approvals
+- Enhanced RBAC with User Management table, Permission Matrix, and Role descriptions
+- Accessibility-compliant dialog components
+- Zero lint errors, all endpoints working

@@ -5,6 +5,8 @@ import { useAppStore, type ModuleKey } from '@/lib/store'
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -157,6 +159,8 @@ export function GlobalSearch() {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden" showCloseButton={false}>
+        <DialogTitle className="sr-only">Global Search</DialogTitle>
+        <DialogDescription className="sr-only">Search across vouchers, accounts, customers, suppliers, projects, donors, assets, and locations</DialogDescription>
         {/* Search Input */}
         <div className="flex items-center border-b px-3">
           {loading ? (
