@@ -7,10 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { Plus, Search, Eye, XCircle, Printer, Copy, CheckCircle2 } from 'lucide-react'
+import { Separator } from '@/components/ui/separator'
+import { Plus, Search, Eye, XCircle, Printer, Copy, CheckCircle2, Pencil, Trash2, CopyPlus } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { numberToWords } from '@/lib/number-to-words'
 
@@ -29,14 +31,6 @@ const statusColors: Record<string, string> = {
   approved: 'bg-green-100 text-green-800 border-green-200',
   posted: 'bg-emerald-100 text-emerald-800 border-emerald-200',
   rejected: 'bg-red-100 text-red-800 border-red-200',
-}
-
-const statusFlow: Record<string, string[]> = {
-  draft: ['reviewed', 'rejected'],
-  reviewed: ['approved', 'rejected'],
-  approved: ['posted', 'rejected'],
-  posted: [],
-  rejected: ['draft'],
 }
 
 function formatCurrency(amount: number) {
@@ -83,7 +77,7 @@ const defaultForm = {
   donorId: '',
   locationId: '',
   autoPost: true as boolean,
-  entries: [{ accountId: '', debit: 0, credit: 0, description: '' }] as any[],
+  entries: [{ accountId: '', debit: 0, credit: 0, description: '' }] as { accountId: string; debit: number; credit: number; description: string }[],
 }
 
 export function VoucherManagement() {
@@ -99,8 +93,14 @@ export function VoucherManagement() {
   const [detailVoucher, setDetailVoucher] = useState<any>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editVoucherId, setEditVoucherId] = useState<string | null>(null)
   const [printVoucher, setPrintVoucher] = useState<any>(null)
   const [printOpen, setPrintOpen] = useState(false)
+  const [deleteVoucherId, setDeleteVoucherId] = useState<string | null>(null)
+  const [deleteVoucherNumber, setDeleteVoucherNumber] = useState<string>('')
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const { toast } = useToast()
@@ -253,22 +253,200 @@ export function VoucherManagement() {
       }
       toast({ title: 'Voucher Created', description: form.autoPost ? 'Voucher created and posted to GL' : 'Voucher created as draft' })
       setCreateOpen(false)
-      setForm({ ...defaultForm, entries: [{ accountId: '', debit: 0, credit: 0, description: '' }] })
-      // Reset to page 1 and clear search to ensure new voucher is visible
+      resetForm()
       setSearch('')
       setPage(1)
-      // Wait for state to settle then fetch
       await fetchData('')
-    } catch (err) {
+    } catch {
       toast({ title: 'Error', description: 'Failed to create voucher - check your network connection', variant: 'destructive' })
     } finally {
       setCreating(false)
     }
   }
 
+  // ==================== EDIT VOUCHER ====================
+  const [saving, setSaving] = useState(false)
+
+  const handleEdit = async (voucherId: string) => {
+    try {
+      const res = await fetch(`/api/vouchers/${voucherId}`)
+      const data = await res.json()
+      if (!res.ok) {
+        toast({ title: 'Error', description: data.error || 'Failed to load voucher', variant: 'destructive' })
+        return
+      }
+
+      // Populate the form with existing data
+      setForm({
+        voucherType: data.voucherType,
+        date: new Date(data.date).toISOString().split('T')[0],
+        narration: data.narration || '',
+        reference: data.reference || '',
+        payeeName: data.payeeName || '',
+        chequeNumber: data.chequeNumber || '',
+        chequeDate: data.chequeDate ? new Date(data.chequeDate).toISOString().split('T')[0] : '',
+        voucherNo: data.voucherNo || '',
+        amountInWords: data.amountInWords || '',
+        financialYearId: data.financialYearId || '',
+        projectId: data.projectId || '',
+        donorId: data.donorId || '',
+        locationId: data.locationId || '',
+        autoPost: false, // On edit, don't auto-post
+        entries: data.entries?.map((e: any) => ({
+          accountId: e.accountId,
+          debit: e.debit || 0,
+          credit: e.credit || 0,
+          description: e.description || '',
+        })) || [{ accountId: '', debit: 0, credit: 0, description: '' }],
+      })
+      setEditVoucherId(voucherId)
+      setEditOpen(true)
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load voucher for editing', variant: 'destructive' })
+    }
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editVoucherId) return
+
+    if (!form.voucherType || !form.date || !form.narration) {
+      toast({ title: 'Validation Error', description: 'Type, date, and narration are required', variant: 'destructive' })
+      return
+    }
+    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+      toast({ title: 'Validation Error', description: `Debits (${totalDebit}) must equal Credits (${totalCredit})`, variant: 'destructive' })
+      return
+    }
+    const validEntries = form.entries.filter(e => e.accountId)
+    if (validEntries.length < 2) {
+      toast({ title: 'Validation Error', description: 'At least 2 entries with accounts are required', variant: 'destructive' })
+      return
+    }
+
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/vouchers/${editVoucherId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'edit',
+          voucherType: form.voucherType,
+          voucherTypeName: voucherTypes.find(v => v.value === form.voucherType)?.label,
+          date: form.date,
+          narration: form.narration,
+          reference: form.reference || null,
+          payeeName: form.payeeName || null,
+          chequeNumber: form.chequeNumber || null,
+          chequeDate: form.chequeDate || null,
+          voucherNo: form.voucherNo || null,
+          amountInWords: form.amountInWords || autoAmountInWords || null,
+          projectId: form.projectId || null,
+          donorId: form.donorId || null,
+          locationId: form.locationId || null,
+          entries: validEntries,
+        }),
+      })
+      const result = await res.json()
+      if (!res.ok) {
+        toast({ title: 'Error', description: result.error || 'Failed to update voucher', variant: 'destructive' })
+        setSaving(false)
+        return
+      }
+      toast({ title: 'Voucher Updated', description: 'Voucher has been updated successfully' })
+      setEditOpen(false)
+      resetForm()
+      await fetchData()
+      if (detailOpen && detailVoucher?.id === editVoucherId) {
+        setDetailVoucher(result)
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to update voucher', variant: 'destructive' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ==================== DELETE VOUCHER ====================
+  const handleDeleteClick = (voucherId: string, voucherNumber: string) => {
+    setDeleteVoucherId(voucherId)
+    setDeleteVoucherNumber(voucherNumber)
+    setDeleteOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteVoucherId) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/vouchers/${deleteVoucherId}`, { method: 'DELETE' })
+      const result = await res.json()
+      if (!res.ok) {
+        toast({ title: 'Error', description: result.error || 'Failed to delete voucher', variant: 'destructive' })
+        setDeleting(false)
+        return
+      }
+      toast({ title: 'Voucher Deleted', description: `Voucher ${deleteVoucherNumber} has been deleted` })
+      setDeleteOpen(false)
+      setDeleteVoucherId(null)
+      setDeleteVoucherNumber('')
+      if (detailOpen && detailVoucher?.id === deleteVoucherId) {
+        setDetailOpen(false)
+        setDetailVoucher(null)
+      }
+      await fetchData()
+    } catch {
+      toast({ title: 'Error', description: 'Failed to delete voucher', variant: 'destructive' })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  // ==================== DUPLICATE VOUCHER ====================
+  const handleDuplicate = async (voucherId: string) => {
+    try {
+      const res = await fetch(`/api/vouchers/${voucherId}`)
+      const data = await res.json()
+      if (!res.ok) {
+        toast({ title: 'Error', description: data.error || 'Failed to load voucher', variant: 'destructive' })
+        return
+      }
+
+      // Populate the form with existing data but clear identifying info
+      setForm({
+        voucherType: data.voucherType,
+        date: new Date().toISOString().split('T')[0],
+        narration: data.narration || '',
+        reference: '',
+        payeeName: data.payeeName || '',
+        chequeNumber: '',
+        chequeDate: '',
+        voucherNo: '',
+        amountInWords: '',
+        financialYearId: data.financialYearId || '',
+        projectId: data.projectId || '',
+        donorId: data.donorId || '',
+        locationId: data.locationId || '',
+        autoPost: false,
+        entries: data.entries?.map((e: any) => ({
+          accountId: e.accountId,
+          debit: e.debit || 0,
+          credit: e.credit || 0,
+          description: e.description || '',
+        })) || [{ accountId: '', debit: 0, credit: 0, description: '' }],
+      })
+      setCreateOpen(true)
+      toast({ title: 'Voucher Copied', description: 'Voucher data has been copied to a new form. Make changes and save.' })
+    } catch {
+      toast({ title: 'Error', description: 'Failed to duplicate voucher', variant: 'destructive' })
+    }
+  }
+
+  const resetForm = () => {
+    setForm({ ...defaultForm, entries: [{ accountId: '', debit: 0, credit: 0, description: '' }] })
+  }
+
   const addEntry = () => setForm(p => ({ ...p, entries: [...p.entries, { accountId: '', debit: 0, credit: 0, description: '' }] }))
-  const removeEntry = (i: number) => setForm(p => ({ ...p, entries: p.entries.filter((_: any, idx: number) => idx !== i) }))
-  const updateEntry = (i: number, field: string, value: any) => setForm(p => ({ ...p, entries: p.entries.map((e: any, idx: number) => idx === i ? { ...e, [field]: value } : e) }))
+  const removeEntry = (i: number) => setForm(p => ({ ...p, entries: p.entries.filter((_, idx) => idx !== i) }))
+  const updateEntry = (i: number, field: string, value: any) => setForm(p => ({ ...p, entries: p.entries.map((e, idx) => idx === i ? { ...e, [field]: value } : e) }))
 
   const voucherTypeColor = (type: string) => voucherTypes.find(v => v.value === type)?.color || 'bg-gray-100 text-gray-800'
 
@@ -305,6 +483,169 @@ export function VoucherManagement() {
     printWindow.print()
   }
 
+  // ==================== VOUCHER FORM RENDERER ====================
+  // Shared form used for both Create and Edit dialogs
+  const renderVoucherForm = () => (
+    <div className="space-y-4">
+      {/* Row 1: Voucher Type, Voucher No, Date, Reference */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div><Label className="text-xs">Voucher Type *</Label>
+          <Select value={form.voucherType} onValueChange={v => setForm(p => ({ ...p, voucherType: v }))}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>{voucherTypes.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div><Label className="text-xs">Voucher No</Label><Input className="h-8 text-xs" placeholder="Auto if blank" value={form.voucherNo} onChange={e => setForm(p => ({ ...p, voucherNo: e.target.value }))} /></div>
+        <div><Label className="text-xs">Date *</Label><Input type="date" className="h-8 text-xs" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} /></div>
+        <div><Label className="text-xs">Reference</Label><Input className="h-8 text-xs" value={form.reference} onChange={e => setForm(p => ({ ...p, reference: e.target.value }))} /></div>
+      </div>
+
+      {/* Row 2: Name (Payee), Cheque No, Cheque Date */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div><Label className="text-xs">Name (Payee)</Label><Input className="h-8 text-xs" placeholder="Name of payee/beneficiary" value={form.payeeName} onChange={e => setForm(p => ({ ...p, payeeName: e.target.value }))} /></div>
+        <div><Label className="text-xs">Cheque No</Label><Input className="h-8 text-xs" placeholder="Cheque number" value={form.chequeNumber} onChange={e => setForm(p => ({ ...p, chequeNumber: e.target.value }))} /></div>
+        <div><Label className="text-xs">Cheque Date</Label><Input type="date" className="h-8 text-xs" value={form.chequeDate} onChange={e => setForm(p => ({ ...p, chequeDate: e.target.value }))} /></div>
+      </div>
+
+      {/* Row 3: Project, Donor, Location */}
+      <div className="grid grid-cols-3 gap-3">
+        <div><Label className="text-xs">Project</Label>
+          <Select value={form.projectId || '_none'} onValueChange={v => setForm(p => ({ ...p, projectId: v === '_none' ? '' : v }))}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_none">None</SelectItem>
+              {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.code} - {p.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div><Label className="text-xs">Donor</Label>
+          <Select value={form.donorId || '_none'} onValueChange={v => setForm(p => ({ ...p, donorId: v === '_none' ? '' : v }))}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_none">None</SelectItem>
+              {donors.map(d => <SelectItem key={d.id} value={d.id}>{d.code} - {d.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div><Label className="text-xs">Location</Label>
+          <Select value={form.locationId || '_none'} onValueChange={v => setForm(p => ({ ...p, locationId: v === '_none' ? '' : v }))}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_none">None</SelectItem>
+              {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.code} - {l.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Narration */}
+      <div><Label className="text-xs">Narration *</Label><Textarea className="text-xs" rows={2} value={form.narration} onChange={e => setForm(p => ({ ...p, narration: e.target.value }))} /></div>
+
+      {/* Entries */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <Label className="text-xs font-semibold">Voucher Entries</Label>
+          <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={addEntry}><Plus className="h-3 w-3 mr-1" />Add Line</Button>
+        </div>
+        <div className="space-y-2">
+          {form.entries.map((entry, i) => (
+            <div key={i} className="grid grid-cols-12 gap-2 items-end">
+              <div className="col-span-4">
+                {i === 0 && <Label className="text-[10px]">Account</Label>}
+                <Select value={entry.accountId} onValueChange={v => updateEntry(i, 'accountId', v)}>
+                  <SelectTrigger className="h-7 text-[10px]"><SelectValue placeholder="Select account" /></SelectTrigger>
+                  <SelectContent className="max-h-60">{accounts.map(a => <SelectItem key={a.id} value={a.id}><span className="font-mono">{a.code}</span> {a.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2">
+                {i === 0 && <Label className="text-[10px]">Debit</Label>}
+                <Input type="number" className="h-7 text-[10px]" value={entry.debit || ''} onChange={e => updateEntry(i, 'debit', parseFloat(e.target.value) || 0)} />
+              </div>
+              <div className="col-span-2">
+                {i === 0 && <Label className="text-[10px]">Credit</Label>}
+                <Input type="number" className="h-7 text-[10px]" value={entry.credit || ''} onChange={e => updateEntry(i, 'credit', parseFloat(e.target.value) || 0)} />
+              </div>
+              <div className="col-span-3">
+                {i === 0 && <Label className="text-[10px]">Description</Label>}
+                <Input className="h-7 text-[10px]" value={entry.description} onChange={e => updateEntry(i, 'description', e.target.value)} />
+              </div>
+              <div className="col-span-1">
+                {form.entries.length > 2 && <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeEntry(i)}><XCircle className="h-3.5 w-3.5" /></Button>}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center justify-between mt-2 p-2 rounded bg-muted/50">
+          <div className="flex gap-4 text-xs">
+            <span>Total Debit: <strong>{formatCurrency(totalDebit)}</strong></span>
+            <span>Total Credit: <strong>{formatCurrency(totalCredit)}</strong></span>
+          </div>
+          <Badge className={isBalanced ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+            {isBalanced ? 'Balanced ✓' : 'Out of Balance ✗'}
+          </Badge>
+        </div>
+      </div>
+
+      {/* Amount in Words */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <Label className="text-xs font-semibold">Amount in Words</Label>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 text-[10px] text-muted-foreground hover:text-foreground"
+            onClick={() => setForm(p => ({ ...p, amountInWords: autoAmountInWords }))}
+            disabled={totalDebit === 0}
+          >
+            <Copy className="h-3 w-3 mr-1" />
+            Auto-fill from total
+          </Button>
+        </div>
+        <Textarea
+          className="text-xs font-medium italic"
+          rows={2}
+          placeholder="Amount in words will be auto-generated..."
+          value={form.amountInWords || autoAmountInWords}
+          onChange={e => setForm(p => ({ ...p, amountInWords: e.target.value }))}
+        />
+      </div>
+
+      {/* Auto Post Option - only show for Create */}
+      {!editOpen && (
+        <div className="flex items-center gap-3 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
+          <input
+            type="checkbox"
+            id="autoPost"
+            checked={form.autoPost}
+            onChange={e => setForm(p => ({ ...p, autoPost: e.target.checked }))}
+            className="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+          />
+          <div>
+            <Label htmlFor="autoPost" className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 cursor-pointer">
+              Auto Post to General Ledger
+            </Label>
+            <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
+              {form.autoPost
+                ? 'Voucher will be immediately posted to GL and visible in ledgers'
+                : 'Voucher will be saved as draft — use Review → Approve → Post workflow'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Edit mode notice */}
+      {editOpen && (
+        <div className="flex items-center gap-3 p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+          <Pencil className="h-4 w-4 text-amber-600 shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Editing Voucher</p>
+            <p className="text-[10px] text-amber-600 dark:text-amber-400">Only draft or rejected vouchers can be edited. The voucher status will be reset to draft if it was rejected.</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
@@ -329,7 +670,10 @@ export function VoucherManagement() {
             </SelectContent>
           </Select>
         </div>
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <Dialog open={createOpen} onOpenChange={(open) => {
+          setCreateOpen(open)
+          if (!open) resetForm()
+        }}>
           <DialogTrigger asChild>
             <Button size="sm" className="h-8 text-xs"><Plus className="h-3.5 w-3.5 mr-1" /> New Voucher</Button>
           </DialogTrigger>
@@ -337,153 +681,9 @@ export function VoucherManagement() {
             <DialogHeader>
               <DialogTitle className="text-sm">Create New Voucher</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
-              {/* Row 1: Voucher Type, Voucher No, Date, Reference */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div><Label className="text-xs">Voucher Type *</Label>
-                  <Select value={form.voucherType} onValueChange={v => setForm(p => ({ ...p, voucherType: v }))}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>{voucherTypes.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div><Label className="text-xs">Voucher No</Label><Input className="h-8 text-xs" placeholder="Auto if blank" value={form.voucherNo} onChange={e => setForm(p => ({ ...p, voucherNo: e.target.value }))} /></div>
-                <div><Label className="text-xs">Date *</Label><Input type="date" className="h-8 text-xs" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} /></div>
-                <div><Label className="text-xs">Reference</Label><Input className="h-8 text-xs" value={form.reference} onChange={e => setForm(p => ({ ...p, reference: e.target.value }))} /></div>
-              </div>
-
-              {/* Row 2: Name (Payee), Cheque No, Cheque Date */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <div><Label className="text-xs">Name (Payee)</Label><Input className="h-8 text-xs" placeholder="Name of payee/beneficiary" value={form.payeeName} onChange={e => setForm(p => ({ ...p, payeeName: e.target.value }))} /></div>
-                <div><Label className="text-xs">Cheque No</Label><Input className="h-8 text-xs" placeholder="Cheque number" value={form.chequeNumber} onChange={e => setForm(p => ({ ...p, chequeNumber: e.target.value }))} /></div>
-                <div><Label className="text-xs">Cheque Date</Label><Input type="date" className="h-8 text-xs" value={form.chequeDate} onChange={e => setForm(p => ({ ...p, chequeDate: e.target.value }))} /></div>
-              </div>
-
-              {/* Row 3: Project, Donor, Location */}
-              <div className="grid grid-cols-3 gap-3">
-                <div><Label className="text-xs">Project</Label>
-                  <Select value={form.projectId} onValueChange={v => setForm(p => ({ ...p, projectId: v === '_none' ? '' : v }))}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="_none">None</SelectItem>
-                      {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.code} - {p.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div><Label className="text-xs">Donor</Label>
-                  <Select value={form.donorId} onValueChange={v => setForm(p => ({ ...p, donorId: v === '_none' ? '' : v }))}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="_none">None</SelectItem>
-                      {donors.map(d => <SelectItem key={d.id} value={d.id}>{d.code} - {d.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div><Label className="text-xs">Location</Label>
-                  <Select value={form.locationId} onValueChange={v => setForm(p => ({ ...p, locationId: v === '_none' ? '' : v }))}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="_none">None</SelectItem>
-                      {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.code} - {l.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Narration */}
-              <div><Label className="text-xs">Narration *</Label><Textarea className="text-xs" rows={2} value={form.narration} onChange={e => setForm(p => ({ ...p, narration: e.target.value }))} /></div>
-
-              {/* Entries */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Label className="text-xs font-semibold">Voucher Entries</Label>
-                  <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={addEntry}><Plus className="h-3 w-3 mr-1" />Add Line</Button>
-                </div>
-                <div className="space-y-2">
-                  {form.entries.map((entry, i) => (
-                    <div key={i} className="grid grid-cols-12 gap-2 items-end">
-                      <div className="col-span-4">
-                        {i === 0 && <Label className="text-[10px]">Account</Label>}
-                        <Select value={entry.accountId} onValueChange={v => updateEntry(i, 'accountId', v)}>
-                          <SelectTrigger className="h-7 text-[10px]"><SelectValue placeholder="Select account" /></SelectTrigger>
-                          <SelectContent className="max-h-60">{accounts.map(a => <SelectItem key={a.id} value={a.id}><span className="font-mono">{a.code}</span> {a.name}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </div>
-                      <div className="col-span-2">
-                        {i === 0 && <Label className="text-[10px]">Debit</Label>}
-                        <Input type="number" className="h-7 text-[10px]" value={entry.debit || ''} onChange={e => updateEntry(i, 'debit', parseFloat(e.target.value) || 0)} />
-                      </div>
-                      <div className="col-span-2">
-                        {i === 0 && <Label className="text-[10px]">Credit</Label>}
-                        <Input type="number" className="h-7 text-[10px]" value={entry.credit || ''} onChange={e => updateEntry(i, 'credit', parseFloat(e.target.value) || 0)} />
-                      </div>
-                      <div className="col-span-3">
-                        {i === 0 && <Label className="text-[10px]">Description</Label>}
-                        <Input className="h-7 text-[10px]" value={entry.description} onChange={e => updateEntry(i, 'description', e.target.value)} />
-                      </div>
-                      <div className="col-span-1">
-                        {form.entries.length > 2 && <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeEntry(i)}><XCircle className="h-3.5 w-3.5" /></Button>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex items-center justify-between mt-2 p-2 rounded bg-muted/50">
-                  <div className="flex gap-4 text-xs">
-                    <span>Total Debit: <strong>{formatCurrency(totalDebit)}</strong></span>
-                    <span>Total Credit: <strong>{formatCurrency(totalCredit)}</strong></span>
-                  </div>
-                  <Badge className={isBalanced ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                    {isBalanced ? 'Balanced ✓' : 'Out of Balance ✗'}
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Amount in Words */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <Label className="text-xs font-semibold">Amount in Words</Label>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 text-[10px] text-muted-foreground hover:text-foreground"
-                    onClick={() => setForm(p => ({ ...p, amountInWords: autoAmountInWords }))}
-                    disabled={totalDebit === 0}
-                  >
-                    <Copy className="h-3 w-3 mr-1" />
-                    Auto-fill from total
-                  </Button>
-                </div>
-                <Textarea
-                  className="text-xs font-medium italic"
-                  rows={2}
-                  placeholder="Amount in words will be auto-generated..."
-                  value={form.amountInWords || autoAmountInWords}
-                  onChange={e => setForm(p => ({ ...p, amountInWords: e.target.value }))}
-                />
-              </div>
-
-              {/* Auto Post Option */}
-              <div className="flex items-center gap-3 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
-                <input
-                  type="checkbox"
-                  id="autoPost"
-                  checked={form.autoPost}
-                  onChange={e => setForm(p => ({ ...p, autoPost: e.target.checked }))}
-                  className="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
-                />
-                <div>
-                  <Label htmlFor="autoPost" className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 cursor-pointer">
-                    Auto Post to General Ledger
-                  </Label>
-                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
-                    {form.autoPost
-                      ? 'Voucher will be immediately posted to GL and visible in ledgers'
-                      : 'Voucher will be saved as draft — use Review → Approve → Post workflow'}
-                  </p>
-                </div>
-              </div>
-            </div>
+            {renderVoucherForm()}
             <DialogFooter>
-              <Button variant="outline" size="sm" onClick={() => setCreateOpen(false)}>Cancel</Button>
+              <Button variant="outline" size="sm" onClick={() => { setCreateOpen(false); resetForm() }}>Cancel</Button>
               <Button size="sm" onClick={handleCreate} disabled={!isBalanced || creating}>
                 {creating ? 'Creating...' : form.autoPost ? 'Create & Post to GL' : 'Create as Draft'}
               </Button>
@@ -531,17 +731,43 @@ export function VoucherManagement() {
                   <TableCell className="text-xs text-right font-semibold">{formatCurrency(v.totalDebit)}</TableCell>
                   <TableCell><Badge className={`text-[9px] ${statusColors[v.status]}`}>{v.status}</Badge></TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => {
+                    <div className="flex items-center gap-0.5">
+                      {/* View */}
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="View" onClick={async () => {
                         const res = await fetch(`/api/vouchers/${v.id}`)
                         setDetailVoucher(await res.json())
                         setDetailOpen(true)
                       }}><Eye className="h-3 w-3" /></Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => {
+
+                      {/* Edit - only for draft/rejected */}
+                      {(v.status === 'draft' || v.status === 'rejected') && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-amber-600" title="Edit" onClick={() => handleEdit(v.id)}>
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      )}
+
+                      {/* Duplicate */}
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-violet-600" title="Duplicate" onClick={() => handleDuplicate(v.id)}>
+                        <CopyPlus className="h-3 w-3" />
+                      </Button>
+
+                      {/* Print */}
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Print" onClick={async () => {
                         const res = await fetch(`/api/vouchers/${v.id}`)
                         const data = await res.json()
                         handlePrint(data)
                       }}><Printer className="h-3 w-3" /></Button>
+
+                      {/* Delete - only for draft/rejected */}
+                      {(v.status === 'draft' || v.status === 'rejected') && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" title="Delete" onClick={() => handleDeleteClick(v.id, v.voucherNo || v.voucherNumber)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+
+                      <Separator orientation="vertical" className="h-5 mx-0.5" />
+
+                      {/* Status Actions */}
                       {v.status === 'draft' && (
                         <Button variant="ghost" size="sm" className="h-7 text-[10px] text-blue-600" onClick={() => handleStatusChange(v.id, 'review')}>Review</Button>
                       )}
@@ -551,7 +777,6 @@ export function VoucherManagement() {
                       {v.status === 'approved' && (
                         <Button variant="ghost" size="sm" className="h-7 text-[10px] text-emerald-600" onClick={() => handleStatusChange(v.id, 'post')}>Post</Button>
                       )}
-                      {/* Quick Post: skip review/approve and post directly */}
                       {(v.status === 'draft' || v.status === 'reviewed') && (
                         <Button variant="ghost" size="sm" className="h-7 text-[10px] text-emerald-700 font-semibold" onClick={() => handleStatusChange(v.id, 'quick_post')}>Quick Post</Button>
                       )}
@@ -577,6 +802,46 @@ export function VoucherManagement() {
           </div>
         </div>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={(open) => {
+        setEditOpen(open)
+        if (!open) { resetForm(); setEditVoucherId(null) }
+      }}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-sm flex items-center gap-2">
+              <Pencil className="h-4 w-4 text-amber-600" />
+              Edit Voucher
+            </DialogTitle>
+          </DialogHeader>
+          {renderVoucherForm()}
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => { setEditOpen(false); resetForm(); setEditVoucherId(null) }}>Cancel</Button>
+            <Button size="sm" onClick={handleSaveEdit} disabled={!isBalanced || saving}>
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-sm">Delete Voucher</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs">
+              Are you sure you want to delete voucher <strong className="font-mono">{deleteVoucherNumber}</strong>? This action cannot be undone. All entries and approval history will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="text-xs" onClick={() => { setDeleteOpen(false); setDeleteVoucherId(null) }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={handleDeleteConfirm} disabled={deleting}>
+              {deleting ? 'Deleting...' : 'Delete Voucher'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Detail Dialog */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
@@ -623,7 +888,7 @@ export function VoucherManagement() {
 
               {/* Status Actions in Detail */}
               {detailVoucher.status !== 'posted' && detailVoucher.status !== 'rejected' && (
-                <div className="flex items-center gap-2 p-3 rounded-md bg-muted/30 border">
+                <div className="flex items-center gap-2 p-3 rounded-md bg-muted/30 border flex-wrap">
                   <span className="text-xs text-muted-foreground">Actions:</span>
                   {detailVoucher.status === 'draft' && (
                     <Button variant="outline" size="sm" className="h-7 text-[10px] text-blue-600" onClick={() => { handleStatusChange(detailVoucher.id, 'review'); }}>Review</Button>
@@ -639,12 +904,46 @@ export function VoucherManagement() {
                       <CheckCircle2 className="h-3 w-3 mr-1" /> Quick Post to GL
                     </Button>
                   )}
+                  <Separator orientation="vertical" className="h-5" />
+                  {(detailVoucher.status === 'draft' || detailVoucher.status === 'rejected') && (
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] text-amber-600" onClick={() => { setDetailOpen(false); handleEdit(detailVoucher.id); }}>
+                      <Pencil className="h-3 w-3 mr-1" /> Edit
+                    </Button>
+                  )}
+                  {(detailVoucher.status === 'draft' || detailVoucher.status === 'rejected') && (
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => { setDetailOpen(false); handleDeleteClick(detailVoucher.id, detailVoucher.voucherNo || detailVoucher.voucherNumber); }}>
+                      <Trash2 className="h-3 w-3 mr-1" /> Delete
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" className="h-7 text-[10px] text-violet-600" onClick={() => { setDetailOpen(false); handleDuplicate(detailVoucher.id); }}>
+                    <CopyPlus className="h-3 w-3 mr-1" /> Duplicate
+                  </Button>
+                </div>
+              )}
+              {detailVoucher.status === 'rejected' && (
+                <div className="flex items-center gap-2 p-3 rounded-md bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 flex-wrap">
+                  <XCircle className="h-4 w-4 text-red-600 shrink-0" />
+                  <span className="text-xs font-semibold text-red-700 dark:text-red-400">This voucher has been rejected</span>
+                  <Separator orientation="vertical" className="h-5" />
+                  <Button variant="outline" size="sm" className="h-7 text-[10px] text-amber-600" onClick={() => { setDetailOpen(false); handleEdit(detailVoucher.id); }}>
+                    <Pencil className="h-3 w-3 mr-1" /> Edit & Resubmit
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => { setDetailOpen(false); handleDeleteClick(detailVoucher.id, detailVoucher.voucherNo || detailVoucher.voucherNumber); }}>
+                    <Trash2 className="h-3 w-3 mr-1" /> Delete
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-7 text-[10px] text-violet-600" onClick={() => { setDetailOpen(false); handleDuplicate(detailVoucher.id); }}>
+                    <CopyPlus className="h-3 w-3 mr-1" /> Duplicate
+                  </Button>
                 </div>
               )}
               {detailVoucher.status === 'posted' && (
                 <div className="flex items-center gap-2 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                   <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">This voucher has been posted to the General Ledger</span>
+                  <Separator orientation="vertical" className="h-5" />
+                  <Button variant="outline" size="sm" className="h-7 text-[10px] text-violet-600" onClick={() => { setDetailOpen(false); handleDuplicate(detailVoucher.id); }}>
+                    <CopyPlus className="h-3 w-3 mr-1" /> Duplicate
+                  </Button>
                 </div>
               )}
               <Table>
@@ -683,6 +982,7 @@ export function VoucherManagement() {
                       <Badge className="text-[8px]">{a.action}</Badge>
                       <span>{a.user?.name || 'System'}</span>
                       <span className="text-muted-foreground">{a.comments}</span>
+                      <span className="text-muted-foreground ml-auto">{new Date(a.createdAt).toLocaleString()}</span>
                     </div>
                   ))}
                 </div>
