@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -61,7 +60,6 @@ export function Ledgers() {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 
-  // Use refs to always have latest state in async callbacks
   const ledgerTypeRef = useRef(ledgerType)
   const statusFilterRef = useRef(statusFilter)
   const selectedAccountRef = useRef(selectedAccount)
@@ -102,9 +100,10 @@ export function Ledgers() {
     return <Badge className={`text-[8px] ${colors[status] || 'bg-gray-100 text-gray-800'}`}>{status}</Badge>
   }
 
-  const renderGeneralLedger = () => (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 flex-wrap">
+  // Shared filter bar
+  const renderFilterBar = (showAccountFilter = false) => (
+    <div className="flex items-center gap-2 flex-wrap">
+      {showAccountFilter && (
         <Select value={selectedAccount} onValueChange={v => { setSelectedAccount(v) }}>
           <SelectTrigger className="h-8 w-64 text-xs"><SelectValue placeholder="Filter by account" /></SelectTrigger>
           <SelectContent>
@@ -112,25 +111,35 @@ export function Ledgers() {
             {accounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={v => setStatusFilter(v)}>
-          <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Voucher Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="posted">Approved & Posted</SelectItem>
-            <SelectItem value="approved">Reviewed & Above</SelectItem>
-            <SelectItem value="all">All (incl. Drafts)</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fetchData}>
-          <RefreshCw className="h-3 w-3 mr-1" /> Refresh
-        </Button>
-      </div>
+      )}
+      <Select value={statusFilter} onValueChange={v => setStatusFilter(v)}>
+        <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Voucher Status" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="posted">Approved & Posted</SelectItem>
+          <SelectItem value="approved">Reviewed & Above</SelectItem>
+          <SelectItem value="all">All (incl. Drafts)</SelectItem>
+        </SelectContent>
+      </Select>
+      <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fetchData}>
+        <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+      </Button>
+    </div>
+  )
+
+  // Grouped ledger renderer (used by General, Bank, Expense)
+  const renderGroupedLedger = (emptyType: string, showAccountFilter = false) => (
+    <div className="space-y-4">
+      {renderFilterBar(showAccountFilter)}
       {loading ? (
         <div className="text-center text-xs py-8 text-muted-foreground">Loading ledger data...</div>
       ) : data.length === 0 ? (
-        <EmptyState type="general" />
+        <EmptyState type={emptyType} />
       ) : (
         <div className="space-y-4">
           {data.map((group: any) => {
+            // Only render accounts that have entries
+            if (!group.entries || group.entries.length === 0) return null
+
             // Calculate running balance
             let runningBalance = 0
             const entriesWithBalance = group.entries.map((e: any) => {
@@ -160,6 +169,7 @@ export function Ledgers() {
                       <TableRow>
                         <TableHead className="text-[10px]">Date</TableHead>
                         <TableHead className="text-[10px]">Voucher</TableHead>
+                        <TableHead className="text-[10px]">Type</TableHead>
                         <TableHead className="text-[10px]">Description</TableHead>
                         <TableHead className="text-[10px]">Status</TableHead>
                         <TableHead className="text-[10px] text-right">Debit</TableHead>
@@ -172,6 +182,18 @@ export function Ledgers() {
                         <TableRow key={i}>
                           <TableCell className="text-xs">{new Date(e.voucher.date).toLocaleDateString()}</TableCell>
                           <TableCell className="text-xs font-mono">{e.voucher.voucherNumber}</TableCell>
+                          <TableCell className="text-xs">
+                            {e.voucher.voucherTypeName && (
+                              <Badge className={`text-[8px] ${
+                                e.voucher.voucherType === 'BP' ? 'bg-red-100 text-red-800' :
+                                e.voucher.voucherType === 'CP' ? 'bg-orange-100 text-orange-800' :
+                                e.voucher.voucherType === 'BR' ? 'bg-emerald-100 text-emerald-800' :
+                                e.voucher.voucherType === 'CR' ? 'bg-green-100 text-green-800' :
+                                e.voucher.voucherType === 'JV' ? 'bg-blue-100 text-blue-800' :
+                                'bg-purple-100 text-purple-800'
+                              }`}>{e.voucher.voucherTypeName}</Badge>
+                            )}
+                          </TableCell>
                           <TableCell className="text-xs">{e.description || e.voucher.narration}</TableCell>
                           <TableCell>{statusBadge(e.voucher.status)}</TableCell>
                           <TableCell className="text-xs text-right">{e.debit > 0 ? formatCurrency(e.debit) : ''}</TableCell>
@@ -192,21 +214,10 @@ export function Ledgers() {
     </div>
   )
 
+  // Sub-ledger renderer (Receivables / Payables)
   const renderSubLedger = (type: string) => (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 flex-wrap">
-        <Select value={statusFilter} onValueChange={v => setStatusFilter(v)}>
-          <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Voucher Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="posted">Approved & Posted</SelectItem>
-            <SelectItem value="approved">Reviewed & Above</SelectItem>
-            <SelectItem value="all">All (incl. Drafts)</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fetchData}>
-          <RefreshCw className="h-3 w-3 mr-1" /> Refresh
-        </Button>
-      </div>
+      {renderFilterBar(false)}
       {loading ? (
         <div className="text-center text-xs py-8 text-muted-foreground">Loading...</div>
       ) : data.length === 0 ? (
@@ -214,13 +225,15 @@ export function Ledgers() {
       ) : data.map((group: any) => (
         <Card key={type === 'receivables' ? group.customerId : group.supplierId}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs">
-              {type === 'receivables' ? group.customer?.name : group.supplier?.name}
-            </CardTitle>
-            <div className="flex gap-3 text-[10px]">
-              <span>Total Dr: {formatCurrency(group.totalDebit)}</span>
-              <span>Total Cr: {formatCurrency(group.totalCredit)}</span>
-              <Badge className="text-[9px]">Balance: {formatCurrency(Math.abs(group.totalDebit - group.totalCredit))} {group.totalDebit >= group.totalCredit ? 'Dr' : 'Cr'}</Badge>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xs">
+                {type === 'receivables' ? group.customer?.name : group.supplier?.name}
+              </CardTitle>
+              <div className="flex gap-3 text-[10px]">
+                <span>Total Dr: {formatCurrency(group.totalDebit)}</span>
+                <span>Total Cr: {formatCurrency(group.totalCredit)}</span>
+                <Badge className="text-[9px]">Balance: {formatCurrency(Math.abs(group.totalDebit - group.totalCredit))} {group.totalDebit >= group.totalCredit ? 'Dr' : 'Cr'}</Badge>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -254,60 +267,6 @@ export function Ledgers() {
     </div>
   )
 
-  const renderBankExpenseLedger = () => (
-    <div>
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <Select value={statusFilter} onValueChange={v => setStatusFilter(v)}>
-          <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Voucher Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="posted">Approved & Posted</SelectItem>
-            <SelectItem value="approved">Reviewed & Above</SelectItem>
-            <SelectItem value="all">All (incl. Drafts)</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fetchData}>
-          <RefreshCw className="h-3 w-3 mr-1" /> Refresh
-        </Button>
-      </div>
-      {loading ? (
-        <div className="text-center text-xs py-8 text-muted-foreground">Loading...</div>
-      ) : (Array.isArray(data) ? data : []).length === 0 ? (
-        <EmptyState type={ledgerType} />
-      ) : (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-[10px]">Date</TableHead>
-                  <TableHead className="text-[10px]">Voucher</TableHead>
-                  <TableHead className="text-[10px]">Account</TableHead>
-                  <TableHead className="text-[10px]">Description</TableHead>
-                  <TableHead className="text-[10px]">Status</TableHead>
-                  <TableHead className="text-[10px] text-right">Debit</TableHead>
-                  <TableHead className="text-[10px] text-right">Credit</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(Array.isArray(data) ? data : []).map((e: any, i: number) => (
-                  <TableRow key={i}>
-                    <TableCell className="text-xs">{new Date(e.voucher?.date || e.date).toLocaleDateString()}</TableCell>
-                    <TableCell className="text-xs font-mono">{e.voucher?.voucherNumber}</TableCell>
-                    <TableCell className="text-xs">{e.account?.code} - {e.account?.name}</TableCell>
-                    <TableCell className="text-xs">{e.description || e.voucher?.narration}</TableCell>
-                    <TableCell>{statusBadge(e.voucher?.status)}</TableCell>
-                    <TableCell className="text-xs text-right">{e.debit > 0 ? formatCurrency(e.debit) : ''}</TableCell>
-                    <TableCell className="text-xs text-right">{e.credit > 0 ? formatCurrency(e.credit) : ''}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  )
-
   return (
     <div className="space-y-4">
       <Tabs value={ledgerType} onValueChange={setLedgerType}>
@@ -319,11 +278,11 @@ export function Ledgers() {
           <TabsTrigger value="expense" className="text-xs h-7">Expense Ledger</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general">{renderGeneralLedger()}</TabsContent>
+        <TabsContent value="general">{renderGroupedLedger('general', true)}</TabsContent>
         <TabsContent value="receivables">{renderSubLedger('receivables')}</TabsContent>
         <TabsContent value="payables">{renderSubLedger('payables')}</TabsContent>
-        <TabsContent value="bank">{renderBankExpenseLedger()}</TabsContent>
-        <TabsContent value="expense">{renderBankExpenseLedger()}</TabsContent>
+        <TabsContent value="bank">{renderGroupedLedger('bank', false)}</TabsContent>
+        <TabsContent value="expense">{renderGroupedLedger('expense', false)}</TabsContent>
       </Tabs>
     </div>
   )

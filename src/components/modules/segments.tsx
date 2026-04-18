@@ -1,67 +1,54 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-
-import { Plus, Pencil, Trash2, FolderTree, Heart, MapPin, Loader2 } from 'lucide-react'
+import { Plus, FolderTree, Heart, MapPin, Pencil, Trash2, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
-}
-
-// ─── Projects Module ───────────────────────────────────────────
-const emptyProjectForm = { code: '', name: '', description: '', startDate: '', endDate: '', status: 'active' }
-
+// Projects Module
 export function Projects() {
   const [data, setData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState<any>(null)
-  const [form, setForm] = useState(emptyProjectForm)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<any>(null)
-  const [deleting, setDeleting] = useState(false)
+  const [form, setForm] = useState({ code: '', name: '', description: '', startDate: '', endDate: '', status: 'active' })
   const { toast } = useToast()
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
+  const fetchData = async () => {
     try {
       const res = await fetch('/api/projects')
-      if (res.ok) setData(await res.json())
-      else setData([])
+      const json = await res.json()
+      setData(Array.isArray(json) ? json : [])
     } catch {
       toast({ title: 'Error', description: 'Failed to load projects', variant: 'destructive' })
-    } finally {
-      setLoading(false)
     }
-  }, [toast])
-
-  useEffect(() => { fetchData() }, [fetchData])
+  }
+  useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   const openCreate = () => {
-    setEditingItem(null)
-    setForm(emptyProjectForm)
+    setEditingId(null)
+    setForm({ code: '', name: '', description: '', startDate: '', endDate: '', status: 'active' })
     setDialogOpen(true)
   }
 
-  const openEdit = (item: any) => {
-    setEditingItem(item)
+  const openEdit = (p: any) => {
+    setEditingId(p.id)
     setForm({
-      code: item.code || '',
-      name: item.name || '',
-      description: item.description || '',
-      startDate: item.startDate ? new Date(item.startDate).toISOString().split('T')[0] : '',
-      endDate: item.endDate ? new Date(item.endDate).toISOString().split('T')[0] : '',
-      status: item.status || 'active',
+      code: p.code,
+      name: p.name,
+      description: p.description || '',
+      startDate: p.startDate ? new Date(p.startDate).toISOString().split('T')[0] : '',
+      endDate: p.endDate ? new Date(p.endDate).toISOString().split('T')[0] : '',
+      status: p.status,
     })
     setDialogOpen(true)
   }
@@ -74,40 +61,50 @@ export function Projects() {
     setSaving(true)
     try {
       const payload = { ...form, startDate: form.startDate || undefined, endDate: form.endDate || undefined }
-      if (editingItem) {
-        const res = await fetch('/api/projects', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editingItem.id, ...payload }) })
-        if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to update project') }
+      if (editingId) {
+        const res = await fetch('/api/projects', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingId, ...payload }),
+        })
+        const result = await res.json()
+        if (!res.ok) { toast({ title: 'Error', description: result.error, variant: 'destructive' }); setSaving(false); return }
         toast({ title: 'Updated', description: `Project ${form.code} updated` })
       } else {
-        const res = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-        if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to create project') }
+        const res = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        const result = await res.json()
+        if (!res.ok) { toast({ title: 'Error', description: result.error, variant: 'destructive' }); setSaving(false); return }
         toast({ title: 'Created', description: `Project ${form.code} created` })
       }
       setDialogOpen(false)
-      setForm(emptyProjectForm)
-      setEditingItem(null)
+      setForm({ code: '', name: '', description: '', startDate: '', endDate: '', status: 'active' })
+      setEditingId(null)
       fetchData()
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Operation failed', variant: 'destructive' })
+    } catch {
+      toast({ title: 'Error', description: 'Operation failed', variant: 'destructive' })
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return
-    setDeleting(true)
+  const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/projects?id=${deleteTarget.id}`, { method: 'DELETE' })
-      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to delete project') }
-      toast({ title: 'Deleted', description: `Project ${deleteTarget.code} deleted` })
-      setDeleteTarget(null)
+      const res = await fetch(`/api/projects?id=${id}`, { method: 'DELETE' })
+      const result = await res.json()
+      if (!res.ok) {
+        toast({ title: 'Cannot Delete', description: result.error, variant: 'destructive' })
+        return
+      }
+      toast({ title: 'Deleted', description: 'Project deleted successfully' })
       fetchData()
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Delete failed', variant: 'destructive' })
-      setDeleteTarget(null)
+    } catch {
+      toast({ title: 'Error', description: 'Failed to delete project', variant: 'destructive' })
     } finally {
-      setDeleting(false)
+      setDeletingId(null)
     }
   }
 
@@ -115,12 +112,14 @@ export function Projects() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold flex items-center gap-2"><FolderTree className="h-4 w-4" />Projects</h3>
-        <Button size="sm" className="h-8 text-xs" onClick={openCreate}><Plus className="h-3.5 w-3.5 mr-1" />New Project</Button>
+        <Button size="sm" className="h-8 text-xs" onClick={openCreate}>
+          <Plus className="h-3.5 w-3.5 mr-1" />New Project
+        </Button>
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setEditingItem(null); setForm(emptyProjectForm) } }}>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle className="text-sm">{editingItem ? 'Edit Project' : 'New Project'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="text-sm">{editingId ? 'Edit Project' : 'New Project'}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div><Label className="text-xs">Code *</Label><Input className="h-8 text-xs" value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value }))} /></div>
@@ -140,103 +139,91 @@ export function Projects() {
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button size="sm" onClick={handleSave} disabled={saving}>{saving && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}{editingItem ? 'Update' : 'Create'}</Button>
+            <Button size="sm" onClick={handleSave} disabled={saving}>
+              {saving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+              {editingId ? 'Update' : 'Create'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Project</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete project <strong>{deleteTarget?.code} - {deleteTarget?.name}</strong>? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {deleting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 mr-1" />}Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {loading ? (
-        <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-      ) : data.length === 0 ? (
-        <div className="text-center py-8 text-xs text-muted-foreground">No projects found. Create your first project.</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {data.map(p => (
-            <Card key={p.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-mono text-xs font-semibold text-muted-foreground">{p.code}</p>
-                    <p className="text-sm font-medium mt-0.5">{p.name}</p>
-                    {p.description && <p className="text-[10px] text-muted-foreground mt-1">{p.description}</p>}
-                  </div>
-                  <div className="flex items-center gap-1 ml-2 shrink-0">
-                    <Badge className={`text-[9px] ${p.status === 'active' ? 'bg-green-100 text-green-800' : p.status === 'completed' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>{p.status}</Badge>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(p)}><Pencil className="h-3 w-3" /></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(p)}><Trash2 className="h-3 w-3" /></Button>
-                  </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {data.map(p => (
+          <Card key={p.id} className="hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-mono text-xs font-semibold text-muted-foreground">{p.code}</p>
+                  <p className="text-sm font-medium mt-0.5">{p.name}</p>
+                  {p.description && <p className="text-[10px] text-muted-foreground mt-1">{p.description}</p>}
                 </div>
-                {p.startDate && <p className="text-[10px] text-muted-foreground mt-2">{new Date(p.startDate).toLocaleDateString()} - {p.endDate ? new Date(p.endDate).toLocaleDateString() : 'Ongoing'}</p>}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+                <div className="flex items-center gap-1">
+                  <Badge className={`text-[9px] ${p.status === 'active' ? 'bg-green-100 text-green-800' : p.status === 'completed' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>{p.status}</Badge>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(p)}><Pencil className="h-3 w-3" /></Button>
+                  <AlertDialog open={deletingId === p.id} onOpenChange={(open) => { if (!open) setDeletingId(null) }}>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeletingId(p.id)}><Trash2 className="h-3 w-3" /></Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-sm">Delete Project?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-xs">
+                          Are you sure you want to delete &quot;{p.name}&quot; ({p.code})? This action cannot be undone. Projects with associated vouchers cannot be deleted.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="text-xs">Cancel</AlertDialogCancel>
+                        <AlertDialogAction className="text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => handleDelete(p.id)}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+              {p.startDate && <p className="text-[10px] text-muted-foreground mt-2">{new Date(p.startDate).toLocaleDateString()} - {p.endDate ? new Date(p.endDate).toLocaleDateString() : 'Ongoing'}</p>}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   )
 }
 
-// ─── Donors Module ─────────────────────────────────────────────
-const emptyDonorForm = { code: '', name: '', contactPerson: '', email: '', phone: '', address: '' }
-
+// Donors Module
 export function Donors() {
   const [data, setData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState<any>(null)
-  const [form, setForm] = useState(emptyDonorForm)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<any>(null)
-  const [deleting, setDeleting] = useState(false)
+  const [form, setForm] = useState({ code: '', name: '', contactPerson: '', email: '', phone: '', address: '' })
   const { toast } = useToast()
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
+  const fetchData = async () => {
     try {
       const res = await fetch('/api/donors')
-      if (res.ok) setData(await res.json())
-      else setData([])
+      const json = await res.json()
+      setData(Array.isArray(json) ? json : [])
     } catch {
       toast({ title: 'Error', description: 'Failed to load donors', variant: 'destructive' })
-    } finally {
-      setLoading(false)
     }
-  }, [toast])
-
-  useEffect(() => { fetchData() }, [fetchData])
+  }
+  useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   const openCreate = () => {
-    setEditingItem(null)
-    setForm(emptyDonorForm)
+    setEditingId(null)
+    setForm({ code: '', name: '', contactPerson: '', email: '', phone: '', address: '' })
     setDialogOpen(true)
   }
 
-  const openEdit = (item: any) => {
-    setEditingItem(item)
+  const openEdit = (d: any) => {
+    setEditingId(d.id)
     setForm({
-      code: item.code || '',
-      name: item.name || '',
-      contactPerson: item.contactPerson || '',
-      email: item.email || '',
-      phone: item.phone || '',
-      address: item.address || '',
+      code: d.code,
+      name: d.name,
+      contactPerson: d.contactPerson || '',
+      email: d.email || '',
+      phone: d.phone || '',
+      address: d.address || '',
     })
     setDialogOpen(true)
   }
@@ -248,40 +235,50 @@ export function Donors() {
     }
     setSaving(true)
     try {
-      if (editingItem) {
-        const res = await fetch('/api/donors', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editingItem.id, ...form }) })
-        if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to update donor') }
+      if (editingId) {
+        const res = await fetch('/api/donors', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingId, ...form }),
+        })
+        const result = await res.json()
+        if (!res.ok) { toast({ title: 'Error', description: result.error, variant: 'destructive' }); setSaving(false); return }
         toast({ title: 'Updated', description: `Donor ${form.code} updated` })
       } else {
-        const res = await fetch('/api/donors', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
-        if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to create donor') }
+        const res = await fetch('/api/donors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        })
+        const result = await res.json()
+        if (!res.ok) { toast({ title: 'Error', description: result.error, variant: 'destructive' }); setSaving(false); return }
         toast({ title: 'Created', description: `Donor ${form.code} created` })
       }
       setDialogOpen(false)
-      setForm(emptyDonorForm)
-      setEditingItem(null)
+      setForm({ code: '', name: '', contactPerson: '', email: '', phone: '', address: '' })
+      setEditingId(null)
       fetchData()
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Operation failed', variant: 'destructive' })
+    } catch {
+      toast({ title: 'Error', description: 'Operation failed', variant: 'destructive' })
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return
-    setDeleting(true)
+  const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/donors?id=${deleteTarget.id}`, { method: 'DELETE' })
-      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to delete donor') }
-      toast({ title: 'Deleted', description: `Donor ${deleteTarget.code} deleted` })
-      setDeleteTarget(null)
+      const res = await fetch(`/api/donors?id=${id}`, { method: 'DELETE' })
+      const result = await res.json()
+      if (!res.ok) {
+        toast({ title: 'Cannot Delete', description: result.error, variant: 'destructive' })
+        return
+      }
+      toast({ title: 'Deleted', description: 'Donor deleted successfully' })
       fetchData()
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Delete failed', variant: 'destructive' })
-      setDeleteTarget(null)
+    } catch {
+      toast({ title: 'Error', description: 'Failed to delete donor', variant: 'destructive' })
     } finally {
-      setDeleting(false)
+      setDeletingId(null)
     }
   }
 
@@ -289,12 +286,14 @@ export function Donors() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold flex items-center gap-2"><Heart className="h-4 w-4" />Donors</h3>
-        <Button size="sm" className="h-8 text-xs" onClick={openCreate}><Plus className="h-3.5 w-3.5 mr-1" />New Donor</Button>
+        <Button size="sm" className="h-8 text-xs" onClick={openCreate}>
+          <Plus className="h-3.5 w-3.5 mr-1" />New Donor
+        </Button>
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setEditingItem(null); setForm(emptyDonorForm) } }}>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle className="text-sm">{editingItem ? 'Edit Donor' : 'New Donor'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="text-sm">{editingId ? 'Edit Donor' : 'New Donor'}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div><Label className="text-xs">Code *</Label><Input className="h-8 text-xs" value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value }))} /></div>
@@ -309,49 +308,52 @@ export function Donors() {
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button size="sm" onClick={handleSave} disabled={saving}>{saving && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}{editingItem ? 'Update' : 'Create'}</Button>
+            <Button size="sm" onClick={handleSave} disabled={saving}>
+              {saving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+              {editingId ? 'Update' : 'Create'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Donor</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete donor <strong>{deleteTarget?.code} - {deleteTarget?.name}</strong>? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {deleting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 mr-1" />}Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <Card><CardContent className="p-0">
         <Table>
           <TableHeader><TableRow>
-            <TableHead className="text-[10px]">Code</TableHead><TableHead className="text-[10px]">Name</TableHead><TableHead className="text-[10px]">Contact</TableHead><TableHead className="text-[10px]">Email</TableHead><TableHead className="text-[10px]">Phone</TableHead><TableHead className="text-[10px] w-20">Actions</TableHead>
+            <TableHead className="text-[10px]">Code</TableHead>
+            <TableHead className="text-[10px]">Name</TableHead>
+            <TableHead className="text-[10px]">Contact</TableHead>
+            <TableHead className="text-[10px]">Email</TableHead>
+            <TableHead className="text-[10px]">Phone</TableHead>
+            <TableHead className="text-[10px] w-20">Actions</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {loading ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8"><Loader2 className="h-4 w-4 animate-spin mx-auto text-muted-foreground" /></TableCell></TableRow>
-            ) : data.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-xs text-muted-foreground">No donors found. Create your first donor.</TableCell></TableRow>
-            ) : data.map(d => (
+            {data.map(d => (
               <TableRow key={d.id}>
                 <TableCell className="font-mono text-xs font-semibold">{d.code}</TableCell>
                 <TableCell className="text-xs font-medium">{d.name}</TableCell>
                 <TableCell className="text-xs">{d.contactPerson || '-'}</TableCell>
                 <TableCell className="text-xs">{d.email || '-'}</TableCell>
                 <TableCell className="text-xs">{d.phone || '-'}</TableCell>
-                <TableCell className="text-xs">
+                <TableCell>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(d)}><Pencil className="h-3 w-3" /></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(d)}><Trash2 className="h-3 w-3" /></Button>
+                    <AlertDialog open={deletingId === d.id} onOpenChange={(open) => { if (!open) setDeletingId(null) }}>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeletingId(d.id)}><Trash2 className="h-3 w-3" /></Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-sm">Delete Donor?</AlertDialogTitle>
+                          <AlertDialogDescription className="text-xs">
+                            Are you sure you want to delete &quot;{d.name}&quot; ({d.code})? This action cannot be undone. Donors with associated vouchers cannot be deleted.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="text-xs">Cancel</AlertDialogCancel>
+                          <AlertDialogAction className="text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => handleDelete(d.id)}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </TableCell>
               </TableRow>
@@ -363,48 +365,36 @@ export function Donors() {
   )
 }
 
-// ─── Locations Module ──────────────────────────────────────────
-const emptyLocationForm = { code: '', name: '', address: '' }
-
+// Locations Module
 export function Locations() {
   const [data, setData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState<any>(null)
-  const [form, setForm] = useState(emptyLocationForm)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<any>(null)
-  const [deleting, setDeleting] = useState(false)
+  const [form, setForm] = useState({ code: '', name: '', address: '' })
   const { toast } = useToast()
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
+  const fetchData = async () => {
     try {
       const res = await fetch('/api/locations')
-      if (res.ok) setData(await res.json())
-      else setData([])
+      const json = await res.json()
+      setData(Array.isArray(json) ? json : [])
     } catch {
       toast({ title: 'Error', description: 'Failed to load locations', variant: 'destructive' })
-    } finally {
-      setLoading(false)
     }
-  }, [toast])
-
-  useEffect(() => { fetchData() }, [fetchData])
+  }
+  useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   const openCreate = () => {
-    setEditingItem(null)
-    setForm(emptyLocationForm)
+    setEditingId(null)
+    setForm({ code: '', name: '', address: '' })
     setDialogOpen(true)
   }
 
-  const openEdit = (item: any) => {
-    setEditingItem(item)
-    setForm({
-      code: item.code || '',
-      name: item.name || '',
-      address: item.address || '',
-    })
+  const openEdit = (l: any) => {
+    setEditingId(l.id)
+    setForm({ code: l.code, name: l.name, address: l.address || '' })
     setDialogOpen(true)
   }
 
@@ -415,40 +405,50 @@ export function Locations() {
     }
     setSaving(true)
     try {
-      if (editingItem) {
-        const res = await fetch('/api/locations', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editingItem.id, ...form }) })
-        if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to update location') }
+      if (editingId) {
+        const res = await fetch('/api/locations', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingId, ...form }),
+        })
+        const result = await res.json()
+        if (!res.ok) { toast({ title: 'Error', description: result.error, variant: 'destructive' }); setSaving(false); return }
         toast({ title: 'Updated', description: `Location ${form.code} updated` })
       } else {
-        const res = await fetch('/api/locations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
-        if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to create location') }
+        const res = await fetch('/api/locations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        })
+        const result = await res.json()
+        if (!res.ok) { toast({ title: 'Error', description: result.error, variant: 'destructive' }); setSaving(false); return }
         toast({ title: 'Created', description: `Location ${form.code} created` })
       }
       setDialogOpen(false)
-      setForm(emptyLocationForm)
-      setEditingItem(null)
+      setForm({ code: '', name: '', address: '' })
+      setEditingId(null)
       fetchData()
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Operation failed', variant: 'destructive' })
+    } catch {
+      toast({ title: 'Error', description: 'Operation failed', variant: 'destructive' })
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return
-    setDeleting(true)
+  const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/locations?id=${deleteTarget.id}`, { method: 'DELETE' })
-      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to delete location') }
-      toast({ title: 'Deleted', description: `Location ${deleteTarget.code} deleted` })
-      setDeleteTarget(null)
+      const res = await fetch(`/api/locations?id=${id}`, { method: 'DELETE' })
+      const result = await res.json()
+      if (!res.ok) {
+        toast({ title: 'Cannot Delete', description: result.error, variant: 'destructive' })
+        return
+      }
+      toast({ title: 'Deleted', description: 'Location deleted successfully' })
       fetchData()
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Delete failed', variant: 'destructive' })
-      setDeleteTarget(null)
+    } catch {
+      toast({ title: 'Error', description: 'Failed to delete location', variant: 'destructive' })
     } finally {
-      setDeleting(false)
+      setDeletingId(null)
     }
   }
 
@@ -456,12 +456,14 @@ export function Locations() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold flex items-center gap-2"><MapPin className="h-4 w-4" />Locations</h3>
-        <Button size="sm" className="h-8 text-xs" onClick={openCreate}><Plus className="h-3.5 w-3.5 mr-1" />New Location</Button>
+        <Button size="sm" className="h-8 text-xs" onClick={openCreate}>
+          <Plus className="h-3.5 w-3.5 mr-1" />New Location
+        </Button>
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setEditingItem(null); setForm(emptyLocationForm) } }}>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle className="text-sm">{editingItem ? 'Edit Location' : 'New Location'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="text-sm">{editingId ? 'Edit Location' : 'New Location'}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div><Label className="text-xs">Code *</Label><Input className="h-8 text-xs" value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value }))} /></div>
@@ -471,54 +473,52 @@ export function Locations() {
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button size="sm" onClick={handleSave} disabled={saving}>{saving && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}{editingItem ? 'Update' : 'Create'}</Button>
+            <Button size="sm" onClick={handleSave} disabled={saving}>
+              {saving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+              {editingId ? 'Update' : 'Create'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Location</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete location <strong>{deleteTarget?.code} - {deleteTarget?.name}</strong>? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {deleting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 mr-1" />}Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {loading ? (
-        <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-      ) : data.length === 0 ? (
-        <div className="text-center py-8 text-xs text-muted-foreground">No locations found. Create your first location.</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {data.map(l => (
-            <Card key={l.id}>
-              <CardContent className="p-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {data.map(l => (
+          <Card key={l.id}>
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3">
                   <div className="h-8 w-8 rounded bg-primary/10 text-primary flex items-center justify-center shrink-0"><MapPin className="h-4 w-4" /></div>
-                  <div className="flex-1 min-w-0">
+                  <div>
                     <p className="font-mono text-xs font-semibold">{l.code}</p>
                     <p className="text-sm font-medium">{l.name}</p>
                     {l.address && <p className="text-[10px] text-muted-foreground mt-0.5">{l.address}</p>}
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(l)}><Pencil className="h-3 w-3" /></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(l)}><Trash2 className="h-3 w-3" /></Button>
-                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(l)}><Pencil className="h-3 w-3" /></Button>
+                  <AlertDialog open={deletingId === l.id} onOpenChange={(open) => { if (!open) setDeletingId(null) }}>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeletingId(l.id)}><Trash2 className="h-3 w-3" /></Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-sm">Delete Location?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-xs">
+                          Are you sure you want to delete &quot;{l.name}&quot; ({l.code})? This action cannot be undone. Locations with associated vouchers cannot be deleted.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="text-xs">Cancel</AlertDialogCancel>
+                        <AlertDialogAction className="text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => handleDelete(l.id)}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   )
 }

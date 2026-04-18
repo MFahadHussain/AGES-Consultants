@@ -121,3 +121,40 @@ Stage Summary:
 - Seed endpoint clears all transactional data while preserving Chart of Accounts, Financial Year, and Users
 - Projects, Donors, and Locations now have full CRUD (GET, POST, PUT, DELETE) with proper validation
 - All API routes have descriptive error messages and proper HTTP status codes
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Fix Bank/Expense ledger UI, add CRUD UI for Projects/Donors/Locations, clean data
+
+Work Log:
+- Updated src/components/modules/ledgers.tsx:
+  - Replaced renderBankExpenseLedger() which expected flat arrays with renderGroupedLedger()
+  - Bank and expense ledgers now render same as general ledger: grouped by account with running balances
+  - Each account group shows: Account Code - Name, Total Dr/Cr, Balance badge
+  - Running balance calculated correctly based on account type (ASSET/EXPENSE: Dr-Cr, others: Cr-Dr)
+  - Added Voucher Type badge column for better visibility
+  - Empty groups (0 entries) are filtered out from display
+  - Shared renderFilterBar() and renderGroupedLedger() reduce code duplication
+- Updated src/components/modules/segments.tsx:
+  - Projects: Added full Edit and Delete with AlertDialog confirmation
+  - Donors: Added full Edit and Delete with AlertDialog confirmation
+  - Locations: Added full Edit and Delete with AlertDialog confirmation
+  - All three modules now share consistent UI patterns: Pencil icon for edit, Trash2 icon for delete
+  - Edit reuses the create dialog (toggled via editingId state)
+  - Delete shows AlertDialog with descriptive warning about voucher associations
+  - Added Loader2 spinner for save operations
+  - PUT calls /api/projects|donors|locations with { id, ...fields }
+  - DELETE calls /api/projects|donors|locations?id=XXX
+  - Proper error handling with toast messages for both success and failure
+- Cleaned database via GET /api/seed - preserved only Chart of Accounts (64 accounts) and FY 2024-25
+- Created test data: 3 vouchers (BP, CP, BR) to verify end-to-end flow
+- Created reference data: 3 projects, 3 donors, 3 locations
+- All API endpoints tested and returning 200: ledgers (general/bank/expense), vouchers, dashboard, reports, projects, donors, locations
+- Lint passes with no errors
+
+Stage Summary:
+- Bank Ledger and Expense Ledger now render properly with grouped data and running balances
+- Projects, Donors, and Locations have full CRUD in both API and UI
+- Database cleaned to only Chart of Accounts + Financial Year + test vouchers
+- All 20+ API endpoints working correctly
