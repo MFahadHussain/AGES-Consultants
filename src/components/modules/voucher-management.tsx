@@ -10,16 +10,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { Plus, Search, Eye, CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Plus, Search, Eye, CheckCircle, XCircle, Filter, FileText, ArrowRight } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 const voucherTypes = [
-  { value: 'BP', label: 'Bank Payment' },
-  { value: 'CP', label: 'Cash Payment' },
-  { value: 'BR', label: 'Bank Receipt' },
-  { value: 'CR', label: 'Cash Receipt' },
-  { value: 'JV', label: 'Journal Voucher' },
-  { value: 'BILL', label: 'Bill' },
+  { value: 'BP', label: 'Bank Payment', color: 'bg-red-100 text-red-800' },
+  { value: 'CP', label: 'Cash Payment', color: 'bg-orange-100 text-orange-800' },
+  { value: 'BR', label: 'Bank Receipt', color: 'bg-emerald-100 text-emerald-800' },
+  { value: 'CR', label: 'Cash Receipt', color: 'bg-green-100 text-green-800' },
+  { value: 'JV', label: 'Journal Voucher', color: 'bg-blue-100 text-blue-800' },
+  { value: 'BILL', label: 'Bill', color: 'bg-purple-100 text-purple-800' },
 ]
 
 const statusColors: Record<string, string> = {
@@ -48,6 +49,9 @@ interface Account { id: string; code: string; name: string; accountType: string 
 export function VoucherManagement() {
   const [vouchers, setVouchers] = useState<Voucher[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [projects, setProjects] = useState<any[]>([])
+  const [donors, setDonors] = useState<any[]>([])
+  const [locations, setLocations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
@@ -66,7 +70,6 @@ export function VoucherManagement() {
   })
 
   const fetchData = async () => {
-
     try {
       const params = new URLSearchParams()
       if (typeFilter !== 'all') params.set('voucherType', typeFilter)
@@ -82,14 +85,21 @@ export function VoucherManagement() {
     setLoading(false)
   }
 
-  const fetchAccounts = async () => {
-    const res = await fetch('/api/accounts?isActive=true')
-    const data = await res.json()
-    setAccounts(data.filter((a: Account) => a.accountType))
+  const fetchReferenceData = async () => {
+    const [accRes, projRes, donorRes, locRes] = await Promise.all([
+      fetch('/api/accounts?isActive=true'),
+      fetch('/api/projects'),
+      fetch('/api/donors'),
+      fetch('/api/locations'),
+    ])
+    setAccounts(await accRes.json())
+    setProjects(await projRes.json())
+    setDonors(await donorRes.json())
+    setLocations(await locRes.json())
   }
 
   useEffect(() => { queueMicrotask(() => fetchData()) }, [page, typeFilter, statusFilter])
-  useEffect(() => { queueMicrotask(() => fetchAccounts()) }, [])
+  useEffect(() => { queueMicrotask(() => fetchReferenceData()) }, [])
 
   const handleStatusChange = async (voucherId: string, action: string) => {
     try {
@@ -118,9 +128,13 @@ export function VoucherManagement() {
       toast({ title: 'Validation Error', description: `Debits (${totalDebit}) must equal Credits (${totalCredit})`, variant: 'destructive' })
       return
     }
+    const validEntries = form.entries.filter(e => e.accountId)
+    if (validEntries.length < 2) {
+      toast({ title: 'Validation Error', description: 'At least 2 entries with accounts are required', variant: 'destructive' })
+      return
+    }
 
     try {
-      // Get active financial year
       const fyRes = await fetch('/api/financial-year')
       const fys = await fyRes.json()
       const activeFy = fys.find((f: any) => f.status === 'open')
@@ -129,7 +143,15 @@ export function VoucherManagement() {
       await fetch('/api/vouchers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, financialYearId: activeFy.id, voucherTypeName: voucherTypes.find(v => v.value === form.voucherType)?.label }),
+        body: JSON.stringify({
+          ...form,
+          entries: validEntries,
+          financialYearId: activeFy.id,
+          voucherTypeName: voucherTypes.find(v => v.value === form.voucherType)?.label,
+          projectId: form.projectId || undefined,
+          donorId: form.donorId || undefined,
+          locationId: form.locationId || undefined,
+        }),
       })
       toast({ title: 'Created', description: 'Voucher created successfully' })
       setCreateOpen(false)
@@ -145,6 +167,8 @@ export function VoucherManagement() {
   const totalDebit = form.entries.reduce((s, e) => s + (e.debit || 0), 0)
   const totalCredit = form.entries.reduce((s, e) => s + (e.credit || 0), 0)
   const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01
+
+  const voucherTypeColor = (type: string) => voucherTypes.find(v => v.value === type)?.color || 'bg-gray-100 text-gray-800'
 
   return (
     <div className="space-y-4">
@@ -189,9 +213,32 @@ export function VoucherManagement() {
                 <div><Label className="text-xs">Date *</Label><Input type="date" className="h-8 text-xs" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} /></div>
                 <div><Label className="text-xs">Reference</Label><Input className="h-8 text-xs" value={form.reference} onChange={e => setForm(p => ({ ...p, reference: e.target.value }))} /></div>
                 <div><Label className="text-xs">Project</Label>
-                  <Select value={form.projectId} onValueChange={v => setForm(p => ({ ...p, projectId: v }))}>
+                  <Select value={form.projectId} onValueChange={v => setForm(p => ({ ...p, projectId: v === '_none' ? '' : v }))}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
-                    <SelectContent><SelectItem value="none">None</SelectItem></SelectContent>
+                    <SelectContent>
+                      <SelectItem value="_none">None</SelectItem>
+                      {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.code} - {p.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div><Label className="text-xs">Donor</Label>
+                  <Select value={form.donorId} onValueChange={v => setForm(p => ({ ...p, donorId: v === '_none' ? '' : v }))}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">None</SelectItem>
+                      {donors.map(d => <SelectItem key={d.id} value={d.id}>{d.code} - {d.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div><Label className="text-xs">Location</Label>
+                  <Select value={form.locationId} onValueChange={v => setForm(p => ({ ...p, locationId: v === '_none' ? '' : v }))}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">None</SelectItem>
+                      {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.code} - {l.name}</SelectItem>)}
+                    </SelectContent>
                   </Select>
                 </div>
               </div>
@@ -210,7 +257,7 @@ export function VoucherManagement() {
                         {i === 0 && <Label className="text-[10px]">Account</Label>}
                         <Select value={entry.accountId} onValueChange={v => updateEntry(i, 'accountId', v)}>
                           <SelectTrigger className="h-7 text-[10px]"><SelectValue placeholder="Select account" /></SelectTrigger>
-                          <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}><span className="font-mono">{a.code}</span> {a.name}</SelectItem>)}</SelectContent>
+                          <SelectContent className="max-h-60">{accounts.map(a => <SelectItem key={a.id} value={a.id}><span className="font-mono">{a.code}</span> {a.name}</SelectItem>)}</SelectContent>
                         </Select>
                       </div>
                       <div className="col-span-2">
@@ -260,7 +307,8 @@ export function VoucherManagement() {
                 <TableHead className="text-[10px]">Type</TableHead>
                 <TableHead className="text-[10px]">Date</TableHead>
                 <TableHead className="text-[10px]">Narration</TableHead>
-                <TableHead className="text-[10px]">Amount</TableHead>
+                <TableHead className="text-[10px]">Project / Donor</TableHead>
+                <TableHead className="text-[10px] text-right">Amount</TableHead>
                 <TableHead className="text-[10px]">Status</TableHead>
                 <TableHead className="text-[10px]">Integration</TableHead>
                 <TableHead className="text-[10px]">Actions</TableHead>
@@ -268,16 +316,21 @@ export function VoucherManagement() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={8} className="text-center text-xs py-8 text-muted-foreground">Loading...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center text-xs py-8 text-muted-foreground">Loading...</TableCell></TableRow>
               ) : vouchers.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center text-xs py-8 text-muted-foreground">No vouchers found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center text-xs py-8 text-muted-foreground">No vouchers found</TableCell></TableRow>
               ) : vouchers.map(v => (
                 <TableRow key={v.id} className="hover:bg-accent/50">
                   <TableCell className="font-mono text-xs font-semibold">{v.voucherNumber}</TableCell>
-                  <TableCell className="text-xs">{v.voucherTypeName}</TableCell>
+                  <TableCell><Badge className={`text-[9px] ${voucherTypeColor(v.voucherType)}`}>{v.voucherTypeName}</Badge></TableCell>
                   <TableCell className="text-xs">{new Date(v.date).toLocaleDateString()}</TableCell>
                   <TableCell className="text-xs max-w-[200px] truncate">{v.narration}</TableCell>
-                  <TableCell className="text-xs font-semibold">{formatCurrency(v.totalDebit)}</TableCell>
+                  <TableCell className="text-xs">
+                    {v.project?.name && <span className="text-[9px] text-violet-600 mr-1">{v.project.name}</span>}
+                    {v.donor?.name && <span className="text-[9px] text-pink-600">{v.donor.name}</span>}
+                    {!v.project?.name && !v.donor?.name && <span className="text-muted-foreground">-</span>}
+                  </TableCell>
+                  <TableCell className="text-xs text-right font-semibold">{formatCurrency(v.totalDebit)}</TableCell>
                   <TableCell><Badge className={`text-[9px] ${statusColors[v.status]}`}>{v.status}</Badge></TableCell>
                   <TableCell>
                     <div className="flex gap-1">
@@ -292,14 +345,17 @@ export function VoucherManagement() {
                         setDetailVoucher(await res.json())
                         setDetailOpen(true)
                       }}><Eye className="h-3 w-3" /></Button>
-                      {statusFlow[v.status]?.length && statusFlow[v.status].includes('reviewed') && (
-                        <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={() => handleStatusChange(v.id, 'review')}>Review</Button>
+                      {statusFlow[v.status]?.includes('reviewed') && (
+                        <Button variant="ghost" size="sm" className="h-7 text-[10px] text-blue-600" onClick={() => handleStatusChange(v.id, 'review')}>Review</Button>
                       )}
-                      {statusFlow[v.status]?.length && statusFlow[v.status].includes('approved') && (
-                        <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={() => handleStatusChange(v.id, 'approve')}>Approve</Button>
+                      {statusFlow[v.status]?.includes('approved') && (
+                        <Button variant="ghost" size="sm" className="h-7 text-[10px] text-green-600" onClick={() => handleStatusChange(v.id, 'approve')}>Approve</Button>
                       )}
-                      {statusFlow[v.status]?.length && statusFlow[v.status].includes('posted') && (
+                      {statusFlow[v.status]?.includes('posted') && (
                         <Button variant="ghost" size="sm" className="h-7 text-[10px] text-emerald-600" onClick={() => handleStatusChange(v.id, 'post')}>Post</Button>
+                      )}
+                      {statusFlow[v.status]?.includes('rejected') && v.status !== 'rejected' && (
+                        <Button variant="ghost" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => handleStatusChange(v.id, 'reject')}>Reject</Button>
                       )}
                     </div>
                   </TableCell>
@@ -339,6 +395,13 @@ export function VoucherManagement() {
                 <div><span className="text-muted-foreground">Status:</span> <Badge className={`text-[9px] ${statusColors[detailVoucher.status]}`}>{detailVoucher.status}</Badge></div>
                 <div><span className="text-muted-foreground">Reference:</span> {detailVoucher.reference || '-'}</div>
               </div>
+              {(detailVoucher.project || detailVoucher.donor || detailVoucher.location) && (
+                <div className="flex gap-3 text-xs">
+                  {detailVoucher.project && <Badge variant="outline" className="text-[9px]">Project: {detailVoucher.project.name}</Badge>}
+                  {detailVoucher.donor && <Badge variant="outline" className="text-[9px]">Donor: {detailVoucher.donor.name}</Badge>}
+                  {detailVoucher.location && <Badge variant="outline" className="text-[9px]">Location: {detailVoucher.location.name}</Badge>}
+                </div>
+              )}
               <div className="text-xs"><span className="text-muted-foreground">Narration:</span> {detailVoucher.narration}</div>
               <Table>
                 <TableHeader>

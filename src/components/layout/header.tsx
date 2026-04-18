@@ -6,6 +6,15 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useTheme } from 'next-themes'
 import { useEffect, useState } from 'react'
+import { useIsMobile } from '@/hooks/use-mobile'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb'
 
 const moduleLabels: Record<ModuleKey, string> = {
   dashboard: 'Dashboard',
@@ -30,15 +39,39 @@ const moduleLabels: Record<ModuleKey, string> = {
   payroll: 'Payroll Integration',
 }
 
+const moduleGroups: Record<ModuleKey, string> = {
+  dashboard: 'Overview',
+  'chart-of-accounts': 'Accounting',
+  vouchers: 'Accounting',
+  ledgers: 'Accounting',
+  'bank-reconciliation': 'Accounting',
+  customers: 'Masters',
+  suppliers: 'Masters',
+  projects: 'Segments',
+  donors: 'Segments',
+  locations: 'Segments',
+  budgets: 'Planning',
+  taxation: 'Planning',
+  aging: 'Planning',
+  'financial-year': 'Planning',
+  reports: 'Reports',
+  'import-export': 'System',
+  'audit-log': 'System',
+  settings: 'System',
+  'fixed-assets': 'Integration',
+  payroll: 'Integration',
+}
+
 export function Header() {
   const { activeModule, setSidebarOpen, sidebarOpen } = useAppStore()
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const isMobile = useIsMobile()
 
   useEffect(() => { queueMicrotask(() => setMounted(true)) }, [])
 
   return (
-    <header className="border-b bg-card px-4 py-3 flex items-center justify-between shrink-0">
+    <header className="border-b bg-card px-4 py-2.5 flex items-center justify-between shrink-0">
       <div className="flex items-center gap-3">
         <Button
           variant="ghost"
@@ -48,13 +81,35 @@ export function Header() {
         >
           <Menu className="h-4 w-4" />
         </Button>
-        <div>
-          <h2 className="text-sm font-semibold">{moduleLabels[activeModule]}</h2>
-          <p className="text-[10px] text-muted-foreground">Accounting & Financial Management System</p>
+        <div className="hidden sm:block">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink className="text-[10px] text-muted-foreground cursor-pointer" onClick={() => useAppStore.getState().setActiveModule('dashboard')}>
+                  Home
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink className="text-[10px] text-muted-foreground">
+                  {moduleGroups[activeModule]}
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage className="text-xs font-medium">
+                  {moduleLabels[activeModule]}
+                </BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+        <div className="sm:hidden">
+          <p className="text-sm font-semibold">{moduleLabels[activeModule]}</p>
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <Badge variant="outline" className="text-[10px] font-normal">
+        <Badge variant="outline" className="text-[10px] font-normal hidden sm:inline-flex">
           FY 2024-25
         </Badge>
         <Button variant="ghost" size="icon" className="h-8 w-8 relative">
@@ -70,9 +125,9 @@ export function Header() {
           <div className="h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
             <User className="h-3.5 w-3.5" />
           </div>
-          <div className="hidden sm:block">
+          <div className="hidden md:block">
             <p className="text-xs font-medium">Admin</p>
-            <p className="text-[10px] text-muted-foreground">admin@acerp.com</p>
+            <p className="text-[10px] text-muted-foreground">admin@acctfin.com</p>
           </div>
         </div>
       </div>
