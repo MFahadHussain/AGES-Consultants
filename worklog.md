@@ -77,3 +77,47 @@ Stage Summary:
 - Ledgers: fetchData now uses refs for state, is wrapped in useCallback, properly handles errors
 - Both components now properly refresh data after mutations and when navigated to
 - Lint passes with no errors
+
+---
+Task ID: 1
+Agent: Backend API Agent
+Task: Fix Ledger API, rewrite Seed endpoint, add CRUD for Projects/Donors/Locations
+
+Work Log:
+- Fixed src/app/api/ledgers/route.ts:
+  - Bank ledger: now returns grouped entries by bank account (with allowPosting: true filter) instead of flat array
+  - Expense ledger: now returns grouped entries by expense account (with allowPosting: true filter) instead of flat array
+  - Both bank and expense cases now include accountType in response for running balance direction
+  - Added voucherTypeName to voucher select in both bank and expense cases (was missing in expense case)
+  - Response format matches general ledger: grouped by account with accountId, accountCode, accountName, accountType, entries array, totalDebit, totalCredit
+  - Added empty array return when no bank/expense accounts found
+  - Also added accountType and voucherTypeName to receivables and payables cases for consistency
+- Rewrote src/app/api/seed/route.ts:
+  - Removed all sample data creation (projects, donors, locations, customers, suppliers, vouchers, budgets, fixed assets, payroll batches, etc.)
+  - Deletes all data from 18 tables in correct FK constraint order (child tables first)
+  - Level 1 (leaf): VoucherEntry, VoucherApproval, VoucherAttachment, BankReconciliationItem, BankStatementItem, BankStatement, BudgetLine, FixedAssetDepreciation, PayrollBatchLine, TaxCalculation
+  - Level 2 (mid): Voucher, Budget, FixedAsset, PayrollBatch, TaxRate
+  - Level 3 (master): Customer, Supplier, Project, Donor, Location, AccountBalance, ImportLog, ExportLog, AuditLog
+  - Preserves: Account table (Chart of Accounts), FinancialYear (ensures at least one open FY), User table
+  - If no open FY exists, reopens most recent or creates FY 2025-26
+  - Returns preserved counts for confirmation
+- Added PUT and DELETE handlers to src/app/api/projects/route.ts:
+  - PUT: validates id, code, name; checks existence; prevents duplicate code on rename
+  - DELETE: validates id; checks existence; prevents deletion if project has vouchers or budgets
+  - POST also now checks for duplicate code (409 response)
+- Added PUT and DELETE handlers to src/app/api/donors/route.ts:
+  - PUT: validates id, code, name; checks existence; prevents duplicate code on rename
+  - DELETE: validates id; checks existence; prevents deletion if donor has vouchers or budgets
+  - POST also now checks for duplicate code (409 response)
+- Added PUT and DELETE handlers to src/app/api/locations/route.ts:
+  - PUT: validates id, code, name; checks existence; prevents duplicate code on rename
+  - DELETE: validates id; checks existence; prevents deletion if location has vouchers
+  - POST also now checks for duplicate code (409 response)
+- All changes pass lint check with no errors
+- Dev server running without errors
+
+Stage Summary:
+- Bank and expense ledgers now return properly grouped data matching general ledger format
+- Seed endpoint clears all transactional data while preserving Chart of Accounts, Financial Year, and Users
+- Projects, Donors, and Locations now have full CRUD (GET, POST, PUT, DELETE) with proper validation
+- All API routes have descriptive error messages and proper HTTP status codes
