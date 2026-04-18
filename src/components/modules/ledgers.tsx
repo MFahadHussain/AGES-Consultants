@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -61,25 +61,35 @@ export function Ledgers() {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 
+  // Use refs to always have latest state in async callbacks
+  const ledgerTypeRef = useRef(ledgerType)
+  const statusFilterRef = useRef(statusFilter)
+  const selectedAccountRef = useRef(selectedAccount)
+  useEffect(() => { ledgerTypeRef.current = ledgerType }, [ledgerType])
+  useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
+  useEffect(() => { selectedAccountRef.current = selectedAccount }, [selectedAccount])
+
   useEffect(() => {
-    queueMicrotask(() => {
-      fetch('/api/accounts?isActive=true').then(r => r.json()).then(d => setAccounts(d))
-    })
+    fetch('/api/accounts?isActive=true').then(r => r.json()).then(d => setAccounts(d)).catch(() => {})
   }, [])
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true)
-    const params = new URLSearchParams({ type: ledgerType, status: statusFilter })
-    if (selectedAccount && selectedAccount !== 'all') params.set('accountId', selectedAccount)
+    const lt = ledgerTypeRef.current
+    const sf = statusFilterRef.current
+    const sa = selectedAccountRef.current
+    const params = new URLSearchParams({ type: lt, status: sf })
+    if (sa && sa !== 'all') params.set('accountId', sa)
     try {
       const res = await fetch(`/api/ledgers?${params}`)
+      if (!res.ok) throw new Error('Failed to fetch')
       const result = await res.json()
       setData(Array.isArray(result) ? result : [])
-    } catch (e) { console.error(e) }
+    } catch (e) { console.error(e); setData([]) }
     setLoading(false)
-  }
+  }, [])
 
-  useEffect(() => { queueMicrotask(() => fetchData()) }, [ledgerType, selectedAccount, statusFilter])
+  useEffect(() => { fetchData() }, [ledgerType, selectedAccount, statusFilter, fetchData])
 
   const statusBadge = (status: string) => {
     const colors: Record<string, string> = {

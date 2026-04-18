@@ -42,3 +42,38 @@ Stage Summary:
 - Draft vouchers can be Quick Posted from the voucher list
 - Ledger API now supports status filtering
 - All FK references use valid User IDs via getSystemUserId()
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Fix stale closure and data refresh issues in voucher and ledger components
+
+Work Log:
+- Read and analyzed all API routes and frontend components
+- Tested API endpoints directly with curl - confirmed all working (POST 201, GET 200)
+- Identified root cause: stale closure issues in fetchData functions due to queueMicrotask pattern and missing useCallback/useRef patterns
+- Fixed VoucherManagement component:
+  - Replaced queueMicrotask with direct useEffect calls
+  - Added useRef for filter/search/page state to prevent stale closures in async callbacks
+  - Wrapped fetchData in useCallback with refs instead of direct state access
+  - Added setLoading(true) at start of fetchData for proper loading state
+  - After voucher creation: reset search and page to ensure new voucher is visible, await fetchData('')
+  - Made handleStatusChange await fetchData() for reliable refresh
+  - Cleaned up unused imports (Tabs, AlertCircle, CardHeader, CardTitle)
+- Fixed Ledgers component:
+  - Replaced queueMicrotask with direct useEffect calls
+  - Added useRef for ledgerType/statusFilter/selectedAccount to prevent stale closures
+  - Wrapped fetchData in useCallback with refs
+  - Added proper error handling (setData([]) on error)
+  - Component remounts fresh when user navigates to it, ensuring latest data is shown
+- End-to-end verification with curl:
+  - POST /api/vouchers → 201 Created (voucher JV-2026-005 created)
+  - GET /api/vouchers → 200 OK (16 total vouchers, new one appears first)
+  - GET /api/ledgers → 200 OK (12 account groups with entries)
+
+Stage Summary:
+- Root cause: Stale closures in fetchData functions caused by queueMicrotask pattern and lack of useCallback/useRef
+- VoucherManagement: fetchData now uses refs for state, is wrapped in useCallback, properly awaits after creation
+- Ledgers: fetchData now uses refs for state, is wrapped in useCallback, properly handles errors
+- Both components now properly refresh data after mutations and when navigated to
+- Lint passes with no errors

@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,8 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, Search, Eye, XCircle, Printer, Copy, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Plus, Search, Eye, XCircle, Printer, Copy, CheckCircle2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { numberToWords } from '@/lib/number-to-words'
 
@@ -115,39 +114,60 @@ export function VoucherManagement() {
   // Auto-generate amount in words when totals change
   const autoAmountInWords = totalDebit > 0 ? numberToWords(totalDebit) : ''
 
-  const fetchData = async () => {
+  // Use refs to always have latest state in async callbacks
+  const typeFilterRef = useRef(typeFilter)
+  const statusFilterRef = useRef(statusFilter)
+  const searchRef = useRef(search)
+  const pageRef = useRef(page)
+  useEffect(() => { typeFilterRef.current = typeFilter }, [typeFilter])
+  useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
+  useEffect(() => { searchRef.current = search }, [search])
+  useEffect(() => { pageRef.current = page }, [page])
+
+  const fetchData = useCallback(async (overrideSearch?: string) => {
+    setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (typeFilter !== 'all') params.set('voucherType', typeFilter)
-      if (statusFilter !== 'all') params.set('status', statusFilter)
-      if (search) params.set('search', search)
-      params.set('page', String(page))
+      const tf = typeFilterRef.current
+      const sf = statusFilterRef.current
+      const s = overrideSearch !== undefined ? overrideSearch : searchRef.current
+      const p = pageRef.current
+      if (tf !== 'all') params.set('voucherType', tf)
+      if (sf !== 'all') params.set('status', sf)
+      if (s) params.set('search', s)
+      params.set('page', String(p))
       params.set('limit', '20')
       const res = await fetch(`/api/vouchers?${params}`)
+      if (!res.ok) throw new Error('Failed to fetch')
       const data = await res.json()
       setVouchers(data.data || [])
       setTotal(data.total || 0)
     } catch {
       toast({ title: 'Error', description: 'Failed to load vouchers', variant: 'destructive' })
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
-  }
+  }, [toast])
 
-  const fetchReferenceData = async () => {
-    const [accRes, projRes, donorRes, locRes] = await Promise.all([
-      fetch('/api/accounts?isActive=true'),
-      fetch('/api/projects'),
-      fetch('/api/donors'),
-      fetch('/api/locations'),
-    ])
-    setAccounts(await accRes.json())
-    setProjects(await projRes.json())
-    setDonors(await donorRes.json())
-    setLocations(await locRes.json())
-  }
+  const fetchReferenceData = useCallback(async () => {
+    try {
+      const [accRes, projRes, donorRes, locRes] = await Promise.all([
+        fetch('/api/accounts?isActive=true'),
+        fetch('/api/projects'),
+        fetch('/api/donors'),
+        fetch('/api/locations'),
+      ])
+      setAccounts(await accRes.json())
+      setProjects(await projRes.json())
+      setDonors(await donorRes.json())
+      setLocations(await locRes.json())
+    } catch {
+      console.error('Failed to load reference data')
+    }
+  }, [])
 
-  useEffect(() => { queueMicrotask(() => fetchData()) }, [page, typeFilter, statusFilter])
-  useEffect(() => { queueMicrotask(() => fetchReferenceData()) }, [])
+  useEffect(() => { fetchData() }, [page, typeFilter, statusFilter, fetchData])
+  useEffect(() => { fetchReferenceData() }, [fetchReferenceData])
 
   const handleStatusChange = async (voucherId: string, action: string) => {
     try {
@@ -169,7 +189,7 @@ export function VoucherManagement() {
         reject: 'Rejected',
       }
       toast({ title: 'Status Updated', description: `Voucher ${actionLabels[action] || action}` })
-      fetchData()
+      await fetchData()
       if (detailOpen) {
         const detailRes = await fetch(`/api/vouchers/${voucherId}`)
         setDetailVoucher(await detailRes.json())
@@ -234,7 +254,11 @@ export function VoucherManagement() {
       toast({ title: 'Voucher Created', description: form.autoPost ? 'Voucher created and posted to GL' : 'Voucher created as draft' })
       setCreateOpen(false)
       setForm({ ...defaultForm, entries: [{ accountId: '', debit: 0, credit: 0, description: '' }] })
-      fetchData()
+      // Reset to page 1 and clear search to ensure new voucher is visible
+      setSearch('')
+      setPage(1)
+      // Wait for state to settle then fetch
+      await fetchData('')
     } catch (err) {
       toast({ title: 'Error', description: 'Failed to create voucher - check your network connection', variant: 'destructive' })
     } finally {
