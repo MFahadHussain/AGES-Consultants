@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, getSystemUserId } from '@/lib/db'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -67,6 +67,30 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       })
       await db.auditLog.create({
         data: { userId: 'system', action: 'POST', entity: 'Voucher', entityId: id, details: 'Voucher posted to GL' },
+      })
+      return NextResponse.json(voucher)
+    }
+
+    // Quick Post: skip review/approve and post directly from draft/reviewed
+    if (data.action === 'quick_post') {
+      const current = await db.voucher.findUnique({ where: { id }, select: { status: true } })
+      if (!current || current.status === 'posted') {
+        return NextResponse.json({ error: 'Voucher already posted or not found' }, { status: 400 })
+      }
+      const voucher = await db.voucher.update({
+        where: { id },
+        data: {
+          status: 'posted',
+          reviewedBy: current.status === 'draft' ? 'system' : undefined,
+          approvedBy: 'system',
+          postedBy: 'system',
+        },
+      })
+      await db.voucherApproval.create({
+        data: { voucherId: id, userId: 'system', action: 'QUICK_POST', comments: data.comments || 'Quick posted to GL' },
+      })
+      await db.auditLog.create({
+        data: { userId: 'system', action: 'QUICK_POST', entity: 'Voucher', entityId: id, details: 'Voucher quick-posted to GL (skipped review/approve)' },
       })
       return NextResponse.json(voucher)
     }

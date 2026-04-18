@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, getSystemUserId } from '@/lib/db'
 
 export async function GET(request: Request) {
   try {
@@ -29,6 +29,9 @@ export async function GET(request: Request) {
         { voucherNumber: { contains: search } },
         { narration: { contains: search } },
         { reference: { contains: search } },
+        { payeeName: { contains: search } },
+        { voucherNo: { contains: search } },
+        { chequeNumber: { contains: search } },
       ]
     }
 
@@ -117,7 +120,7 @@ export async function POST(request: Request) {
     })
 
     await db.auditLog.create({
-      data: { userId: 'system', action: 'CREATE', entity: 'Voucher', entityId: voucher.id, details: `Created ${voucherNumber}` },
+      data: { userId: await getSystemUserId(), action: 'CREATE', entity: 'Voucher', entityId: voucher.id, details: `Created ${voucherNumber}` },
     })
 
     return NextResponse.json(voucher, { status: 201 })

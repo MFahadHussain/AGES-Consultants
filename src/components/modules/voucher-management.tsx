@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, Search, Eye, XCircle, Printer, Copy } from 'lucide-react'
+import { Plus, Search, Eye, XCircle, Printer, Copy, CheckCircle2, AlertCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { numberToWords } from '@/lib/number-to-words'
 
@@ -166,6 +166,8 @@ export function VoucherManagement() {
     }
   }
 
+  const [creating, setCreating] = useState(false)
+
   const handleCreate = async () => {
     if (!form.voucherType || !form.date || !form.narration) {
       toast({ title: 'Validation Error', description: 'Type, date, and narration are required', variant: 'destructive' })
@@ -181,13 +183,14 @@ export function VoucherManagement() {
       return
     }
 
+    setCreating(true)
     try {
       const fyRes = await fetch('/api/financial-year')
       const fys = await fyRes.json()
       const activeFy = fys.find((f: any) => f.status === 'open')
-      if (!activeFy) { toast({ title: 'Error', description: 'No open financial year', variant: 'destructive' }); return }
+      if (!activeFy) { toast({ title: 'Error', description: 'No open financial year', variant: 'destructive' }); setCreating(false); return }
 
-      await fetch('/api/vouchers', {
+      const res = await fetch('/api/vouchers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -201,12 +204,20 @@ export function VoucherManagement() {
           locationId: form.locationId || undefined,
         }),
       })
+      const result = await res.json()
+      if (!res.ok) {
+        toast({ title: 'Error', description: result.error || 'Failed to create voucher', variant: 'destructive' })
+        setCreating(false)
+        return
+      }
       toast({ title: 'Created', description: 'Voucher created successfully' })
       setCreateOpen(false)
       setForm({ ...defaultForm, entries: [{ accountId: '', debit: 0, credit: 0, description: '' }] })
       fetchData()
-    } catch {
-      toast({ title: 'Error', description: 'Failed to create voucher', variant: 'destructive' })
+    } catch (err) {
+      toast({ title: 'Error', description: 'Failed to create voucher - check your network connection', variant: 'destructive' })
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -407,7 +418,9 @@ export function VoucherManagement() {
             </div>
             <DialogFooter>
               <Button variant="outline" size="sm" onClick={() => setCreateOpen(false)}>Cancel</Button>
-              <Button size="sm" onClick={handleCreate} disabled={!isBalanced}>Create Voucher</Button>
+              <Button size="sm" onClick={handleCreate} disabled={!isBalanced || creating}>
+                {creating ? 'Creating...' : 'Create Voucher'}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -463,16 +476,20 @@ export function VoucherManagement() {
                         const data = await res.json()
                         handlePrint(data)
                       }}><Printer className="h-3 w-3" /></Button>
-                      {statusFlow[v.status]?.includes('reviewed') && (
+                      {v.status === 'draft' && (
                         <Button variant="ghost" size="sm" className="h-7 text-[10px] text-blue-600" onClick={() => handleStatusChange(v.id, 'review')}>Review</Button>
                       )}
-                      {statusFlow[v.status]?.includes('approved') && (
+                      {v.status === 'reviewed' && (
                         <Button variant="ghost" size="sm" className="h-7 text-[10px] text-green-600" onClick={() => handleStatusChange(v.id, 'approve')}>Approve</Button>
                       )}
-                      {statusFlow[v.status]?.includes('posted') && (
+                      {v.status === 'approved' && (
                         <Button variant="ghost" size="sm" className="h-7 text-[10px] text-emerald-600" onClick={() => handleStatusChange(v.id, 'post')}>Post</Button>
                       )}
-                      {statusFlow[v.status]?.includes('rejected') && v.status !== 'rejected' && (
+                      {/* Quick Post: skip review/approve and post directly */}
+                      {(v.status === 'draft' || v.status === 'reviewed') && (
+                        <Button variant="ghost" size="sm" className="h-7 text-[10px] text-emerald-700 font-semibold" onClick={() => handleStatusChange(v.id, 'quick_post')}>Quick Post</Button>
+                      )}
+                      {v.status !== 'rejected' && v.status !== 'posted' && (
                         <Button variant="ghost" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => handleStatusChange(v.id, 'reject')}>Reject</Button>
                       )}
                     </div>
@@ -537,6 +554,33 @@ export function VoucherManagement() {
                 </div>
               )}
               <div className="text-xs"><span className="text-muted-foreground">Narration:</span> {detailVoucher.narration}</div>
+
+              {/* Status Actions in Detail */}
+              {detailVoucher.status !== 'posted' && detailVoucher.status !== 'rejected' && (
+                <div className="flex items-center gap-2 p-3 rounded-md bg-muted/30 border">
+                  <span className="text-xs text-muted-foreground">Actions:</span>
+                  {detailVoucher.status === 'draft' && (
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] text-blue-600" onClick={() => { handleStatusChange(detailVoucher.id, 'review'); }}>Review</Button>
+                  )}
+                  {detailVoucher.status === 'reviewed' && (
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] text-green-600" onClick={() => { handleStatusChange(detailVoucher.id, 'approve'); }}>Approve</Button>
+                  )}
+                  {detailVoucher.status === 'approved' && (
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] text-emerald-600" onClick={() => { handleStatusChange(detailVoucher.id, 'post'); }}>Post to GL</Button>
+                  )}
+                  {(detailVoucher.status === 'draft' || detailVoucher.status === 'reviewed') && (
+                    <Button variant="default" size="sm" className="h-7 text-[10px]" onClick={() => { handleStatusChange(detailVoucher.id, 'quick_post'); }}>
+                      <CheckCircle2 className="h-3 w-3 mr-1" /> Quick Post to GL
+                    </Button>
+                  )}
+                </div>
+              )}
+              {detailVoucher.status === 'posted' && (
+                <div className="flex items-center gap-2 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">This voucher has been posted to the General Ledger</span>
+                </div>
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>

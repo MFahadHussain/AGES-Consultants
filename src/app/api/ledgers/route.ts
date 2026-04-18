@@ -12,10 +12,11 @@ export async function GET(request: Request) {
     const donorId = searchParams.get('donorId')
 
     // Build where clause for voucher entries
-    const entryWhere: any = { voucher: { status: 'posted' } }
+    // Show approved and posted vouchers in ledgers (approved = confirmed, posted = final)
+    const entryWhere: any = { voucher: { status: { in: ['approved', 'posted'] } } }
     if (accountId) entryWhere.accountId = accountId
     if (dateFrom || dateTo) {
-      entryWhere.voucher = { ...entryWhere.voucher, date: {} }
+      entryWhere.voucher.date = {}
       if (dateFrom) entryWhere.voucher.date.gte = new Date(dateFrom)
       if (dateTo) entryWhere.voucher.date.lte = new Date(dateTo)
     }
