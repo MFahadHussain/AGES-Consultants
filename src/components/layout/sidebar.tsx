@@ -5,7 +5,7 @@ import {
   LayoutDashboard,
   BookOpen,
   FileText,
-  Ledger,
+  BookOpenCheck,
   Users,
   Building2,
   Landmark,
@@ -49,7 +49,7 @@ const navigation: NavGroup[] = [
     items: [
       { key: 'chart-of-accounts', label: 'Chart of Accounts', icon: BookOpen },
       { key: 'vouchers', label: 'Voucher Management', icon: FileText },
-      { key: 'ledgers', label: 'Ledgers & Sub-Ledgers', icon: Ledger },
+      { key: 'ledgers', label: 'Ledgers & Sub-Ledgers', icon: BookOpenCheck },
       { key: 'bank-reconciliation', label: 'Bank Reconciliation', icon: Landmark },
     ],
   },

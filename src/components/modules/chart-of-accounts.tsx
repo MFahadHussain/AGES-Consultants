@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,7 +41,6 @@ const subTypes: Record<string, string[]> = {
 
 export function ChartOfAccounts() {
   const [accounts, setAccounts] = useState<Account[]>([])
-  const [filteredAccounts, setFilteredAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
@@ -65,11 +64,11 @@ export function ChartOfAccounts() {
 
   useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
-  useEffect(() => {
+  const filteredAccounts = useMemo(() => {
     let result = accounts
     if (search) result = result.filter(a => a.code.includes(search) || a.name.toLowerCase().includes(search.toLowerCase()))
     if (typeFilter !== 'all') result = result.filter(a => a.accountType === typeFilter)
-    setFilteredAccounts(result)
+    return result
   }, [accounts, search, typeFilter])
 
   const handleSubmit = async () => {
