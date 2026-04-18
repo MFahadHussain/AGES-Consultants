@@ -3,6 +3,7 @@
 import { useAppStore, type ModuleKey } from '@/lib/store'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
+import { GlobalSearch } from '@/components/layout/global-search'
 import { Dashboard } from '@/components/modules/dashboard'
 import { ChartOfAccounts } from '@/components/modules/chart-of-accounts'
 import { VoucherManagement } from '@/components/modules/voucher-management'
@@ -20,11 +21,9 @@ import { PayrollIntegration } from '@/components/modules/payroll'
 import { ImportExport } from '@/components/modules/import-export'
 import { AuditTrail } from '@/components/modules/audit-trail'
 import { SettingsModule } from '@/components/modules/settings'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { Menu } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 const moduleComponents: Record<ModuleKey, React.ComponentType> = {
   dashboard: Dashboard,
@@ -53,6 +52,7 @@ export default function Home() {
   const { activeModule, setActiveModule, sidebarOpen, setSidebarOpen } = useAppStore()
   const ActiveComponent = moduleComponents[activeModule] || Dashboard
   const isMobile = useIsMobile()
+  const [searchOpen, setSearchOpen] = useState(false)
 
   // On mobile, auto-close sidebar when module changes
   useEffect(() => {
@@ -74,7 +74,7 @@ export default function Home() {
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <Header />
+        <Header onSearchOpen={() => setSearchOpen(true)} />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <ActiveComponent />
         </main>
@@ -85,6 +85,9 @@ export default function Home() {
           </div>
         </footer>
       </div>
+
+      {/* Global Search Dialog */}
+      <GlobalSearch />
     </div>
   )
 }

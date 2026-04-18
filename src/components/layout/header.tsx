@@ -1,7 +1,7 @@
 'use client'
 
 import { useAppStore, type ModuleKey } from '@/lib/store'
-import { Menu, Bell, Moon, Sun, User } from 'lucide-react'
+import { Menu, Bell, Moon, Sun, User, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useTheme } from 'next-themes'
@@ -62,7 +62,11 @@ const moduleGroups: Record<ModuleKey, string> = {
   payroll: 'Integration',
 }
 
-export function Header() {
+interface HeaderProps {
+  onSearchOpen?: () => void
+}
+
+export function Header({ onSearchOpen }: HeaderProps) {
   const { activeModule, setSidebarOpen, sidebarOpen } = useAppStore()
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -109,6 +113,27 @@ export function Header() {
         </div>
       </div>
       <div className="flex items-center gap-2">
+        {/* Global Search Trigger */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 hidden sm:flex items-center gap-2 text-xs text-muted-foreground w-56 justify-start font-normal"
+          onClick={onSearchOpen}
+        >
+          <Search className="h-3.5 w-3.5" />
+          <span className="truncate">Search everything...</span>
+          <kbd className="pointer-events-none ml-auto inline-flex h-4 select-none items-center gap-0.5 rounded border bg-muted px-1 font-mono text-[9px] font-medium text-muted-foreground">
+            ⌘K
+          </kbd>
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 sm:hidden"
+          onClick={onSearchOpen}
+        >
+          <Search className="h-4 w-4" />
+        </Button>
         <Badge variant="outline" className="text-[10px] font-normal hidden sm:inline-flex">
           FY 2024-25
         </Badge>

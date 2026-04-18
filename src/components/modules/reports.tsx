@@ -37,43 +37,124 @@ export function FinancialReports() {
   const handlePrint = () => {
     const printContent = document.getElementById('report-content')
     if (printContent) {
-      const win = window.open('', '', 'width=900,height=700')
-      win?.document.write(`<html><head><title>${reportType.replace(/_/g, ' ').toUpperCase()} Report</title>
+      const reportTitle = reportTypes.find(r => r.value === reportType)?.label || reportType.replace(/_/g, ' ').toUpperCase()
+      const win = window.open('', '', 'width=1000,height=750')
+      win?.document.write(`<html><head><title>${reportTitle} - AcctFin ERP</title>
         <style>
-          body{font-family:Arial,sans-serif;font-size:11px;padding:20px;color:#1a1a1a}
-          h1{font-size:16px;text-align:center;margin-bottom:4px}
-          h2{font-size:12px;text-align:center;color:#666;margin-bottom:16px}
-          .header-info{text-align:center;margin-bottom:16px;font-size:10px;color:#888}
-          table{width:100%;border-collapse:collapse;margin-bottom:20px}
-          th{background:#f0f0f0;font-weight:bold;padding:8px 10px;text-align:left;border-bottom:2px solid #ddd;font-size:10px}
-          td{padding:6px 10px;border-bottom:1px solid #eee;font-size:10px}
+          @page{margin:15mm 12mm;size:A4}
+          *{box-sizing:border-box}
+          body{font-family:'Segoe UI',Arial,sans-serif;font-size:10px;padding:0;margin:0;color:#1a1a1a;line-height:1.4}
+          .report-header{border-bottom:3px double #333;padding-bottom:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-start}
+          .report-header .left h1{font-size:16px;font-weight:700;margin:0 0 2px;color:#111;letter-spacing:-0.3px}
+          .report-header .left h2{font-size:13px;font-weight:600;margin:0 0 4px;color:#333}
+          .report-header .left p{font-size:9px;color:#666;margin:1px 0}
+          .report-header .right{text-align:right;font-size:9px;color:#666}
+          .report-header .right .logo{font-size:20px;font-weight:800;color:#16a34a;letter-spacing:-1px}
+          .report-meta{display:flex;justify-content:space-between;font-size:9px;color:#888;border-bottom:1px solid #ddd;padding-bottom:8px;margin-bottom:12px}
+          table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:10px}
+          th{background:#f5f5f5;font-weight:700;padding:7px 8px;text-align:left;border-bottom:2px solid #bbb;font-size:9px;text-transform:uppercase;letter-spacing:0.3px;color:#444}
+          td{padding:5px 8px;border-bottom:1px solid #e5e5e5}
+          tr:hover{background:#fafafa}
           .text-right{text-align:right}
-          .font-bold{font-weight:bold}
-          .section-header{background:#f8f8f8;font-weight:bold;padding:8px 10px}
-          .total-row{background:#f0f0f0;font-weight:bold;border-top:2px solid #999}
-          .badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:8px;font-weight:bold}
-          @media print{body{padding:0}table{page-break-inside:auto}tr{page-break-inside:avoid}}
+          .font-bold{font-weight:700}
+          .font-mono{font-family:'Courier New',monospace}
+          .section-header{background:#f0f4f0;font-weight:700;padding:8px 10px;border-left:3px solid #16a34a;font-size:10px}
+          .total-row{background:#f5f5f5;font-weight:700;border-top:2px solid #999;font-size:10px}
+          .badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:8px;font-weight:600;border:1px solid #ddd}
+          .balance-check{border:2px solid #16a34a;background:#f0fdf4;border-radius:6px;padding:10px;text-align:center;margin-top:12px}
+          .balance-check.fail{border-color:#dc2626;background:#fef2f2}
+          .footer{position:fixed;bottom:0;left:0;right:0;border-top:1px solid #ddd;padding:6px 12mm;font-size:8px;color:#999;display:flex;justify-content:space-between}
+          .page-break{page-break-before:always}
+          @media print{body{padding:0}.footer{position:fixed;bottom:0}table{page-break-inside:auto}tr{page-break-inside:avoid}thead{display:table-header-group}}
         </style></head><body>
-        <h1>AcctFin ERP - Accounting & Financial Management System</h1>
-        <h2>${reportType.replace(/_/g, ' ').toUpperCase()}</h2>
-        <div class="header-info">${dateFrom ? `From: ${dateFrom}` : ''} ${dateTo ? `To: ${dateTo}` : ''} | Generated: ${new Date().toLocaleString()}</div>
-        ${printContent.innerHTML}</body></html>`)
+        <div class="report-header">
+          <div class="left">
+            <h1>${reportTitle}</h1>
+            <h2>AcctFin ERP - Accounting & Financial Management System</h2>
+            <p>Multi-Project • Multi-Donor • Multi-Currency • Multi-Location</p>
+          </div>
+          <div class="right">
+            <div class="logo">AF</div>
+            <p>Generated: ${new Date().toLocaleString()}</p>
+            <p>FY 2024-25</p>
+          </div>
+        </div>
+        <div class="report-meta">
+          <span>${dateFrom ? `Period: ${dateFrom} to ${dateTo}` : `As at: ${dateTo || new Date().toLocaleDateString()}`}</span>
+          <span>Report Type: ${reportTitle}</span>
+          <span>Printed by: Admin</span>
+        </div>
+        ${printContent.innerHTML}
+        <div class="footer">
+          <span>AcctFin ERP v1.0.0 • Confidential</span>
+          <span>This report is computer generated and does not require a signature.</span>
+          <span>Page 1</span>
+        </div>
+        </body></html>`)
       win?.document.close()
-      win?.print()
+      setTimeout(() => win?.print(), 500)
     }
   }
 
   const handleExport = async (format: string) => {
-    if (reportData) {
-      const text = JSON.stringify(reportData, null, 2)
-      const blob = new Blob([text], { type: 'text/plain' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${reportType}-report.${format === 'XLSX' ? 'txt' : format.toLowerCase()}`
-      a.click()
-      URL.revokeObjectURL(url)
+    if (!reportData) return
+    const reportTitle = reportTypes.find(r => r.value === reportType)?.label || reportType
+    let content: string
+    let mimeType: string
+    let extension: string
+
+    if (format === 'CSV') {
+      // Generate CSV
+      const rows: string[][] = []
+      if (reportType === 'trial_balance' && reportData.data) {
+        rows.push(['Code', 'Account Name', 'Type', 'Debit', 'Credit', 'Balance', 'Balance Type'])
+        reportData.data.forEach((row: any) => {
+          rows.push([row.code, row.name, row.accountType, row.totalDebit || '', row.totalCredit || '', row.balance, row.balanceType])
+        })
+        rows.push(['', '', 'TOTAL', reportData.totalDebit, reportData.totalCredit, '', ''])
+      } else if (reportType === 'balance_sheet' && reportData.sections) {
+        rows.push(['Section', 'Code', 'Name', 'Sub Type', 'Amount'])
+        reportData.sections.assets?.forEach((a: any) => rows.push(['Assets', a.code, a.name, a.subType || '', a.balance]))
+        rows.push(['Assets', '', 'Total Assets', '', reportData.totalAssets])
+        reportData.sections.liabilities?.forEach((a: any) => rows.push(['Liabilities', a.code, a.name, '', a.balance]))
+        rows.push(['Liabilities', '', 'Total Liabilities', '', reportData.totalLiabilities])
+        reportData.sections.equity?.forEach((a: any) => rows.push(['Equity', a.code, a.name, '', a.balance]))
+        rows.push(['Equity', '', 'Total Equity', '', reportData.totalEquity])
+      } else if (reportType === 'pnl' && reportData.income) {
+        rows.push(['Section', 'Code', 'Name', 'Amount'])
+        reportData.income.forEach((a: any) => rows.push(['Income', a.code, a.name, a.balance]))
+        rows.push(['Income', '', 'Total Income', reportData.totalIncome])
+        reportData.expenses.forEach((a: any) => rows.push(['Expenses', a.code, a.name, a.balance]))
+        rows.push(['Expenses', '', 'Total Expenses', reportData.totalExpenses])
+        rows.push(['', '', reportData.netSurplus >= 0 ? 'Net Surplus' : 'Net Deficit', Math.abs(reportData.netSurplus)])
+      } else if (reportType === 'cash_flow' && reportData.entries) {
+        rows.push(['Date', 'Voucher', 'Account', 'Narration', 'Inflow', 'Outflow'])
+        reportData.entries.forEach((e: any) => {
+          rows.push([new Date(e.voucher?.date).toLocaleDateString(), e.voucher?.voucherNumber, `${e.account?.code} - ${e.account?.name}`, e.voucher?.narration, e.debit > 0 ? e.debit : '', e.credit > 0 ? e.credit : ''])
+        })
+      } else {
+        // Segment reports
+        rows.push(['Code', 'Name', 'Total Debit', 'Total Credit', 'Net Balance'])
+        reportData.data?.forEach((d: any) => {
+          rows.push([d.code, d.project || d.donor || d.location, d.totalDebit, d.totalCredit, d.balance])
+        })
+      }
+      content = rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+      mimeType = 'text/csv'
+      extension = 'csv'
+    } else {
+      content = JSON.stringify(reportData, null, 2)
+      mimeType = 'application/json'
+      extension = 'json'
     }
+
+    const blob = new Blob([content], { type: mimeType })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${reportTitle.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.${extension}`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const renderTrialBalance = () => {
@@ -292,7 +373,8 @@ export function FinancialReports() {
             </Button>
             <div className="flex gap-1 ml-auto">
               <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handlePrint} disabled={!reportData}><Printer className="h-3.5 w-3.5 mr-1" />Print</Button>
-              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => handleExport('XLSX')} disabled={!reportData}><Download className="h-3.5 w-3.5 mr-1" />Export</Button>
+              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => handleExport('CSV')} disabled={!reportData}><Download className="h-3.5 w-3.5 mr-1" />CSV</Button>
+              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => handleExport('JSON')} disabled={!reportData}><Download className="h-3.5 w-3.5 mr-1" />JSON</Button>
             </div>
           </div>
         </CardContent>
