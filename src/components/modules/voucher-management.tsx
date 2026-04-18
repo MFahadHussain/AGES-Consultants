@@ -42,6 +42,39 @@ const roleLabels: Record<string, string> = {
   admin: 'Admin', manager: 'Manager', accountant: 'Accountant', auditor: 'Auditor', viewer: 'Viewer'
 }
 
+// Role-based workflow permissions
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  submit: ['admin', 'manager', 'accountant'],
+  approve: ['admin', 'manager'],
+  post: ['admin'],
+  reject: ['admin', 'manager'],
+  quick_post: ['admin'],
+  edit: ['admin', 'manager', 'accountant'],
+  revoke: ['admin'],
+  delete: ['admin', 'manager', 'accountant'],
+}
+
+function hasPermission(action: string, role: string): boolean {
+  return ROLE_PERMISSIONS[action]?.includes(role) ?? false
+}
+
+// Role colors for the selector badge
+const roleColors: Record<string, string> = {
+  admin: 'bg-rose-100 text-rose-800 border-rose-200',
+  manager: 'bg-amber-100 text-amber-800 border-amber-200',
+  accountant: 'bg-sky-100 text-sky-800 border-sky-200',
+  auditor: 'bg-violet-100 text-violet-800 border-violet-200',
+  viewer: 'bg-gray-100 text-gray-800 border-gray-200',
+}
+
+// Which role is needed for each workflow step
+const stepRoles: Record<string, string> = {
+  draft: 'Accountant creates',
+  pending: 'Manager reviews',
+  approved: 'Admin posts',
+  posted: 'Locked',
+}
+
 const categoryColors: Record<string, string> = {
   invoice: 'bg-blue-100 text-blue-800',
   receipt: 'bg-green-100 text-green-800',
@@ -68,34 +101,44 @@ function FileIcon({ mimeType }: { mimeType?: string | null }) {
   return <File className="h-4 w-4 text-gray-500" />
 }
 
-// Workflow Step Indicator
-function WorkflowSteps({ currentStatus }: { currentStatus: string }) {
+// Workflow Step Indicator with Role Labels
+function WorkflowSteps({ currentStatus, currentRole }: { currentStatus: string; currentRole?: string }) {
   const steps = ['draft', 'pending', 'approved', 'posted']
   const currentStep = statusConfig[currentStatus]?.step || 0
   const isRejected = currentStatus === 'rejected'
 
   return (
-    <div className="flex items-center gap-1">
-      {steps.map((step, i) => {
-        const config = statusConfig[step]
-        const isCompleted = currentStep > i + 1 || (currentStatus === 'posted' && i < 3)
-        const isCurrent = currentStep === i + 1
-        const isRejectedStep = isRejected
-        return (
-          <div key={step} className="flex items-center gap-1">
-            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold ${
-              isCompleted ? 'bg-emerald-100 text-emerald-800' :
-              isCurrent && !isRejectedStep ? config.color :
-              'bg-gray-100 text-gray-400'
-            }`}>
-              {isCompleted ? <CheckCircle2 className="h-2.5 w-2.5" /> : <span className="h-2.5 w-2.5 rounded-full border flex items-center justify-center text-[7px]">{i + 1}</span>}
-              <span className="hidden sm:inline">{config.label}</span>
+    <div className="space-y-1">
+      <div className="flex items-center gap-1">
+        {steps.map((step, i) => {
+          const config = statusConfig[step]
+          const isCompleted = currentStep > i + 1 || (currentStatus === 'posted' && i < 3)
+          const isCurrent = currentStep === i + 1
+          const isRejectedStep = isRejected
+          return (
+            <div key={step} className="flex items-center gap-1">
+              <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold ${
+                isCompleted ? 'bg-emerald-100 text-emerald-800' :
+                isCurrent && !isRejectedStep ? config.color :
+                'bg-gray-100 text-gray-400'
+              }`}>
+                {isCompleted ? <CheckCircle2 className="h-2.5 w-2.5" /> : <span className="h-2.5 w-2.5 rounded-full border flex items-center justify-center text-[7px]">{i + 1}</span>}
+                <span className="hidden sm:inline">{config.label}</span>
+              </div>
+              {i < 3 && <div className={`h-px w-3 ${isCompleted ? 'bg-emerald-300' : 'bg-gray-200'}`} />}
             </div>
-            {i < 3 && <div className={`h-px w-3 ${isCompleted ? 'bg-emerald-300' : 'bg-gray-200'}`} />}
-          </div>
-        )
-      })}
-      {isRejected && <Badge className="text-[9px] bg-red-100 text-red-800 ml-1">Rejected</Badge>}
+          )
+        })}
+        {isRejected && <Badge className="text-[9px] bg-red-100 text-red-800 ml-1">Rejected</Badge>}
+      </div>
+      <div className="flex items-center gap-1 text-[8px] text-muted-foreground">
+        {steps.map((step, i) => (
+          <span key={step} className="flex items-center gap-1">
+            <span className={`px-1.5 py-0 rounded ${currentStep === i + 1 && !isRejected ? 'font-semibold text-foreground' : ''}`}>{stepRoles[step]}</span>
+            {i < 3 && <span className="w-3" />}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
@@ -185,6 +228,10 @@ export function VoucherManagement() {
   const [rejectComments, setRejectComments] = useState('')
 
   // Attachment states
+  // Current role for workflow simulation
+  const [currentRole, setCurrentRole] = useState<string>('admin')
+
+  // Attachment states
   const [uploadingFiles, setUploadingFiles] = useState(false)
   const [attachmentCategory, setAttachmentCategory] = useState('other')
 
@@ -262,11 +309,16 @@ export function VoucherManagement() {
 
   // ==================== WORKFLOW ACTIONS ====================
   const handleStatusChange = async (voucherId: string, action: string, comments?: string) => {
+    // Check role permission before sending
+    if (!hasPermission(action, currentRole)) {
+      toast({ title: 'Permission Denied', description: `${roleLabels[currentRole]} role cannot ${action} vouchers. Required: ${ROLE_PERMISSIONS[action]?.map(r => roleLabels[r]).join(', ') || 'N/A'}`, variant: 'destructive' })
+      return
+    }
     try {
       const res = await fetch(`/api/vouchers/${voucherId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, comments, userRole: 'admin' }),
+        body: JSON.stringify({ action, comments, userRole: currentRole }),
       })
       const result = await res.json()
       if (!res.ok) {
@@ -335,7 +387,7 @@ export function VoucherManagement() {
           autoPost: form.autoPost, entries: validEntries, financialYearId: activeFy.id,
           voucherTypeName: voucherTypes.find(v => v.value === form.voucherType)?.label,
           projectId: form.projectId || undefined, donorId: form.donorId || undefined,
-          locationId: form.locationId || undefined, userRole: 'admin',
+          locationId: form.locationId || undefined, userRole: currentRole,
         }),
       })
       const result = await res.json()
@@ -390,7 +442,7 @@ export function VoucherManagement() {
           chequeDate: form.chequeDate || null, voucherNo: form.voucherNo || null,
           amountInWords: form.amountInWords || autoAmountInWords || null,
           projectId: form.projectId || null, donorId: form.donorId || null,
-          locationId: form.locationId || null, entries: validEntries, userRole: 'admin',
+          locationId: form.locationId || null, entries: validEntries, userRole: currentRole,
         }),
       })
       const result = await res.json()
@@ -584,6 +636,27 @@ export function VoucherManagement() {
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Role Selector */}
+          <div className="flex items-center gap-1.5">
+            <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+            <Select value={currentRole} onValueChange={setCurrentRole}>
+              <SelectTrigger className={`h-8 w-32 text-xs border-dashed ${currentRole !== 'admin' ? 'border-2' : ''}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {['admin', 'manager', 'accountant', 'auditor', 'viewer'].map(r => (
+                  <SelectItem key={r} value={r}>
+                    <span className="flex items-center gap-1.5">
+                      <span className={`inline-block h-2 w-2 rounded-full ${r === 'admin' ? 'bg-rose-500' : r === 'manager' ? 'bg-amber-500' : r === 'accountant' ? 'bg-sky-500' : r === 'auditor' ? 'bg-violet-500' : 'bg-gray-400'}`} />
+                      {roleLabels[r]}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Badge className={`text-[8px] ${roleColors[currentRole]}`}>{roleLabels[currentRole]}</Badge>
+          </div>
+          <Separator orientation="vertical" className="h-5" />
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input placeholder="Search vouchers..." className="pl-7 h-8 text-xs w-52" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && fetchData()} />
@@ -671,7 +744,7 @@ export function VoucherManagement() {
                 <TableCell className="text-xs font-medium">{v.payeeName || '-'}</TableCell>
                 <TableCell className="text-xs">{new Date(v.date).toLocaleDateString()}</TableCell>
                 <TableCell className="text-xs text-right font-semibold">{formatCurrency(v.totalDebit)}</TableCell>
-                <TableCell><WorkflowSteps currentStatus={v.status} /></TableCell>
+                <TableCell><WorkflowSteps currentStatus={v.status} currentRole={currentRole} /></TableCell>
                 <TableCell>
                   <div className="flex items-center gap-0.5">
                     <Button variant="ghost" size="icon" className="h-7 w-7" title="View" onClick={async () => { const res = await fetch(`/api/vouchers/${v.id}`); setDetailVoucher(await res.json()); setDetailOpen(true) }}><Eye className="h-3 w-3" /></Button>
@@ -757,7 +830,7 @@ export function VoucherManagement() {
               {/* Workflow Steps */}
               <div className="p-3 rounded-md bg-muted/30 border">
                 <p className="text-[10px] text-muted-foreground mb-2 font-semibold">APPROVAL WORKFLOW</p>
-                <WorkflowSteps currentStatus={detailVoucher.status} />
+                <WorkflowSteps currentStatus={detailVoucher.status} currentRole={currentRole} />
               </div>
 
               {/* Voucher Info */}
