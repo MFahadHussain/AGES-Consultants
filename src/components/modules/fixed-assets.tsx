@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Package, TrendingDown, ArrowRightLeft } from 'lucide-react'
+import { Plus, Package, TrendingDown } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
 
 function formatCurrency(amount: number) {
@@ -31,8 +32,12 @@ export function FixedAssetsIntegration() {
   const { toast } = useToast()
 
   const fetchData = async () => {
-    const res = await fetch('/api/fixed-assets')
-    setAssets(await res.json())
+    try {
+      const res = await fetch('/api/fixed-assets')
+      setAssets(await res.json())
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load fixed assets', variant: 'destructive' })
+    }
   }
 
   useEffect(() => {
@@ -49,41 +54,53 @@ export function FixedAssetsIntegration() {
       toast({ title: 'Error', description: 'Required fields missing', variant: 'destructive' }); return
     }
     // INTEGRATION: Fixed Assets → GL - Asset purchase creates entries in Asset account
-    await fetch('/api/fixed-assets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, netBookValue: form.purchaseCost }),
-    })
-    toast({ title: 'Created', description: `Asset ${form.assetCode} created. INTEGRATION: Creates asset purchase entry in GL.` })
-    setDialogOpen(false)
-    fetchData()
+    try {
+      await fetch('/api/fixed-assets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, netBookValue: form.purchaseCost }),
+      })
+      toast({ title: 'Created', description: `Asset ${form.assetCode} created. INTEGRATION: Creates asset purchase entry in GL.` })
+      setDialogOpen(false)
+      fetchData()
+    } catch {
+      toast({ title: 'Error', description: 'Failed to create fixed asset', variant: 'destructive' })
+    }
   }
 
   const handleDepreciation = async () => {
     // INTEGRATION: Fixed Assets → GL - Monthly depreciation auto-generates journal entries
-    const res = await fetch('/api/fixed-assets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'depreciation', period: depPeriod }),
-    })
-    const result = await res.json()
-    toast({ title: 'Depreciation Run Complete', description: `INTEGRATION: ${result.processed} assets depreciated. Journal entries created in GL.` })
-    setDepDialogOpen(false)
-    fetchData()
+    try {
+      const res = await fetch('/api/fixed-assets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'depreciation', period: depPeriod }),
+      })
+      const result = await res.json()
+      toast({ title: 'Depreciation Run Complete', description: `INTEGRATION: ${result.processed} assets depreciated. Journal entries created in GL.` })
+      setDepDialogOpen(false)
+      fetchData()
+    } catch {
+      toast({ title: 'Error', description: 'Failed to run depreciation', variant: 'destructive' })
+    }
   }
 
   const handleDispose = async () => {
     if (!selectedAsset) return
     // INTEGRATION: Fixed Assets → GL - Asset disposals post gain/loss entries
-    const res = await fetch('/api/fixed-assets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'dispose', assetId: selectedAsset.id, ...disposeForm }),
-    })
-    const result = await res.json()
-    toast({ title: 'Asset Disposed', description: `INTEGRATION: Gain/Loss of ${formatCurrency(result.gainLoss)} posted to GL as ${result.gainLossType}.` })
-    setDisposeDialogOpen(false)
-    fetchData()
+    try {
+      const res = await fetch('/api/fixed-assets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'dispose', assetId: selectedAsset.id, ...disposeForm }),
+      })
+      const result = await res.json()
+      toast({ title: 'Asset Disposed', description: `INTEGRATION: Gain/Loss of ${formatCurrency(result.gainLoss)} posted to GL as ${result.gainLossType}.` })
+      setDisposeDialogOpen(false)
+      fetchData()
+    } catch {
+      toast({ title: 'Error', description: 'Failed to dispose asset', variant: 'destructive' })
+    }
   }
 
   const statusStyles: Record<string, string> = { active: 'bg-green-100 text-green-800', disposed: 'bg-red-100 text-red-800', transferred: 'bg-blue-100 text-blue-800' }
@@ -143,7 +160,7 @@ export function FixedAssetsIntegration() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <input type="checkbox" checked={form.isDonorFunded} onChange={e => setForm(p => ({ ...p, isDonorFunded: e.target.checked }))} className="rounded" />
+                  <Switch checked={form.isDonorFunded} onCheckedChange={v => setForm(p => ({ ...p, isDonorFunded: v }))} />
                   <Label className="text-xs">Donor-Funded Asset (Zero Depreciation)</Label>
                 </div>
                 {form.isDonorFunded && <p className="text-[10px] text-purple-600 font-medium">INTEGRATION: Donor-funded assets are flagged and excluded from depreciation journal entries.</p>}

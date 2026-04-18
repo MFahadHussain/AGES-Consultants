@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Switch } from '@/components/ui/switch'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Plus, Search, Edit2, Trash2, ChevronRight, ChevronDown, Filter } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, ChevronRight, ChevronDown } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 interface Account {
@@ -123,66 +123,6 @@ export function ChartOfAccounts() {
     return accounts
       .filter(a => a.parentId === parentId)
       .map(a => ({ ...a, level, children: buildTree(accounts, a.id, level + 1) }))
-  }
-
-  const renderTree = (items: Account[], level = 0) => {
-    return items.map(account => {
-      const hasChildren = accounts.some(a => a.parentId === account.id)
-      const isExpanded = expandedIds.has(account.id)
-      return (
-        <div key={account.id}>
-          <TableRow className={`hover:bg-accent/50 ${!account.isActive ? 'opacity-50' : ''}`}>
-            <TableCell>
-              <div className="flex items-center" style={{ paddingLeft: `${level * 24}px` }}>
-                {hasChildren ? (
-                  <button onClick={() => toggleExpand(account.id)} className="mr-1">
-                    {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                  </button>
-                ) : (
-                  <span className="w-5" />
-                )}
-                <span className="font-mono text-xs font-semibold">{account.code}</span>
-              </div>
-            </TableCell>
-            <TableCell>
-              <div style={{ paddingLeft: `${level * 8}px` }} className="text-xs">{account.name}</div>
-            </TableCell>
-            <TableCell>
-              <Badge className={`text-[9px] ${typeColors[account.accountType] || ''}`}>
-                {account.accountType}
-              </Badge>
-            </TableCell>
-            <TableCell className="text-[10px] text-muted-foreground">{account.subType || '-'}</TableCell>
-            <TableCell>
-              <div className="flex items-center gap-1">
-                {account.isActive && <Badge className="text-[9px] bg-green-100 text-green-800">Active</Badge>}
-                {!account.isActive && <Badge className="text-[9px] bg-gray-100 text-gray-800">Inactive</Badge>}
-                {account.allowPosting && <Badge className="text-[9px] bg-blue-100 text-blue-800">Posting</Badge>}
-                {account.isSystem && <Badge className="text-[9px] bg-purple-100 text-purple-800">System</Badge>}
-              </div>
-            </TableCell>
-            <TableCell className="text-xs text-right">
-              {account._count?.voucherEntries || 0}
-            </TableCell>
-            <TableCell>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
-                  setEditingAccount(account)
-                  setForm({ code: account.code, name: account.name, accountType: account.accountType, subType: account.subType || '', parentId: account.parentId || '', allowPosting: account.allowPosting, description: account.description || '' })
-                  setDialogOpen(true)
-                }}>
-                  <Edit2 className="h-3 w-3" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeactivate(account)} disabled={account.isSystem}>
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            </TableCell>
-          </TableRow>
-          {isExpanded && hasChildren && renderTree(buildTree(accounts, account.id), level + 1)}
-        </div>
-      )
-    })
   }
 
   const rootAccounts = buildTree(filteredAccounts.filter(a => a.parentId === null))

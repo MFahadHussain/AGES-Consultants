@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Shield, Search } from 'lucide-react'
+import { Shield } from 'lucide-react'
 
 export function AuditTrail() {
   const [logs, setLogs] = useState<any[]>([])

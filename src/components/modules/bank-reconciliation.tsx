@@ -27,13 +27,17 @@ export function BankReconciliation() {
   useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   const handleMatch = async (statementItemId: string, voucherId: string) => {
-    await fetch('/api/bank-reconciliation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'reconcile', bankStatementItemId: statementItemId, voucherId }),
-    })
-    toast({ title: 'Matched', description: 'Item reconciled' })
-    fetchData()
+    try {
+      await fetch('/api/bank-reconciliation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reconcile', bankStatementItemId: statementItemId, voucherId }),
+      })
+      toast({ title: 'Matched', description: 'Item reconciled' })
+      fetchData()
+    } catch {
+      toast({ title: 'Error', description: 'Failed to reconcile', variant: 'destructive' })
+    }
   }
 
   return (
@@ -94,7 +98,13 @@ export function BankReconciliation() {
                         <Badge className="text-[9px] bg-yellow-100 text-yellow-800"><AlertCircle className="h-3 w-3 mr-1" />Unmatched</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-xs">{item.reconItems?.[0]?.voucher?.voucherNumber || '-'}</TableCell>
+                    <TableCell className="text-xs">
+                      {item.isMatched ? (
+                        item.reconItems?.[0]?.voucher?.voucherNumber || '-'
+                      ) : (
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px] text-blue-600" onClick={() => handleMatch(item.id, 'auto')}>Auto-Match</Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

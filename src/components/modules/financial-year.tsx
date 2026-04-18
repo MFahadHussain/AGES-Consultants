@@ -20,8 +20,12 @@ export function FinancialYearManagement() {
   const { toast } = useToast()
 
   const fetchData = async () => {
-    const res = await fetch('/api/financial-year')
-    setYears(await res.json())
+    try {
+      const res = await fetch('/api/financial-year')
+      setYears(await res.json())
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load financial years', variant: 'destructive' })
+    }
   }
 
   useEffect(() => { queueMicrotask(() => fetchData()) }, [])
@@ -30,23 +34,31 @@ export function FinancialYearManagement() {
     if (!form.name || !form.startDate || !form.endDate) {
       toast({ title: 'Error', description: 'All fields required', variant: 'destructive' }); return
     }
-    await fetch('/api/financial-year', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
-    toast({ title: 'Created', description: `Financial year ${form.name} created` })
-    setDialogOpen(false)
-    setForm({ name: '', startDate: '', endDate: '' })
-    fetchData()
+    try {
+      await fetch('/api/financial-year', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+      toast({ title: 'Created', description: `Financial year ${form.name} created` })
+      setDialogOpen(false)
+      setForm({ name: '', startDate: '', endDate: '' })
+      fetchData()
+    } catch {
+      toast({ title: 'Error', description: 'Failed to create financial year', variant: 'destructive' })
+    }
   }
 
   const handleClose = async () => {
     if (!selectedYear) return
-    await fetch('/api/financial-year', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'close', id: selectedYear.id, createNext: true }),
-    })
-    toast({ title: 'Year Closed', description: `${selectedYear.name} closed and next year created` })
-    setCloseDialogOpen(false)
-    fetchData()
+    try {
+      await fetch('/api/financial-year', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'close', id: selectedYear.id, createNext: true }),
+      })
+      toast({ title: 'Year Closed', description: `${selectedYear.name} closed and next year created` })
+      setCloseDialogOpen(false)
+      fetchData()
+    } catch {
+      toast({ title: 'Error', description: 'Failed to close financial year', variant: 'destructive' })
+    }
   }
 
   const statusStyles: Record<string, string> = {

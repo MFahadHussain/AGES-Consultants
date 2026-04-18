@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Switch } from '@/components/ui/switch'
-import { Plus, Search, Edit2, Building2, Users } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 interface Customer { id: string; code: string; name: string; contactPerson: string | null; email: string | null; phone: string | null; address: string | null; creditTerms: number; creditLimit: number; isActive: boolean }
@@ -23,20 +23,28 @@ export function Customers() {
   const { toast } = useToast()
 
   const fetchData = async () => {
-    const params = search ? `?search=${search}` : ''
-    const res = await fetch(`/api/customers${params}`)
-    setData(await res.json())
+    try {
+      const params = search ? `?search=${search}` : ''
+      const res = await fetch(`/api/customers${params}`)
+      setData(await res.json())
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load customers', variant: 'destructive' })
+    }
   }
 
   useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   const handleCreate = async () => {
     if (!form.code || !form.name) { toast({ title: 'Error', description: 'Code and name required', variant: 'destructive' }); return }
-    await fetch('/api/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
-    toast({ title: 'Created', description: `Customer ${form.code} created` })
-    setDialogOpen(false)
-    setForm({ code: '', name: '', contactPerson: '', email: '', phone: '', address: '', creditTerms: 30, creditLimit: 0 })
-    fetchData()
+    try {
+      await fetch('/api/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+      toast({ title: 'Created', description: `Customer ${form.code} created` })
+      setDialogOpen(false)
+      setForm({ code: '', name: '', contactPerson: '', email: '', phone: '', address: '', creditTerms: 30, creditLimit: 0 })
+      fetchData()
+    } catch {
+      toast({ title: 'Error', description: 'Failed to create customer', variant: 'destructive' })
+    }
   }
 
   return (
@@ -102,20 +110,28 @@ export function Suppliers() {
   const { toast } = useToast()
 
   const fetchData = async () => {
-    const params = search ? `?search=${search}` : ''
-    const res = await fetch(`/api/suppliers${params}`)
-    setData(await res.json())
+    try {
+      const params = search ? `?search=${search}` : ''
+      const res = await fetch(`/api/suppliers${params}`)
+      setData(await res.json())
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load suppliers', variant: 'destructive' })
+    }
   }
 
   useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   const handleCreate = async () => {
     if (!form.code || !form.name) { toast({ title: 'Error', description: 'Code and name required', variant: 'destructive' }); return }
-    await fetch('/api/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
-    toast({ title: 'Created', description: `Supplier ${form.code} created` })
-    setDialogOpen(false)
-    setForm({ code: '', name: '', contactPerson: '', email: '', phone: '', address: '', creditTerms: 30, taxNumber: '', bankName: '', bankAccount: '' })
-    fetchData()
+    try {
+      await fetch('/api/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+      toast({ title: 'Created', description: `Supplier ${form.code} created` })
+      setDialogOpen(false)
+      setForm({ code: '', name: '', contactPerson: '', email: '', phone: '', address: '', creditTerms: 30, taxNumber: '', bankName: '', bankAccount: '' })
+      fetchData()
+    } catch {
+      toast({ title: 'Error', description: 'Failed to create supplier', variant: 'destructive' })
+    }
   }
 
   return (

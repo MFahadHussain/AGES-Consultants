@@ -25,27 +25,39 @@ export function Taxation() {
   const { toast } = useToast()
 
   const fetchData = async () => {
-    const res = await fetch('/api/taxation')
-    setTaxRates(await res.json())
+    try {
+      const res = await fetch('/api/taxation')
+      setTaxRates(await res.json())
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load tax rates', variant: 'destructive' })
+    }
   }
 
   useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   const handleCreate = async () => {
     if (!form.name) { toast({ title: 'Error', description: 'Name required', variant: 'destructive' }); return }
-    await fetch('/api/taxation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
-    toast({ title: 'Created', description: 'Tax rate created' })
-    setDialogOpen(false)
-    fetchData()
+    try {
+      await fetch('/api/taxation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+      toast({ title: 'Created', description: 'Tax rate created' })
+      setDialogOpen(false)
+      fetchData()
+    } catch {
+      toast({ title: 'Error', description: 'Failed to create tax rate', variant: 'destructive' })
+    }
   }
 
   const handleCalculate = async () => {
-    const res = await fetch('/api/taxation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'calculate', ...calcForm }),
-    })
-    setCalcResult(await res.json())
+    try {
+      const res = await fetch('/api/taxation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'calculate', ...calcForm }),
+      })
+      setCalcResult(await res.json())
+    } catch {
+      toast({ title: 'Error', description: 'Failed to calculate tax', variant: 'destructive' })
+    }
   }
 
   const taxTypeLabels: Record<string, string> = { INCOME_TAX: 'Income Tax', SALES_TAX: 'Sales Tax', GST: 'GST', ZAKAT: 'Zakat' }

@@ -7,8 +7,8 @@ import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/lib/store'
 import {
-  Banknote, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
-  FileText, Users, Building2, Package, AlertTriangle, Eye,
+  Banknote, TrendingUp, ArrowUpRight, ArrowDownRight,
+  FileText, Users, Building2, Package, AlertTriangle,
   BookOpen, FolderTree, Heart, RefreshCw, Activity, Wallet,
   CreditCard, PiggyBank, ArrowRight,
 } from 'lucide-react'

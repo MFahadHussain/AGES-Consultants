@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Progress } from '@/components/ui/progress'
+
 import { Plus, Search, FolderTree, Heart, MapPin } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -24,16 +24,20 @@ export function Projects() {
   const [form, setForm] = useState({ code: '', name: '', description: '', startDate: '', endDate: '', status: 'active' })
   const { toast } = useToast()
 
-  const fetchData = async () => { const res = await fetch('/api/projects'); setData(await res.json()) }
+  const fetchData = async () => { try { const res = await fetch('/api/projects'); setData(await res.json()) } catch { toast({ title: 'Error', description: 'Failed to load projects', variant: 'destructive' }) } }
   useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   const handleCreate = async () => {
     if (!form.code || !form.name) { toast({ title: 'Error', description: 'Code and name required', variant: 'destructive' }); return }
-    await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, startDate: form.startDate || undefined, endDate: form.endDate || undefined }) })
-    toast({ title: 'Created', description: `Project ${form.code} created` })
-    setDialogOpen(false)
-    setForm({ code: '', name: '', description: '', startDate: '', endDate: '', status: 'active' })
-    fetchData()
+    try {
+      await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, startDate: form.startDate || undefined, endDate: form.endDate || undefined }) })
+      toast({ title: 'Created', description: `Project ${form.code} created` })
+      setDialogOpen(false)
+      setForm({ code: '', name: '', description: '', startDate: '', endDate: '', status: 'active' })
+      fetchData()
+    } catch {
+      toast({ title: 'Error', description: 'Failed to create project', variant: 'destructive' })
+    }
   }
 
   return (
@@ -93,16 +97,20 @@ export function Donors() {
   const [form, setForm] = useState({ code: '', name: '', contactPerson: '', email: '', phone: '', address: '' })
   const { toast } = useToast()
 
-  const fetchData = async () => { const res = await fetch('/api/donors'); setData(await res.json()) }
+  const fetchData = async () => { try { const res = await fetch('/api/donors'); setData(await res.json()) } catch { toast({ title: 'Error', description: 'Failed to load donors', variant: 'destructive' }) } }
   useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   const handleCreate = async () => {
     if (!form.code || !form.name) { toast({ title: 'Error', description: 'Code and name required', variant: 'destructive' }); return }
-    await fetch('/api/donors', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
-    toast({ title: 'Created', description: `Donor ${form.code} created` })
-    setDialogOpen(false)
-    setForm({ code: '', name: '', contactPerson: '', email: '', phone: '', address: '' })
-    fetchData()
+    try {
+      await fetch('/api/donors', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+      toast({ title: 'Created', description: `Donor ${form.code} created` })
+      setDialogOpen(false)
+      setForm({ code: '', name: '', contactPerson: '', email: '', phone: '', address: '' })
+      fetchData()
+    } catch {
+      toast({ title: 'Error', description: 'Failed to create donor', variant: 'destructive' })
+    }
   }
 
   return (
@@ -158,16 +166,20 @@ export function Locations() {
   const [form, setForm] = useState({ code: '', name: '', address: '' })
   const { toast } = useToast()
 
-  const fetchData = async () => { const res = await fetch('/api/locations'); setData(await res.json()) }
+  const fetchData = async () => { try { const res = await fetch('/api/locations'); setData(await res.json()) } catch { toast({ title: 'Error', description: 'Failed to load locations', variant: 'destructive' }) } }
   useEffect(() => { queueMicrotask(() => fetchData()) }, [])
 
   const handleCreate = async () => {
     if (!form.code || !form.name) { toast({ title: 'Error', description: 'Code and name required', variant: 'destructive' }); return }
-    await fetch('/api/locations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
-    toast({ title: 'Created', description: `Location ${form.code} created` })
-    setDialogOpen(false)
-    setForm({ code: '', name: '', address: '' })
-    fetchData()
+    try {
+      await fetch('/api/locations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+      toast({ title: 'Created', description: `Location ${form.code} created` })
+      setDialogOpen(false)
+      setForm({ code: '', name: '', address: '' })
+      fetchData()
+    } catch {
+      toast({ title: 'Error', description: 'Failed to create location', variant: 'destructive' })
+    }
   }
 
   return (

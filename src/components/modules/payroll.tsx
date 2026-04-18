@@ -24,8 +24,12 @@ export function PayrollIntegration() {
   const { toast } = useToast()
 
   const fetchData = async () => {
-    const res = await fetch('/api/payroll')
-    setBatches(await res.json())
+    try {
+      const res = await fetch('/api/payroll')
+      setBatches(await res.json())
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load payroll batches', variant: 'destructive' })
+    }
   }
 
   useEffect(() => {
@@ -41,15 +45,19 @@ export function PayrollIntegration() {
     if (!fy) { toast({ title: 'Error', description: 'No open financial year', variant: 'destructive' }); return }
 
     // INTEGRATION: Payroll → GL
-    const res = await fetch('/api/payroll', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'post-to-gl', batchId: selectedBatch.id, financialYearId: fy.id }),
-    })
-    const result = await res.json()
-    toast({ title: 'Posted to GL', description: `INTEGRATION: Payroll → GL - Voucher ${result.voucherNumber} created with total debit ${formatCurrency(result.totalDebit)}` })
-    setPostDialogOpen(false)
-    fetchData()
+    try {
+      const res = await fetch('/api/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'post-to-gl', batchId: selectedBatch.id, financialYearId: fy.id }),
+      })
+      const result = await res.json()
+      toast({ title: 'Posted to GL', description: `INTEGRATION: Payroll → GL - Voucher ${result.voucherNumber} created with total debit ${formatCurrency(result.totalDebit)}` })
+      setPostDialogOpen(false)
+      fetchData()
+    } catch {
+      toast({ title: 'Error', description: 'Failed to post payroll to GL', variant: 'destructive' })
+    }
   }
 
   const statusStyles: Record<string, string> = {

@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Download, Upload, FileSpreadsheet, FileText } from 'lucide-react'
+import { Download, Upload, FileSpreadsheet } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 export function ImportExport() {
@@ -67,10 +67,25 @@ export function ImportExport() {
             </div>
             <div>
               <Label className="text-xs">Upload File (CSV/Excel)</Label>
-              <div className="border-2 border-dashed rounded-lg p-6 text-center mt-1 hover:border-primary/50 transition-colors cursor-pointer">
+              <div 
+                className="border-2 border-dashed rounded-lg p-6 text-center mt-1 hover:border-primary/50 transition-colors cursor-pointer"
+                onClick={() => document.getElementById('file-upload')?.click()}
+              >
                 <FileSpreadsheet className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                 <p className="text-xs text-muted-foreground">Click or drag file to upload</p>
                 <p className="text-[10px] text-muted-foreground mt-1">Supports .csv, .xlsx formats</p>
+                <input 
+                  id="file-upload" 
+                  type="file" 
+                  accept=".csv,.xlsx,.xls" 
+                  className="hidden" 
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      toast({ title: 'File Selected', description: `${file.name} (${(file.size / 1024).toFixed(1)} KB)` })
+                    }
+                  }}
+                />
               </div>
             </div>
             <Button size="sm" className="w-full h-8 text-xs" onClick={handleImport}><Upload className="h-3.5 w-3.5 mr-1" />Import</Button>

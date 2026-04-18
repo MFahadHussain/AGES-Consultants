@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, AlertTriangle, PieChart } from 'lucide-react'
+import { Plus, AlertTriangle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 function formatCurrency(amount: number) {
@@ -23,6 +23,9 @@ export function BudgetManagement() {
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [accounts, setAccounts] = useState<any[]>([])
+  const [financialYears, setFinancialYears] = useState<any[]>([])
+  const [projects, setProjects] = useState<any[]>([])
+  const [donors, setDonors] = useState<any[]>([])
   const [form, setForm] = useState({ name: '', financialYearId: '', projectId: '', donorId: '', period: 'ANNUAL', lines: [{ accountId: '', budgetAmount: 0 }] as any[] })
   const { toast } = useToast()
 
@@ -32,7 +35,7 @@ export function BudgetManagement() {
     setLoading(false)
   }
 
-  useEffect(() => { queueMicrotask(() => { fetchData(); fetch('/api/accounts?accountType=EXPENSE').then(r => r.json()).then(d => setAccounts(d)) }) }, [])
+  useEffect(() => { queueMicrotask(() => { fetchData(); fetch('/api/accounts?accountType=EXPENSE').then(r => r.json()).then(d => setAccounts(d)); fetch('/api/financial-year').then(r => r.json()).then(d => setFinancialYears(d)); fetch('/api/projects').then(r => r.json()).then(d => setProjects(d)); fetch('/api/donors').then(r => r.json()).then(d => setDonors(d)) }) }, [])
 
   const handleCreate = async () => {
     if (!form.name || !form.financialYearId) { toast({ title: 'Error', description: 'Name and financial year required', variant: 'destructive' }); return }
@@ -54,6 +57,32 @@ export function BudgetManagement() {
             <DialogHeader><DialogTitle className="text-sm">Create Budget</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <div><Label className="text-xs">Budget Name *</Label><Input className="h-8 text-xs" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></div>
+              <div className="grid grid-cols-3 gap-3">
+                <div><Label className="text-xs">Financial Year *</Label>
+                  <Select value={form.financialYearId} onValueChange={v => setForm(p => ({ ...p, financialYearId: v }))}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select FY" /></SelectTrigger>
+                    <SelectContent>{financialYears.filter((f: any) => f.status === 'open').map((f: any) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div><Label className="text-xs">Project</Label>
+                  <Select value={form.projectId} onValueChange={v => setForm(p => ({ ...p, projectId: v === '_none' ? '' : v }))}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">None</SelectItem>
+                      {projects.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.code} - {p.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div><Label className="text-xs">Donor</Label>
+                  <Select value={form.donorId} onValueChange={v => setForm(p => ({ ...p, donorId: v === '_none' ? '' : v }))}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">None</SelectItem>
+                      {donors.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.code} - {d.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs font-semibold">Budget Lines</Label>
