@@ -861,38 +861,59 @@ export function VoucherManagement() {
               )}
               <div className="text-xs"><span className="text-muted-foreground">Narration:</span> {detailVoucher.narration}</div>
 
-              {/* Action Buttons */}
+              {/* Action Buttons - Role Based */}
               {detailVoucher.status !== 'posted' && detailVoucher.status !== 'rejected' && (
-                <div className="flex items-center gap-2 p-3 rounded-md bg-muted/30 border flex-wrap">
-                  <span className="text-xs text-muted-foreground">Actions:</span>
-                  {detailVoucher.status === 'draft' && <Button variant="outline" size="sm" className="h-7 text-[10px] text-blue-600" onClick={() => handleStatusChange(detailVoucher.id, 'submit')}><Clock className="h-3 w-3 mr-1" />Submit</Button>}
-                  {detailVoucher.status === 'pending' && <Button variant="outline" size="sm" className="h-7 text-[10px] text-green-600" onClick={() => handleStatusChange(detailVoucher.id, 'approve')}><CheckCircle2 className="h-3 w-3 mr-1" />Approve</Button>}
-                  {detailVoucher.status === 'approved' && <Button variant="outline" size="sm" className="h-7 text-[10px] text-emerald-600" onClick={() => handleStatusChange(detailVoucher.id, 'post')}><Lock className="h-3 w-3 mr-1" />Post to GL</Button>}
-                  {(detailVoucher.status === 'draft' || detailVoucher.status === 'pending') && <Button variant="default" size="sm" className="h-7 text-[10px]" onClick={() => handleStatusChange(detailVoucher.id, 'quick_post')}><CheckCircle2 className="h-3 w-3 mr-1" />Quick Post</Button>}
-                  <Separator orientation="vertical" className="h-5" />
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => { setDetailOpen(false); setRejectVoucherId(detailVoucher.id); setRejectOpen(true) }}><XCircle className="h-3 w-3 mr-1" />Reject</Button>
-                  {(detailVoucher.status === 'draft' || detailVoucher.status === 'rejected') && <Button variant="outline" size="sm" className="h-7 text-[10px] text-amber-600" onClick={() => { setDetailOpen(false); handleEdit(detailVoucher.id) }}><Pencil className="h-3 w-3 mr-1" />Edit</Button>}
-                  {(detailVoucher.status === 'draft' || detailVoucher.status === 'rejected') && <Button variant="outline" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => { setDetailOpen(false); handleDeleteClick(detailVoucher.id, detailVoucher.voucherNo || detailVoucher.voucherNumber) }}><Trash2 className="h-3 w-3 mr-1" />Delete</Button>}
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] text-violet-600" onClick={() => { setDetailOpen(false); handleDuplicate(detailVoucher.id) }}><CopyPlus className="h-3 w-3 mr-1" />Duplicate</Button>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 p-3 rounded-md bg-muted/30 border flex-wrap">
+                    <span className="text-xs text-muted-foreground">Actions:</span>
+                    <Badge className={`text-[8px] ${roleColors[currentRole]}`}>{roleLabels[currentRole]}</Badge>
+                    {detailVoucher.status === 'draft' && hasPermission('submit', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-blue-600" onClick={() => handleStatusChange(detailVoucher.id, 'submit')}><Clock className="h-3 w-3 mr-1" />Submit<span className="hidden sm:inline ml-1 text-muted-foreground">→ Pending</span></Button>}
+                    {detailVoucher.status === 'pending' && hasPermission('approve', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-green-600" onClick={() => handleStatusChange(detailVoucher.id, 'approve')}><CheckCircle2 className="h-3 w-3 mr-1" />Approve<span className="hidden sm:inline ml-1 text-muted-foreground">→ Approved</span></Button>}
+                    {detailVoucher.status === 'approved' && hasPermission('post', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-emerald-600" onClick={() => handleStatusChange(detailVoucher.id, 'post')}><Lock className="h-3 w-3 mr-1" />Post to GL<span className="hidden sm:inline ml-1 text-muted-foreground">→ Posted</span></Button>}
+                    {(detailVoucher.status === 'draft' || detailVoucher.status === 'pending') && hasPermission('quick_post', currentRole) && <Button variant="default" size="sm" className="h-7 text-[10px]" onClick={() => handleStatusChange(detailVoucher.id, 'quick_post')}><CheckCircle2 className="h-3 w-3 mr-1" />Quick Post<span className="hidden sm:inline ml-1 opacity-70">(Admin Only)</span></Button>}
+                    <Separator orientation="vertical" className="h-5" />
+                    {hasPermission('reject', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => { setDetailOpen(false); setRejectVoucherId(detailVoucher.id); setRejectOpen(true) }}><XCircle className="h-3 w-3 mr-1" />Reject</Button>}
+                    {(detailVoucher.status === 'draft' || detailVoucher.status === 'rejected') && hasPermission('edit', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-amber-600" onClick={() => { setDetailOpen(false); handleEdit(detailVoucher.id) }}><Pencil className="h-3 w-3 mr-1" />Edit</Button>}
+                    {(detailVoucher.status === 'draft' || detailVoucher.status === 'rejected') && hasPermission('delete', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => { setDetailOpen(false); handleDeleteClick(detailVoucher.id, detailVoucher.voucherNo || detailVoucher.voucherNumber) }}><Trash2 className="h-3 w-3 mr-1" />Delete</Button>}
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] text-violet-600" onClick={() => { setDetailOpen(false); handleDuplicate(detailVoucher.id) }}><CopyPlus className="h-3 w-3 mr-1" />Duplicate</Button>
+                  </div>
+                  {!hasPermission('submit', currentRole) && !hasPermission('approve', currentRole) && !hasPermission('post', currentRole) && detailVoucher.status !== 'draft' && (
+                    <div className="flex items-center gap-2 p-2 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                      <span className="text-[10px] text-amber-700">Your <strong>{roleLabels[currentRole]}</strong> role cannot advance this voucher. {detailVoucher.status === 'pending' ? 'A Manager or Admin is needed to approve.' : detailVoucher.status === 'approved' ? 'Only an Admin can post to GL.' : ''}</span>
+                    </div>
+                  )}
                 </div>
               )}
               {detailVoucher.status === 'posted' && (
-                <div className="flex items-center gap-2 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 flex-wrap">
-                  <Lock className="h-4 w-4 text-emerald-600" />
-                  <span className="text-xs font-semibold text-emerald-700">Posted to General Ledger — Locked</span>
-                  <Separator orientation="vertical" className="h-5" />
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] text-amber-600" onClick={() => handleStatusChange(detailVoucher.id, 'revoke')}><RotateCcw className="h-3 w-3 mr-1" />Revoke</Button>
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] text-violet-600" onClick={() => { setDetailOpen(false); handleDuplicate(detailVoucher.id) }}><CopyPlus className="h-3 w-3 mr-1" />Duplicate</Button>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 flex-wrap">
+                    <Lock className="h-4 w-4 text-emerald-600" />
+                    <span className="text-xs font-semibold text-emerald-700">Posted to General Ledger — Locked</span>
+                    <Badge className={`text-[8px] ${roleColors[currentRole]}`}>{roleLabels[currentRole]}</Badge>
+                    <Separator orientation="vertical" className="h-5" />
+                    {hasPermission('revoke', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-amber-600" onClick={() => handleStatusChange(detailVoucher.id, 'revoke')}><RotateCcw className="h-3 w-3 mr-1" />Revoke<span className="hidden sm:inline ml-1 text-muted-foreground">(Admin Only)</span></Button>}
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] text-violet-600" onClick={() => { setDetailOpen(false); handleDuplicate(detailVoucher.id) }}><CopyPlus className="h-3 w-3 mr-1" />Duplicate</Button>
+                  </div>
+                  {!hasPermission('revoke', currentRole) && (
+                    <div className="flex items-center gap-2 p-2 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                      <span className="text-[10px] text-amber-700">Only an <strong>Admin</strong> can revoke a posted voucher.</span>
+                    </div>
+                  )}
                 </div>
               )}
               {detailVoucher.status === 'rejected' && (
-                <div className="flex items-center gap-2 p-3 rounded-md bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 flex-wrap">
-                  <XCircle className="h-4 w-4 text-red-600 shrink-0" />
-                  <span className="text-xs font-semibold text-red-700">Rejected</span>
-                  <Separator orientation="vertical" className="h-5" />
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] text-amber-600" onClick={() => { setDetailOpen(false); handleEdit(detailVoucher.id) }}><Pencil className="h-3 w-3 mr-1" />Edit & Resubmit</Button>
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => { setDetailOpen(false); handleDeleteClick(detailVoucher.id, detailVoucher.voucherNo || detailVoucher.voucherNumber) }}><Trash2 className="h-3 w-3 mr-1" />Delete</Button>
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] text-violet-600" onClick={() => { setDetailOpen(false); handleDuplicate(detailVoucher.id) }}><CopyPlus className="h-3 w-3 mr-1" />Duplicate</Button>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 p-3 rounded-md bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 flex-wrap">
+                    <XCircle className="h-4 w-4 text-red-600 shrink-0" />
+                    <span className="text-xs font-semibold text-red-700">Rejected</span>
+                    <Badge className={`text-[8px] ${roleColors[currentRole]}`}>{roleLabels[currentRole]}</Badge>
+                    <Separator orientation="vertical" className="h-5" />
+                    {hasPermission('edit', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-amber-600" onClick={() => { setDetailOpen(false); handleEdit(detailVoucher.id) }}><Pencil className="h-3 w-3 mr-1" />Edit & Resubmit</Button>}
+                    {hasPermission('delete', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => { setDetailOpen(false); handleDeleteClick(detailVoucher.id, detailVoucher.voucherNo || detailVoucher.voucherNumber) }}><Trash2 className="h-3 w-3 mr-1" />Delete</Button>}
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] text-violet-600" onClick={() => { setDetailOpen(false); handleDuplicate(detailVoucher.id) }}><CopyPlus className="h-3 w-3 mr-1" />Duplicate</Button>
+                  </div>
                 </div>
               )}
 
