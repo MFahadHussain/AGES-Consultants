@@ -190,8 +190,11 @@ model Voucher {
   date            DateTime
   narration       String
   reference       String?
+  payeeName       String?   // Name of the payee/beneficiary
   chequeNumber    String?
   chequeDate      DateTime?
+  voucherNo       String?   // Manual/custom voucher number (separate from auto-generated voucherNumber)
+  amountInWords   String?   // Total amount expressed in words
   status          String    @default("draft") // draft, reviewed, approved, posted, rejected
   financialYearId String
   financialYear   FinancialYear @relation(fields: [financialYearId], references: [id])

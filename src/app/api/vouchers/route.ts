@@ -58,7 +58,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const data = await request.json()
-    const { voucherType, voucherTypeName, date, narration, reference, chequeNumber, chequeDate, financialYearId, projectId, donorId, locationId, entries } = data
+    const { voucherType, voucherTypeName, date, narration, reference, payeeName, chequeNumber, chequeDate, voucherNo, amountInWords, financialYearId, projectId, donorId, locationId, entries } = data
 
     if (!voucherType || !date || !narration || !entries?.length) {
       return NextResponse.json({ error: 'Voucher type, date, narration, and entries are required' }, { status: 400 })
@@ -83,8 +83,11 @@ export async function POST(request: Request) {
         date: new Date(date),
         narration,
         reference: reference || null,
+        payeeName: payeeName || null,
         chequeNumber: chequeNumber || null,
         chequeDate: chequeDate ? new Date(chequeDate) : null,
+        voucherNo: voucherNo || null,
+        amountInWords: amountInWords || null,
         status: 'draft',
         financialYearId,
         projectId: projectId || null,

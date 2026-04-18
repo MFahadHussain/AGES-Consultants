@@ -43,6 +43,8 @@ export async function GET(request: Request) {
           { narration: { contains: q } },
           { reference: { contains: q } },
           { chequeNumber: { contains: q } },
+          { payeeName: { contains: q } },
+          { voucherNo: { contains: q } },
         ],
       },
       take: limit,

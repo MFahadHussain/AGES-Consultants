@@ -11,8 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, Search, Eye, CheckCircle, XCircle, Filter, FileText, ArrowRight } from 'lucide-react'
+import { Plus, Search, Eye, CheckCircle, XCircle, Filter, FileText, ArrowRight, Printer, Copy } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { numberToWords } from '@/lib/number-to-words'
 
 const voucherTypes = [
   { value: 'BP', label: 'Bank Payment', color: 'bg-red-100 text-red-800' },
@@ -43,8 +44,47 @@ function formatCurrency(amount: number) {
   return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
 }
 
-interface Voucher { id: string; voucherNumber: string; voucherType: string; voucherTypeName: string; date: string; narration: string; reference: string | null; status: string; totalDebit: number; totalCredit: number; isPayrollPosted: boolean; isAssetPosted: boolean; project?: { name: string } | null; donor?: { name: string } | null; location?: { name: string } | null; _count?: { entries: number } }
+interface Voucher {
+  id: string
+  voucherNumber: string
+  voucherType: string
+  voucherTypeName: string
+  date: string
+  narration: string
+  reference: string | null
+  payeeName: string | null
+  chequeNumber: string | null
+  chequeDate: string | null
+  voucherNo: string | null
+  amountInWords: string | null
+  status: string
+  totalDebit: number
+  totalCredit: number
+  isPayrollPosted: boolean
+  isAssetPosted: boolean
+  project?: { name: string } | null
+  donor?: { name: string } | null
+  location?: { name: string } | null
+  _count?: { entries: number }
+}
 interface Account { id: string; code: string; name: string; accountType: string }
+
+const defaultForm = {
+  voucherType: 'BP',
+  date: new Date().toISOString().split('T')[0],
+  narration: '',
+  reference: '',
+  payeeName: '',
+  chequeNumber: '',
+  chequeDate: '',
+  voucherNo: '',
+  amountInWords: '',
+  financialYearId: '',
+  projectId: '',
+  donorId: '',
+  locationId: '',
+  entries: [{ accountId: '', debit: 0, credit: 0, description: '' }] as any[],
+}
 
 export function VoucherManagement() {
   const [vouchers, setVouchers] = useState<Voucher[]>([])
@@ -59,15 +99,20 @@ export function VoucherManagement() {
   const [detailVoucher, setDetailVoucher] = useState<any>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [printVoucher, setPrintVoucher] = useState<any>(null)
+  const [printOpen, setPrintOpen] = useState(false)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const { toast } = useToast()
 
-  const [form, setForm] = useState({
-    voucherType: 'BP', date: new Date().toISOString().split('T')[0], narration: '', reference: '',
-    financialYearId: '', projectId: '', donorId: '', locationId: '',
-    entries: [{ accountId: '', debit: 0, credit: 0, description: '' }] as any[],
-  })
+  const [form, setForm] = useState({ ...defaultForm })
+
+  const totalDebit = form.entries.reduce((s, e) => s + (e.debit || 0), 0)
+  const totalCredit = form.entries.reduce((s, e) => s + (e.credit || 0), 0)
+  const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01
+
+  // Auto-generate amount in words when totals change
+  const autoAmountInWords = totalDebit > 0 ? numberToWords(totalDebit) : ''
 
   const fetchData = async () => {
     try {
@@ -81,7 +126,9 @@ export function VoucherManagement() {
       const data = await res.json()
       setVouchers(data.data || [])
       setTotal(data.total || 0)
-    } catch (e) { toast({ title: 'Error', description: 'Failed to load vouchers', variant: 'destructive' }) }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load vouchers', variant: 'destructive' })
+    }
     setLoading(false)
   }
 
@@ -114,7 +161,9 @@ export function VoucherManagement() {
         const res = await fetch(`/api/vouchers/${voucherId}`)
         setDetailVoucher(await res.json())
       }
-    } catch (e) { toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' }) }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+    }
   }
 
   const handleCreate = async () => {
@@ -122,8 +171,6 @@ export function VoucherManagement() {
       toast({ title: 'Validation Error', description: 'Type, date, and narration are required', variant: 'destructive' })
       return
     }
-    const totalDebit = form.entries.reduce((s, e) => s + (e.debit || 0), 0)
-    const totalCredit = form.entries.reduce((s, e) => s + (e.credit || 0), 0)
     if (Math.abs(totalDebit - totalCredit) > 0.01) {
       toast({ title: 'Validation Error', description: `Debits (${totalDebit}) must equal Credits (${totalCredit})`, variant: 'destructive' })
       return
@@ -148,6 +195,7 @@ export function VoucherManagement() {
           entries: validEntries,
           financialYearId: activeFy.id,
           voucherTypeName: voucherTypes.find(v => v.value === form.voucherType)?.label,
+          amountInWords: form.amountInWords || autoAmountInWords,
           projectId: form.projectId || undefined,
           donorId: form.donorId || undefined,
           locationId: form.locationId || undefined,
@@ -155,20 +203,51 @@ export function VoucherManagement() {
       })
       toast({ title: 'Created', description: 'Voucher created successfully' })
       setCreateOpen(false)
-      setForm({ voucherType: 'BP', date: new Date().toISOString().split('T')[0], narration: '', reference: '', financialYearId: '', projectId: '', donorId: '', locationId: '', entries: [{ accountId: '', debit: 0, credit: 0, description: '' }] })
+      setForm({ ...defaultForm, entries: [{ accountId: '', debit: 0, credit: 0, description: '' }] })
       fetchData()
-    } catch (e) { toast({ title: 'Error', description: 'Failed to create voucher', variant: 'destructive' }) }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to create voucher', variant: 'destructive' })
+    }
   }
 
   const addEntry = () => setForm(p => ({ ...p, entries: [...p.entries, { accountId: '', debit: 0, credit: 0, description: '' }] }))
   const removeEntry = (i: number) => setForm(p => ({ ...p, entries: p.entries.filter((_: any, idx: number) => idx !== i) }))
   const updateEntry = (i: number, field: string, value: any) => setForm(p => ({ ...p, entries: p.entries.map((e: any, idx: number) => idx === i ? { ...e, [field]: value } : e) }))
 
-  const totalDebit = form.entries.reduce((s, e) => s + (e.debit || 0), 0)
-  const totalCredit = form.entries.reduce((s, e) => s + (e.credit || 0), 0)
-  const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01
-
   const voucherTypeColor = (type: string) => voucherTypes.find(v => v.value === type)?.color || 'bg-gray-100 text-gray-800'
+
+  const handlePrint = (voucher: any) => {
+    setPrintVoucher(voucher)
+    setPrintOpen(true)
+  }
+
+  const handlePrintAction = () => {
+    const printContent = document.getElementById('voucher-print-area')
+    if (!printContent) return
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+    printWindow.document.write(`
+      <html>
+        <head><title>Voucher - ${printVoucher?.voucherNumber || ''}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; font-size: 12px; }
+          table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+          th, td { border: 1px solid #333; padding: 6px 8px; text-align: left; }
+          th { background: #f0f0f0; font-weight: bold; }
+          .header { text-align: center; margin-bottom: 20px; }
+          .header h2 { margin: 0; }
+          .meta { display: flex; justify-content: space-between; margin: 10px 0; }
+          .amount-words { margin: 15px 0; padding: 8px; border: 1px solid #999; background: #f9f9f9; font-weight: bold; }
+          .footer { margin-top: 40px; display: flex; justify-content: space-between; }
+          .signature { border-top: 1px solid #333; padding-top: 5px; width: 150px; text-align: center; }
+        </style>
+        </head>
+        <body>${printContent.innerHTML}</body>
+      </html>
+    `)
+    printWindow.document.close()
+    printWindow.print()
+  }
 
   return (
     <div className="space-y-4">
@@ -198,11 +277,12 @@ export function VoucherManagement() {
           <DialogTrigger asChild>
             <Button size="sm" className="h-8 text-xs"><Plus className="h-3.5 w-3.5 mr-1" /> New Voucher</Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-sm">Create New Voucher</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              {/* Row 1: Voucher Type, Voucher No, Date, Reference */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div><Label className="text-xs">Voucher Type *</Label>
                   <Select value={form.voucherType} onValueChange={v => setForm(p => ({ ...p, voucherType: v }))}>
@@ -210,8 +290,20 @@ export function VoucherManagement() {
                     <SelectContent>{voucherTypes.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
+                <div><Label className="text-xs">Voucher No</Label><Input className="h-8 text-xs" placeholder="Auto if blank" value={form.voucherNo} onChange={e => setForm(p => ({ ...p, voucherNo: e.target.value }))} /></div>
                 <div><Label className="text-xs">Date *</Label><Input type="date" className="h-8 text-xs" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} /></div>
                 <div><Label className="text-xs">Reference</Label><Input className="h-8 text-xs" value={form.reference} onChange={e => setForm(p => ({ ...p, reference: e.target.value }))} /></div>
+              </div>
+
+              {/* Row 2: Name (Payee), Cheque No, Cheque Date */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div><Label className="text-xs">Name (Payee)</Label><Input className="h-8 text-xs" placeholder="Name of payee/beneficiary" value={form.payeeName} onChange={e => setForm(p => ({ ...p, payeeName: e.target.value }))} /></div>
+                <div><Label className="text-xs">Cheque No</Label><Input className="h-8 text-xs" placeholder="Cheque number" value={form.chequeNumber} onChange={e => setForm(p => ({ ...p, chequeNumber: e.target.value }))} /></div>
+                <div><Label className="text-xs">Cheque Date</Label><Input type="date" className="h-8 text-xs" value={form.chequeDate} onChange={e => setForm(p => ({ ...p, chequeDate: e.target.value }))} /></div>
+              </div>
+
+              {/* Row 3: Project, Donor, Location */}
+              <div className="grid grid-cols-3 gap-3">
                 <div><Label className="text-xs">Project</Label>
                   <Select value={form.projectId} onValueChange={v => setForm(p => ({ ...p, projectId: v === '_none' ? '' : v }))}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
@@ -221,8 +313,6 @@ export function VoucherManagement() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
                 <div><Label className="text-xs">Donor</Label>
                   <Select value={form.donorId} onValueChange={v => setForm(p => ({ ...p, donorId: v === '_none' ? '' : v }))}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
@@ -242,6 +332,8 @@ export function VoucherManagement() {
                   </Select>
                 </div>
               </div>
+
+              {/* Narration */}
               <div><Label className="text-xs">Narration *</Label><Textarea className="text-xs" rows={2} value={form.narration} onChange={e => setForm(p => ({ ...p, narration: e.target.value }))} /></div>
 
               {/* Entries */}
@@ -288,6 +380,30 @@ export function VoucherManagement() {
                   </Badge>
                 </div>
               </div>
+
+              {/* Amount in Words */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-xs font-semibold">Amount in Words</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[10px] text-muted-foreground hover:text-foreground"
+                    onClick={() => setForm(p => ({ ...p, amountInWords: autoAmountInWords }))}
+                    disabled={totalDebit === 0}
+                  >
+                    <Copy className="h-3 w-3 mr-1" />
+                    Auto-fill from total
+                  </Button>
+                </div>
+                <Textarea
+                  className="text-xs font-medium italic"
+                  rows={2}
+                  placeholder="Amount in words will be auto-generated..."
+                  value={form.amountInWords || autoAmountInWords}
+                  onChange={e => setForm(p => ({ ...p, amountInWords: e.target.value }))}
+                />
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" size="sm" onClick={() => setCreateOpen(false)}>Cancel</Button>
@@ -305,24 +421,27 @@ export function VoucherManagement() {
               <TableRow>
                 <TableHead className="text-[10px]">Voucher #</TableHead>
                 <TableHead className="text-[10px]">Type</TableHead>
+                <TableHead className="text-[10px]">Name</TableHead>
+                <TableHead className="text-[10px]">Cheque No</TableHead>
                 <TableHead className="text-[10px]">Date</TableHead>
                 <TableHead className="text-[10px]">Narration</TableHead>
                 <TableHead className="text-[10px]">Project / Donor</TableHead>
                 <TableHead className="text-[10px] text-right">Amount</TableHead>
                 <TableHead className="text-[10px]">Status</TableHead>
-                <TableHead className="text-[10px]">Integration</TableHead>
                 <TableHead className="text-[10px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={9} className="text-center text-xs py-8 text-muted-foreground">Loading...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="text-center text-xs py-8 text-muted-foreground">Loading...</TableCell></TableRow>
               ) : vouchers.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="text-center text-xs py-8 text-muted-foreground">No vouchers found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="text-center text-xs py-8 text-muted-foreground">No vouchers found</TableCell></TableRow>
               ) : vouchers.map(v => (
                 <TableRow key={v.id} className="hover:bg-accent/50">
-                  <TableCell className="font-mono text-xs font-semibold">{v.voucherNumber}</TableCell>
+                  <TableCell className="font-mono text-xs font-semibold">{v.voucherNo || v.voucherNumber}</TableCell>
                   <TableCell><Badge className={`text-[9px] ${voucherTypeColor(v.voucherType)}`}>{v.voucherTypeName}</Badge></TableCell>
+                  <TableCell className="text-xs font-medium">{v.payeeName || '-'}</TableCell>
+                  <TableCell className="text-xs font-mono">{v.chequeNumber || '-'}</TableCell>
                   <TableCell className="text-xs">{new Date(v.date).toLocaleDateString()}</TableCell>
                   <TableCell className="text-xs max-w-[200px] truncate">{v.narration}</TableCell>
                   <TableCell className="text-xs">
@@ -333,18 +452,17 @@ export function VoucherManagement() {
                   <TableCell className="text-xs text-right font-semibold">{formatCurrency(v.totalDebit)}</TableCell>
                   <TableCell><Badge className={`text-[9px] ${statusColors[v.status]}`}>{v.status}</Badge></TableCell>
                   <TableCell>
-                    <div className="flex gap-1">
-                      {v.isPayrollPosted && <Badge className="text-[8px] bg-purple-100 text-purple-800">Payroll</Badge>}
-                      {v.isAssetPosted && <Badge className="text-[8px] bg-teal-100 text-teal-800">Asset</Badge>}
-                    </div>
-                  </TableCell>
-                  <TableCell>
                     <div className="flex items-center gap-1">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => {
                         const res = await fetch(`/api/vouchers/${v.id}`)
                         setDetailVoucher(await res.json())
                         setDetailOpen(true)
                       }}><Eye className="h-3 w-3" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => {
+                        const res = await fetch(`/api/vouchers/${v.id}`)
+                        const data = await res.json()
+                        handlePrint(data)
+                      }}><Printer className="h-3 w-3" /></Button>
                       {statusFlow[v.status]?.includes('reviewed') && (
                         <Button variant="ghost" size="sm" className="h-7 text-[10px] text-blue-600" onClick={() => handleStatusChange(v.id, 'review')}>Review</Button>
                       )}
@@ -379,12 +497,12 @@ export function VoucherManagement() {
 
       {/* Detail Dialog */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-sm">
+            <DialogTitle className="text-sm flex items-center gap-2">
               Voucher Details - {detailVoucher?.voucherNumber}
-              {detailVoucher?.isPayrollPosted && <Badge className="ml-2 text-[9px] bg-purple-100 text-purple-800">INTEGRATION: Payroll → GL</Badge>}
-              {detailVoucher?.isAssetPosted && <Badge className="ml-2 text-[9px] bg-teal-100 text-teal-800">INTEGRATION: Fixed Assets → GL</Badge>}
+              {detailVoucher?.isPayrollPosted && <Badge className="text-[9px] bg-purple-100 text-purple-800">INTEGRATION: Payroll → GL</Badge>}
+              {detailVoucher?.isAssetPosted && <Badge className="text-[9px] bg-teal-100 text-teal-800">INTEGRATION: Fixed Assets → GL</Badge>}
             </DialogTitle>
           </DialogHeader>
           {detailVoucher && (
@@ -395,6 +513,22 @@ export function VoucherManagement() {
                 <div><span className="text-muted-foreground">Status:</span> <Badge className={`text-[9px] ${statusColors[detailVoucher.status]}`}>{detailVoucher.status}</Badge></div>
                 <div><span className="text-muted-foreground">Reference:</span> {detailVoucher.reference || '-'}</div>
               </div>
+
+              {/* New Fields Display */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs p-3 rounded-md bg-muted/30 border">
+                <div><span className="text-muted-foreground">Name (Payee):</span> <strong>{detailVoucher.payeeName || '-'}</strong></div>
+                <div><span className="text-muted-foreground">Voucher No:</span> <strong className="font-mono">{detailVoucher.voucherNo || detailVoucher.voucherNumber}</strong></div>
+                <div><span className="text-muted-foreground">Cheque No:</span> <strong className="font-mono">{detailVoucher.chequeNumber || '-'}</strong></div>
+                <div><span className="text-muted-foreground">Cheque Date:</span> {detailVoucher.chequeDate ? new Date(detailVoucher.chequeDate).toLocaleDateString() : '-'}</div>
+              </div>
+
+              {detailVoucher.amountInWords && (
+                <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                  <span className="text-[10px] text-muted-foreground block mb-1">Amount in Words:</span>
+                  <span className="text-xs font-semibold italic">{detailVoucher.amountInWords}</span>
+                </div>
+              )}
+
               {(detailVoucher.project || detailVoucher.donor || detailVoucher.location) && (
                 <div className="flex gap-3 text-xs">
                   {detailVoucher.project && <Badge variant="outline" className="text-[9px]">Project: {detailVoucher.project.name}</Badge>}
@@ -443,6 +577,107 @@ export function VoucherManagement() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Print Preview Dialog */}
+      <Dialog open={printOpen} onOpenChange={setPrintOpen}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-sm flex items-center justify-between">
+              <span>Voucher Print Preview</span>
+              <Button size="sm" className="h-7 text-xs" onClick={handlePrintAction}>
+                <Printer className="h-3 w-3 mr-1" /> Print
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          {printVoucher && (
+            <div id="voucher-print-area" className="border p-6 bg-white text-black text-xs">
+              {/* Header */}
+              <div className="header text-center border-b-2 border-black pb-3 mb-4">
+                <h2 className="text-lg font-bold">VOUCHER</h2>
+                <p className="text-sm font-semibold">{printVoucher.voucherTypeName?.toUpperCase()}</p>
+              </div>
+
+              {/* Meta Info */}
+              <div className="meta flex justify-between mb-4">
+                <div>
+                  <p><strong>Voucher No:</strong> {printVoucher.voucherNo || printVoucher.voucherNumber}</p>
+                  <p><strong>Date:</strong> {new Date(printVoucher.date).toLocaleDateString()}</p>
+                  <p><strong>Reference:</strong> {printVoucher.reference || '-'}</p>
+                </div>
+                <div className="text-right">
+                  <p><strong>Name:</strong> {printVoucher.payeeName || '-'}</p>
+                  <p><strong>Cheque No:</strong> {printVoucher.chequeNumber || '-'}</p>
+                  <p><strong>Cheque Date:</strong> {printVoucher.chequeDate ? new Date(printVoucher.chequeDate).toLocaleDateString() : '-'}</p>
+                </div>
+              </div>
+
+              {/* Narration */}
+              <div className="mb-4">
+                <strong>Narration:</strong> {printVoucher.narration}
+              </div>
+
+              {/* Segments */}
+              {(printVoucher.project || printVoucher.donor || printVoucher.location) && (
+                <div className="mb-4 flex gap-4">
+                  {printVoucher.project && <span><strong>Project:</strong> {printVoucher.project.name}</span>}
+                  {printVoucher.donor && <span><strong>Donor:</strong> {printVoucher.donor.name}</span>}
+                  {printVoucher.location && <span><strong>Location:</strong> {printVoucher.location.name}</span>}
+                </div>
+              )}
+
+              {/* Entries Table */}
+              <table className="w-full border-collapse mb-4">
+                <thead>
+                  <tr>
+                    <th className="border border-black px-2 py-1 text-left">#</th>
+                    <th className="border border-black px-2 py-1 text-left">Account Code</th>
+                    <th className="border border-black px-2 py-1 text-left">Account Name</th>
+                    <th className="border border-black px-2 py-1 text-right">Debit (PKR)</th>
+                    <th className="border border-black px-2 py-1 text-right">Credit (PKR)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {printVoucher.entries?.map((e: any, i: number) => (
+                    <tr key={i}>
+                      <td className="border border-black px-2 py-1">{e.lineNumber}</td>
+                      <td className="border border-black px-2 py-1 font-mono">{e.account?.code}</td>
+                      <td className="border border-black px-2 py-1">{e.account?.name}</td>
+                      <td className="border border-black px-2 py-1 text-right">{e.debit > 0 ? formatCurrency(e.debit) : ''}</td>
+                      <td className="border border-black px-2 py-1 text-right">{e.credit > 0 ? formatCurrency(e.credit) : ''}</td>
+                    </tr>
+                  ))}
+                  <tr className="font-bold">
+                    <td colSpan={3} className="border border-black px-2 py-1">Total</td>
+                    <td className="border border-black px-2 py-1 text-right">{formatCurrency(printVoucher.totalDebit)}</td>
+                    <td className="border border-black px-2 py-1 text-right">{formatCurrency(printVoucher.totalCredit)}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* Amount in Words */}
+              <div className="amount-words border border-black p-2 bg-gray-50 mb-6">
+                <strong>Amount in Words:</strong> {printVoucher.amountInWords || numberToWords(printVoucher.totalDebit)}
+              </div>
+
+              {/* Signatures */}
+              <div className="footer flex justify-between mt-8">
+                <div className="signature border-t border-black pt-1">
+                  <span className="text-[10px]">Prepared By</span>
+                </div>
+                <div className="signature border-t border-black pt-1">
+                  <span className="text-[10px]">Reviewed By</span>
+                </div>
+                <div className="signature border-t border-black pt-1">
+                  <span className="text-[10px]">Approved By</span>
+                </div>
+                <div className="signature border-t border-black pt-1">
+                  <span className="text-[10px]">Received By</span>
+                </div>
+              </div>
             </div>
           )}
         </DialogContent>
