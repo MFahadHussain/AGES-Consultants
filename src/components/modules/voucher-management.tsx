@@ -748,17 +748,17 @@ export function VoucherManagement() {
                 <TableCell>
                   <div className="flex items-center gap-0.5">
                     <Button variant="ghost" size="icon" className="h-7 w-7" title="View" onClick={async () => { const res = await fetch(`/api/vouchers/${v.id}`); setDetailVoucher(await res.json()); setDetailOpen(true) }}><Eye className="h-3 w-3" /></Button>
-                    {(v.status === 'draft' || v.status === 'rejected') && <Button variant="ghost" size="icon" className="h-7 w-7 text-amber-600" title="Edit" onClick={() => handleEdit(v.id)}><Pencil className="h-3 w-3" /></Button>}
+                    {(v.status === 'draft' || v.status === 'rejected') && hasPermission('edit', currentRole) && <Button variant="ghost" size="icon" className="h-7 w-7 text-amber-600" title="Edit" onClick={() => handleEdit(v.id)}><Pencil className="h-3 w-3" /></Button>}
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-violet-600" title="Duplicate" onClick={() => handleDuplicate(v.id)}><CopyPlus className="h-3 w-3" /></Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7" title="Print" onClick={async () => { const res = await fetch(`/api/vouchers/${v.id}`); handlePrint(await res.json()) }}><Printer className="h-3 w-3" /></Button>
-                    {(v.status === 'draft' || v.status === 'rejected') && <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" title="Delete" onClick={() => handleDeleteClick(v.id, v.voucherNo || v.voucherNumber)}><Trash2 className="h-3 w-3" /></Button>}
+                    {(v.status === 'draft' || v.status === 'rejected') && hasPermission('delete', currentRole) && <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" title="Delete" onClick={() => handleDeleteClick(v.id, v.voucherNo || v.voucherNumber)}><Trash2 className="h-3 w-3" /></Button>}
                     <Separator orientation="vertical" className="h-5 mx-0.5" />
-                    {v.status === 'draft' && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-blue-600" onClick={() => handleStatusChange(v.id, 'submit')}>Submit</Button>}
-                    {v.status === 'pending' && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-green-600" onClick={() => handleStatusChange(v.id, 'approve')}>Approve</Button>}
-                    {v.status === 'approved' && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-emerald-600" onClick={() => handleStatusChange(v.id, 'post')}>Post</Button>}
-                    {(v.status === 'draft' || v.status === 'pending') && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-emerald-700 font-semibold" onClick={() => handleStatusChange(v.id, 'quick_post')}>Quick Post</Button>}
-                    {v.status === 'posted' && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-amber-600" onClick={() => handleStatusChange(v.id, 'revoke')}>Revoke</Button>}
-                    {v.status !== 'rejected' && v.status !== 'posted' && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => { setRejectVoucherId(v.id); setRejectOpen(true) }}>Reject</Button>}
+                    {v.status === 'draft' && hasPermission('submit', currentRole) && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-blue-600" onClick={() => handleStatusChange(v.id, 'submit')}>Submit</Button>}
+                    {v.status === 'pending' && hasPermission('approve', currentRole) && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-green-600" onClick={() => handleStatusChange(v.id, 'approve')}>Approve</Button>}
+                    {v.status === 'approved' && hasPermission('post', currentRole) && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-emerald-600" onClick={() => handleStatusChange(v.id, 'post')}>Post</Button>}
+                    {(v.status === 'draft' || v.status === 'pending') && hasPermission('quick_post', currentRole) && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-emerald-700 font-semibold" onClick={() => handleStatusChange(v.id, 'quick_post')}>Quick Post</Button>}
+                    {v.status === 'posted' && hasPermission('revoke', currentRole) && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-amber-600" onClick={() => handleStatusChange(v.id, 'revoke')}>Revoke</Button>}
+                    {v.status !== 'rejected' && v.status !== 'posted' && hasPermission('reject', currentRole) && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => { setRejectVoucherId(v.id); setRejectOpen(true) }}>Reject</Button>}
                   </div>
                 </TableCell>
               </TableRow>

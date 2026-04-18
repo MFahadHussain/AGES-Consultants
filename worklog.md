@@ -95,26 +95,14 @@ Work Log:
 - Rewrote src/app/api/seed/route.ts:
   - Removed all sample data creation (projects, donors, locations, customers, suppliers, vouchers, budgets, fixed assets, payroll batches, etc.)
   - Deletes all data from 18 tables in correct FK constraint order (child tables first)
-  - Level 1 (leaf): VoucherEntry, VoucherApproval, VoucherAttachment, BankReconciliationItem, BankStatementItem, BankStatement, BudgetLine, FixedAssetDepreciation, PayrollBatchLine, TaxCalculation
-  - Level 2 (mid): Voucher, Budget, FixedAsset, PayrollBatch, TaxRate
-  - Level 3 (master): Customer, Supplier, Project, Donor, Location, AccountBalance, ImportLog, ExportLog, AuditLog
   - Preserves: Account table (Chart of Accounts), FinancialYear (ensures at least one open FY), User table
   - If no open FY exists, reopens most recent or creates FY 2025-26
   - Returns preserved counts for confirmation
-- Added PUT and DELETE handlers to src/app/api/projects/route.ts:
+- Added PUT and DELETE handlers to src/app/api/projects/route.ts, donors/route.ts, locations/route.ts:
   - PUT: validates id, code, name; checks existence; prevents duplicate code on rename
-  - DELETE: validates id; checks existence; prevents deletion if project has vouchers or budgets
-  - POST also now checks for duplicate code (409 response)
-- Added PUT and DELETE handlers to src/app/api/donors/route.ts:
-  - PUT: validates id, code, name; checks existence; prevents duplicate code on rename
-  - DELETE: validates id; checks existence; prevents deletion if donor has vouchers or budgets
-  - POST also now checks for duplicate code (409 response)
-- Added PUT and DELETE handlers to src/app/api/locations/route.ts:
-  - PUT: validates id, code, name; checks existence; prevents duplicate code on rename
-  - DELETE: validates id; checks existence; prevents deletion if location has vouchers
+  - DELETE: validates id; checks existence; prevents deletion if has vouchers/budgets
   - POST also now checks for duplicate code (409 response)
 - All changes pass lint check with no errors
-- Dev server running without errors
 
 Stage Summary:
 - Bank and expense ledgers now return properly grouped data matching general ledger format
@@ -135,26 +123,35 @@ Work Log:
   - Running balance calculated correctly based on account type (ASSET/EXPENSE: Dr-Cr, others: Cr-Dr)
   - Added Voucher Type badge column for better visibility
   - Empty groups (0 entries) are filtered out from display
-  - Shared renderFilterBar() and renderGroupedLedger() reduce code duplication
 - Updated src/components/modules/segments.tsx:
-  - Projects: Added full Edit and Delete with AlertDialog confirmation
-  - Donors: Added full Edit and Delete with AlertDialog confirmation
-  - Locations: Added full Edit and Delete with AlertDialog confirmation
-  - All three modules now share consistent UI patterns: Pencil icon for edit, Trash2 icon for delete
-  - Edit reuses the create dialog (toggled via editingId state)
-  - Delete shows AlertDialog with descriptive warning about voucher associations
-  - Added Loader2 spinner for save operations
-  - PUT calls /api/projects|donors|locations with { id, ...fields }
-  - DELETE calls /api/projects|donors|locations?id=XXX
-  - Proper error handling with toast messages for both success and failure
-- Cleaned database via GET /api/seed - preserved only Chart of Accounts (64 accounts) and FY 2024-25
-- Created test data: 3 vouchers (BP, CP, BR) to verify end-to-end flow
-- Created reference data: 3 projects, 3 donors, 3 locations
-- All API endpoints tested and returning 200: ledgers (general/bank/expense), vouchers, dashboard, reports, projects, donors, locations
-- Lint passes with no errors
+  - Projects, Donors, Locations: Added full Edit and Delete with AlertDialog confirmation
+  - Consistent UI patterns: Pencil icon for edit, Trash2 icon for delete
+  - Proper error handling with toast messages
+- Cleaned database via GET /api/seed - preserved only Chart of Accounts
+- Created test data: 3 vouchers, 3 projects, 3 donors, 3 locations
+- All API endpoints tested and returning 200
 
 Stage Summary:
 - Bank Ledger and Expense Ledger now render properly with grouped data and running balances
 - Projects, Donors, and Locations have full CRUD in both API and UI
 - Database cleaned to only Chart of Accounts + Financial Year + test vouchers
-- All 20+ API endpoints working correctly
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Fix list view action buttons to use hasPermission checks, verify role-based workflow
+
+Work Log:
+- Reviewed the voucher-management.tsx component and found role selector, WorkflowSteps with role labels, and hasPermission checks were already implemented in the detail view
+- Fixed list view action buttons (lines 751-761) to also use hasPermission checks for: edit, delete, submit, approve, post, quick_post, revoke, reject
+- Without hasPermission, all workflow buttons were visible to all roles regardless of permissions
+- Now accountant role only sees Submit and Edit/Delete for draft vouchers; manager sees Submit + Approve + Reject; admin sees all including Quick Post, Post, and Revoke
+- Verified lint passes with no errors
+- Started dev server and tested all APIs: vouchers (3 test vouchers), dashboard, accounts all return 200
+- Created test data: 3 vouchers (BP draft, JV draft, CR posted) for workflow testing
+
+Stage Summary:
+- List view action buttons now properly check role permissions before rendering
+- Role-based workflow is fully functional: Accountant creates/edits, Manager approves, Admin posts
+- Switching roles in the selector dynamically shows/hides available workflow actions
+- Lint clean, dev server running, APIs verified
