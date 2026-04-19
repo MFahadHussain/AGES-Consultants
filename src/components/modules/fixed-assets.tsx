@@ -387,6 +387,121 @@ export function FixedAssetsModule() {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
   const [showFilters, setShowFilters] = useState(false)
 
+  // Role-based access state
+  const [currentRole, setCurrentRole] = useState<string>('super-admin')
+
+  // CSV Import state
+  const [csvImportOpen, setCsvImportOpen] = useState(false)
+  const [csvText, setCsvText] = useState('')
+  const [csvImporting, setCsvImporting] = useState(false)
+  const [csvProgress, setCsvProgress] = useState({ done: 0, total: 0 })
+  const [csvErrors, setCsvErrors] = useState<string[]>([])
+
+  // ─── Role Definitions & Permissions ──────────────────────────────────────
+
+  const ROLES: Record<string, { label: string; color: string; icon: string }> = {
+    'super-admin': { label: 'Super Admin', color: 'bg-red-100 text-red-800', icon: '👑' },
+    'cfo': { label: 'CFO', color: 'bg-amber-100 text-amber-800', icon: '🏛️' },
+    'finance-officer': { label: 'Finance Officer', color: 'bg-emerald-100 text-emerald-800', icon: '💰' },
+    'asset-manager': { label: 'Asset Manager', color: 'bg-sky-100 text-sky-800', icon: '📦' },
+    'custodian': { label: 'Custodian', color: 'bg-violet-100 text-violet-800', icon: '🔑' },
+    'auditor': { label: 'Auditor', color: 'bg-gray-100 text-gray-800', icon: '🔍' },
+    'viewer': { label: 'Viewer', color: 'bg-slate-100 text-slate-800', icon: '👁️' },
+  }
+
+  const canCreate = ['super-admin', 'cfo', 'finance-officer', 'asset-manager'].includes(currentRole)
+  const canEdit = ['super-admin', 'cfo', 'finance-officer', 'asset-manager'].includes(currentRole)
+  const canDelete = ['super-admin', 'cfo'].includes(currentRole)
+  const canApprove = ['super-admin', 'cfo'].includes(currentRole)
+  const canRunDepreciation = ['super-admin', 'cfo', 'finance-officer'].includes(currentRole)
+  const canExportJournals = ['super-admin', 'cfo', 'finance-officer'].includes(currentRole)
+  const canManageTransactions = ['super-admin', 'cfo', 'finance-officer', 'asset-manager'].includes(currentRole)
+  const canRequestTransfer = currentRole === 'custodian'
+  const isReadOnly = ['auditor', 'viewer'].includes(currentRole)
+  const isCustodian = currentRole === 'custodian'
+
+  // ─── CSV Import Helpers ──────────────────────────────────────────────────
+
+  const CSV_REQUIRED_COLUMNS = ['name', 'category', 'purchasePrice', 'dateOfPurchase', 'location', 'custodian']
+  const CSV_OPTIONAL_COLUMNS = ['description', 'serialNumber', 'condition', 'supplierName', 'isDonorFunded', 'donor', 'province', 'depreciationMethod', 'usefulLifeYears', 'residualValue']
+
+  const parseCsvPreview = (): { headers: string[]; rows: string[][]; errors: string[] } => {
+    const errors: string[] = []
+    if (!csvText.trim()) return { headers: [], rows: [], errors: ['No CSV data provided'] }
+    const lines = csvText.trim().split('\n').map(l => l.split(',').map(c => c.trim().replace(/^"|"$/g, '')))
+    if (lines.length < 2) return { headers: [], rows: [], errors: ['CSV must have a header row and at least one data row'] }
+    const headers = lines[0]
+    const missingRequired = CSV_REQUIRED_COLUMNS.filter(c => !headers.includes(c))
+    if (missingRequired.length > 0) errors.push(`Missing required columns: ${missingRequired.join(', ')}`)
+    const rows = lines.slice(1, 6)
+    return { headers, rows, errors }
+  }
+
+  const handleCsvImport = async () => {
+    const { headers, errors: parseErrors } = parseCsvPreview()
+    if (parseErrors.length > 0) {
+      setCsvErrors(parseErrors)
+      return
+    }
+    const lines = csvText.trim().split('\n').map(l => l.split(',').map(c => c.trim().replace(/^"|"$/g, '')))
+    const dataRows = lines.slice(1)
+    setCsvImporting(true)
+    setCsvProgress({ done: 0, total: dataRows.length })
+    setCsvErrors([])
+    const errs: string[] = []
+    let done = 0
+    for (const row of dataRows) {
+      try {
+        const obj: Record<string, string> = {}
+        headers.forEach((h, i) => { obj[h] = row[i] || '' })
+        const payload = {
+          name: obj.name,
+          category: obj.category,
+          purchasePrice: parseFloat(obj.purchasePrice) || 0,
+          dateOfPurchase: obj.dateOfPurchase,
+          location: obj.location,
+          custodian: obj.custodian,
+          description: obj.description || '',
+          serialNumber: obj.serialNumber || '',
+          condition: obj.condition || 'Good',
+          supplierName: obj.supplierName || '',
+          isDonorFunded: obj.isDonorFunded === 'true' || obj.isDonorFunded === 'yes',
+          donor: obj.donor || '',
+          province: obj.province || 'KPK',
+          depreciationMethod: obj.depreciationMethod || 'Straight-Line',
+          usefulLifeYears: parseInt(obj.usefulLifeYears) || 5,
+          residualValue: parseFloat(obj.residualValue) || 0,
+          dateOfCapitalization: obj.dateOfPurchase,
+          approvalStatus: 'Draft' as const,
+        }
+        const res = await fetch('/api/fams/assets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}))
+          errs.push(`Row ${done + 1} (${obj.name}): ${errData.error || 'Failed'}`)
+        }
+      } catch {
+        errs.push(`Row ${done + 1}: Network error`)
+      }
+      done++
+      setCsvProgress({ done, total: dataRows.length })
+    }
+    setCsvErrors(errs)
+    setCsvImporting(false)
+    if (errs.length === 0) {
+      toast({ title: 'Import Complete', description: `${done} assets imported successfully` })
+      setCsvImportOpen(false)
+      setCsvText('')
+      refreshAll()
+    } else {
+      toast({ title: 'Import Completed with Errors', description: `${done - errs.length}/${done} succeeded`, variant: 'destructive' })
+      refreshAll()
+    }
+  }
+
   // ─── Data Fetching ──────────────────────────────────────────────────────
 
   const fetchAssets = useCallback(async (page = 1) => {
@@ -1114,15 +1229,21 @@ export function FixedAssetsModule() {
             <CardTitle className="text-sm flex items-center gap-2"><CircleDot className="h-4 w-4" />Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button className="w-full justify-start gap-2 h-10" onClick={openAddWizard}>
-              <Plus className="h-4 w-4" />Add New Asset
-            </Button>
-            <Button variant="outline" className="w-full justify-start gap-2 h-10" onClick={() => setActiveTab('depreciation')}>
-              <TrendingDown className="h-4 w-4" />Run Depreciation
-            </Button>
-            <Button variant="outline" className="w-full justify-start gap-2 h-10" onClick={handleExport}>
-              <Download className="h-4 w-4" />Export to AFMS
-            </Button>
+            {canCreate && (
+              <Button className="w-full justify-start gap-2 h-10" onClick={openAddWizard}>
+                <Plus className="h-4 w-4" />Add New Asset
+              </Button>
+            )}
+            {canRunDepreciation && (
+              <Button variant="outline" className="w-full justify-start gap-2 h-10" onClick={() => setActiveTab('depreciation')}>
+                <TrendingDown className="h-4 w-4" />Run Depreciation
+              </Button>
+            )}
+            {canExportJournals && (
+              <Button variant="outline" className="w-full justify-start gap-2 h-10" onClick={handleExport}>
+                <Download className="h-4 w-4" />Export to AFMS
+              </Button>
+            )}
             <Separator />
             <div className="space-y-2">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Recent Activity</p>
@@ -1162,10 +1283,10 @@ export function FixedAssetsModule() {
 
       {/* Action Bar */}
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" className="h-8 text-xs gap-1" onClick={openAddWizard}><Plus className="h-3.5 w-3.5" />Add Asset</Button>
-        <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => setActiveTab('depreciation')}><TrendingDown className="h-3.5 w-3.5" />Run Depreciation</Button>
-        <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={handleExport}><Download className="h-3.5 w-3.5" />Export to AFMS</Button>
-        <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => toast({ title: 'Import', description: 'CSV import functionality' })}><Upload className="h-3.5 w-3.5" />Import CSV</Button>
+        {canCreate && <Button size="sm" className="h-8 text-xs gap-1" onClick={openAddWizard}><Plus className="h-3.5 w-3.5" />Add Asset</Button>}
+        {canRunDepreciation && <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => setActiveTab('depreciation')}><TrendingDown className="h-3.5 w-3.5" />Run Depreciation</Button>}
+        {canExportJournals && <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={handleExport}><Download className="h-3.5 w-3.5" />Export to AFMS</Button>}
+        {canCreate && <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => setCsvImportOpen(true)}><Upload className="h-3.5 w-3.5" />Import CSV</Button>}
         <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => window.print()}><Printer className="h-3.5 w-3.5" />Print</Button>
         <div className="flex-1" />
         <div className="relative w-64">
@@ -1291,8 +1412,8 @@ export function FixedAssetsModule() {
                       <TableCell>{journalBadge(a.journalStatus)}</TableCell>
                       <TableCell onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
-                          <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => openEditWizard(a)}><Edit className="h-3 w-3" /></Button></TooltipTrigger><TooltipContent>Edit</TooltipContent></Tooltip></TooltipProvider>
-                          <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleDeleteAsset(a.id)}><Trash2 className="h-3 w-3 text-red-500" /></Button></TooltipTrigger><TooltipContent>Write Off</TooltipContent></Tooltip></TooltipProvider>
+                          {canEdit && <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => openEditWizard(a)}><Edit className="h-3 w-3" /></Button></TooltipTrigger><TooltipContent>Edit</TooltipContent></Tooltip></TooltipProvider>}
+                          {canDelete && <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleDeleteAsset(a.id)}><Trash2 className="h-3 w-3 text-red-500" /></Button></TooltipTrigger><TooltipContent>Write Off</TooltipContent></Tooltip></TooltipProvider>}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1535,7 +1656,7 @@ export function FixedAssetsModule() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={handleRunDepreciation} disabled={depRunning || !depPeriod} className="h-8 text-xs gap-1">
+              <Button onClick={handleRunDepreciation} disabled={depRunning || !depPeriod || !canRunDepreciation} className="h-8 text-xs gap-1">
                 {depRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TrendingDown className="h-3.5 w-3.5" />}
                 Run Depreciation
               </Button>
@@ -1718,9 +1839,9 @@ export function FixedAssetsModule() {
           <Button size="sm" variant={txnSubTab === 'transfers' ? 'default' : 'outline'} className="h-8 text-xs" onClick={() => setTxnSubTab('transfers')}>Transfers</Button>
           <Button size="sm" variant={txnSubTab === 'adjustments' ? 'default' : 'outline'} className="h-8 text-xs" onClick={() => setTxnSubTab('adjustments')}>Adjustments</Button>
           <div className="flex-1" />
-          <Button size="sm" className="h-8 text-xs gap-1" onClick={() => setDisposalOpen(true)}><Trash2 className="h-3.5 w-3.5" />Disposal</Button>
-          <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => setTransferOpen(true)}><ArrowRight className="h-3.5 w-3.5" />Transfer</Button>
-          <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => setAdjustmentOpen(true)}><Wrench className="h-3.5 w-3.5" />Adjustment</Button>
+          {canManageTransactions && <Button size="sm" className="h-8 text-xs gap-1" onClick={() => setDisposalOpen(true)}><Trash2 className="h-3.5 w-3.5" />Disposal</Button>}
+          {(canManageTransactions || canRequestTransfer) && <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => setTransferOpen(true)}><ArrowRight className="h-3.5 w-3.5" />Transfer</Button>}
+          {canManageTransactions && <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => setAdjustmentOpen(true)}><Wrench className="h-3.5 w-3.5" />Adjustment</Button>}
         </div>
 
         <Card>
@@ -1771,6 +1892,10 @@ export function FixedAssetsModule() {
     const reportTypes = [
       { value: 'asset-register', label: 'Asset Register Report' },
       { value: 'depreciation-schedule', label: 'Depreciation Schedule' },
+      { value: 'tax-depreciation-fbr', label: 'Tax Depreciation (FBR)' },
+      { value: 'location-wise', label: 'Location-wise Report' },
+      { value: 'custodian-wise', label: 'Custodian-wise Report' },
+      { value: 'nbv-summary', label: 'NBV Summary' },
       { value: 'donor-assets', label: 'Donor Assets Report' },
       { value: 'asset-movement', label: 'Asset Movement Schedule' },
       { value: 'disposal-gain-loss', label: 'Disposal & Gain/Loss Report' },
@@ -2247,17 +2372,20 @@ export function FixedAssetsModule() {
 
             <Separator />
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" className="h-7 text-xs" onClick={() => { setDetailOpen(false); openEditWizard(a) }}><Edit className="h-3 w-3 mr-1" />Edit</Button>
-              {a.approvalStatus === 'Pending Approval' && (
+              {canEdit && <Button size="sm" className="h-7 text-xs" onClick={() => { setDetailOpen(false); openEditWizard(a) }}><Edit className="h-3 w-3 mr-1" />Edit</Button>}
+              {canApprove && a.approvalStatus === 'Pending Approval' && (
                 <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleApproveAsset(a.id)}><Check className="h-3 w-3 mr-1" />Approve</Button>
               )}
-              {a.status === 'Active' && (
+              {canManageTransactions && a.status === 'Active' && (
                 <>
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setDetailOpen(false); setDisposalOpen(true) }}><Trash2 className="h-3 w-3 mr-1" />Dispose</Button>
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setDetailOpen(false); setTransferOpen(true) }}><ArrowRight className="h-3 w-3 mr-1" />Transfer</Button>
                 </>
               )}
-              <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => handleDeleteAsset(a.id)}><XCircle className="h-3 w-3 mr-1" />Write Off</Button>
+              {canRequestTransfer && a.status === 'Active' && (
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setDetailOpen(false); setTransferOpen(true) }}><ArrowRight className="h-3 w-3 mr-1" />Request Transfer</Button>
+              )}
+              {canDelete && <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => handleDeleteAsset(a.id)}><XCircle className="h-3 w-3 mr-1" />Write Off</Button>}
             </div>
           </div>
         </SheetContent>
@@ -2271,10 +2399,35 @@ export function FixedAssetsModule() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold flex items-center gap-2"><Building2 className="h-5 w-5" />Fixed Assets Management</h2>
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Building2 className="h-5 w-5" />Fixed Assets Management
+            <Badge variant="secondary" className={`text-[10px] ${ROLES[currentRole]?.color}`}>
+              <Shield className="h-3 w-3 mr-1" />{ROLES[currentRole]?.label}
+            </Badge>
+          </h2>
           <p className="text-xs text-muted-foreground">Khyber Development Trust — FAMS Module</p>
         </div>
-        <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={refreshAll}><RefreshCw className="h-3.5 w-3.5" />Refresh</Button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <Shield className="h-4 w-4 text-muted-foreground" />
+            <Select value={currentRole} onValueChange={setCurrentRole}>
+              <SelectTrigger className="w-40 h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(ROLES).map(([key, role]) => (
+                  <SelectItem key={key} value={key}>
+                    <span className="flex items-center gap-1.5">
+                      <span>{role.icon}</span>
+                      <span>{role.label}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={refreshAll}><RefreshCw className="h-3.5 w-3.5" />Refresh</Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -2327,12 +2480,16 @@ export function FixedAssetsModule() {
                 <Button onClick={() => setWizardStep(s => s + 1)} disabled={!validateStep(wizardStep)}>Next <ChevronRight className="h-4 w-4 ml-1" /></Button>
               ) : (
                 <>
-                  <Button variant="outline" onClick={() => handleSaveAsset('draft')} disabled={saving}>
-                    <Save className="h-4 w-4 mr-1" />{saving ? 'Saving...' : 'Save as Draft'}
-                  </Button>
-                  <Button onClick={() => handleSaveAsset('submit')} disabled={saving}>
-                    <Send className="h-4 w-4 mr-1" />{saving ? 'Submitting...' : 'Submit for Approval'}
-                  </Button>
+                  {canCreate && (
+                    <Button variant="outline" onClick={() => handleSaveAsset('draft')} disabled={saving}>
+                      <Save className="h-4 w-4 mr-1" />{saving ? 'Saving...' : 'Save as Draft'}
+                    </Button>
+                  )}
+                  {canCreate && (
+                    <Button onClick={() => handleSaveAsset('submit')} disabled={saving}>
+                      <Send className="h-4 w-4 mr-1" />{saving ? 'Submitting...' : 'Submit for Approval'}
+                    </Button>
+                  )}
                 </>
               )}
             </div>
@@ -2347,6 +2504,139 @@ export function FixedAssetsModule() {
 
       {/* Asset Detail Sheet */}
       {renderDetailSheet()}
+
+      {/* CSV Import Dialog */}
+      <Dialog open={csvImportOpen} onOpenChange={setCsvImportOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5" />
+              Import Assets from CSV
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Paste CSV data below. Required columns: {CSV_REQUIRED_COLUMNS.join(', ')}.
+              Optional: {CSV_OPTIONAL_COLUMNS.join(', ')}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-xs font-medium">CSV Data</Label>
+              <Textarea
+                className="mt-1 font-mono text-xs min-h-40"
+                placeholder={`name,category,purchasePrice,dateOfPurchase,location,custodian,province\nGenerator,Machinery,5000000,2024-01-15,Peshawar Office,Ahmad Khan,KPK\nDesk,Furniture,25000,2024-02-01,Conference Room,Sara Ali,KPK`}
+                value={csvText}
+                onChange={e => { setCsvText(e.target.value); setCsvErrors([]) }}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs font-medium">Or select a file:</Label>
+              <Input
+                type="file"
+                accept=".csv"
+                className="h-8 text-xs"
+                onChange={e => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    const reader = new FileReader()
+                    reader.onload = (ev) => {
+                      const text = ev.target?.result as string
+                      setCsvText(text)
+                      setCsvErrors([])
+                    }
+                    reader.readAsText(file)
+                  }
+                }}
+              />
+            </div>
+
+            {/* Preview */}
+            {csvText.trim() && (() => {
+              const { headers, rows, errors: previewErrors } = parseCsvPreview()
+              return (
+                <div className="space-y-2">
+                  {previewErrors.length > 0 && (
+                    <div className="p-2 rounded-lg bg-red-50 border border-red-200">
+                      {previewErrors.map((err, i) => (
+                        <p key={i} className="text-xs text-red-700 flex items-center gap-1">
+                          <XCircle className="h-3 w-3" />{err}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  {headers.length > 0 && rows.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium mb-1">Preview (first {Math.min(rows.length, 5)} rows):</p>
+                      <div className="overflow-x-auto border rounded-lg max-h-48">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              {headers.map((h, i) => (
+                                <TableHead key={i} className="text-[10px] px-2 py-1">
+                                  {h}
+                                  {CSV_REQUIRED_COLUMNS.includes(h) && <span className="text-red-500">*</span>}
+                                </TableHead>
+                              ))}
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {rows.map((row, ri) => (
+                              <TableRow key={ri}>
+                                {headers.map((h, ci) => (
+                                  <TableCell key={ci} className="text-[10px] px-2 py-1 truncate max-w-32">
+                                    {row[ci] || '—'}
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
+            {/* Import Progress */}
+            {csvImporting && (
+              <div className="p-3 rounded-lg bg-sky-50 border border-sky-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-sky-600" />
+                  <span className="text-xs font-medium text-sky-800">Importing assets...</span>
+                </div>
+                <div className="w-full bg-sky-200 rounded-full h-2">
+                  <div
+                    className="bg-sky-600 h-2 rounded-full transition-all"
+                    style={{ width: `${csvProgress.total > 0 ? (csvProgress.done / csvProgress.total) * 100 : 0}%` }}
+                  />
+                </div>
+                <p className="text-xs text-sky-700 mt-1">Imported {csvProgress.done}/{csvProgress.total} assets</p>
+              </div>
+            )}
+
+            {/* Import Errors */}
+            {csvErrors.length > 0 && !csvImporting && (
+              <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+                <p className="text-xs font-medium text-red-800 mb-1">Errors ({csvErrors.length}):</p>
+                <div className="max-h-32 overflow-y-auto space-y-0.5">
+                  {csvErrors.map((err, i) => (
+                    <p key={i} className="text-[10px] text-red-700">{err}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex items-center justify-between">
+            <Button variant="outline" size="sm" className="text-xs" onClick={() => { setCsvText(''); setCsvErrors([]) }} disabled={csvImporting}>
+              <RotateCcw className="h-3.5 w-3.5 mr-1" />Clear
+            </Button>
+            <Button size="sm" className="text-xs" onClick={handleCsvImport} disabled={csvImporting || !csvText.trim()}>
+              {csvImporting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1" />}
+              {csvImporting ? `Importing ${csvProgress.done}/${csvProgress.total}...` : 'Import Assets'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
