@@ -114,3 +114,25 @@ Stage Summary:
   2. Client module - complete with schema, API, UI, sidebar navigation, and voucher integration
   3. Attachment UI in Voucher Management - full upload/download/delete with category selection
 - No code changes needed - all features were implemented in previous session
+
+---
+Task ID: 7
+Agent: Main
+Task: Fix dev server memory issues and stabilize the application
+
+Work Log:
+- Diagnosed dev server crash: Turbopack + recharts + all module imports = 1.3GB RSS which exceeds available memory
+- Converted page.tsx from eager imports to React.lazy() + Suspense for all modules
+- Replaced recharts library in Dashboard with lightweight CSS-based charts (SimpleBarChart, SimpleDonutChart)
+- Changed dev script from Turbopack to webpack (more memory-efficient for this project size)
+- Added NODE_OPTIONS="--max-old-space-size=4096" to dev script for proper GC headroom
+- Pre-warmed all API routes before page compilation to prevent memory spikes
+- Verified lint passes cleanly after all changes
+- Confirmed stable server operation with API warmup sequence
+
+Stage Summary:
+- page.tsx uses lazy loading (React.lazy + Suspense) for all 21 modules
+- Dashboard uses CSS-based charts instead of recharts (major memory savings)
+- Dev script uses webpack + 4GB memory limit for stability
+- Server is stable at ~960-1275 MB RSS after warmup
+- All features verified working: handlePrint, Client module, Attachment UI

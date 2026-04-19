@@ -12,7 +12,6 @@ import {
   BookOpen, FolderTree, Heart, RefreshCw, Activity, Wallet,
   CreditCard, PiggyBank, ArrowRight,
 } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area } from 'recharts'
 
 interface DashboardData {
   cashPosition: number
@@ -43,6 +42,82 @@ function formatCompact(amount: number) {
   if (Math.abs(amount) >= 1000000) return `${(amount / 1000000).toFixed(1)}M`
   if (Math.abs(amount) >= 1000) return `${(amount / 1000).toFixed(0)}K`
   return amount.toString()
+}
+
+// Lightweight CSS-based bar chart (replaces recharts)
+function SimpleBarChart({ data, dataKey1, dataKey2, labelKey, name1, name2, color1, color2 }: {
+  data: any[]; dataKey1: string; dataKey2: string; labelKey: string
+  name1: string; name2: string; color1: string; color2: string
+}) {
+  const maxVal = Math.max(...data.map(d => Math.max(d[dataKey1] || 0, d[dataKey2] || 0)), 1)
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-4 text-[10px]">
+        <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: color1 }} />{name1}</span>
+        <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: color2 }} />{name2}</span>
+      </div>
+      <div className="space-y-2">
+        {data.map((item, i) => (
+          <div key={i} className="space-y-1">
+            <div className="text-[10px] font-medium text-muted-foreground">{item[labelKey]}</div>
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-4 bg-muted/30 rounded-sm overflow-hidden">
+                  <div className="h-full rounded-sm transition-all" style={{ width: `${Math.max(((item[dataKey1] || 0) / maxVal) * 100, 0)}%`, background: color1 }} />
+                </div>
+                <span className="text-[9px] font-mono w-14 text-right">{formatCompact(item[dataKey1] || 0)}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-4 bg-muted/30 rounded-sm overflow-hidden">
+                  <div className="h-full rounded-sm transition-all" style={{ width: `${Math.max(((item[dataKey2] || 0) / maxVal) * 100, 0)}%`, background: color2 }} />
+                </div>
+                <span className="text-[9px] font-mono w-14 text-right">{formatCompact(item[dataKey2] || 0)}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Lightweight CSS-based donut chart (replaces recharts PieChart)
+function SimpleDonutChart({ data, colors, total }: { data: { name: string; value: number }[]; colors: string[]; total: number }) {
+  if (data.length === 0) return <div className="flex items-center justify-center h-48 text-xs text-muted-foreground">No data</div>
+  const segments = data.map((d, i) => ({
+    ...d,
+    percent: total > 0 ? (d.value / total) * 100 : 0,
+    color: colors[i % colors.length],
+  }))
+  // Build conic-gradient string
+  let gradient = ''
+  let accumulated = 0
+  for (const seg of segments) {
+    const start = accumulated
+    accumulated += seg.percent
+    gradient += `${seg.color} ${start}% ${accumulated}%, `
+  }
+  gradient = gradient.slice(0, -2)
+
+  return (
+    <div className="flex items-center justify-center gap-4">
+      <div className="relative">
+        <div className="h-40 w-40 rounded-full" style={{ background: `conic-gradient(${gradient})` }} />
+        <div className="absolute inset-4 rounded-full bg-card flex items-center justify-center flex-col">
+          <span className="text-xl font-bold">{total}</span>
+          <span className="text-[9px] text-muted-foreground">Total</span>
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        {segments.map((seg, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: seg.color }} />
+            <span className="text-[10px]">{seg.name}: <strong>{seg.value}</strong></span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export function Dashboard() {
@@ -217,46 +292,26 @@ export function Dashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={data.typeSummaries.map((t: any) => ({ ...t, type: t.type.charAt(0) + t.type.slice(1).toLowerCase() }))}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="type" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${formatCompact(v)}`} />
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                <Legend wrapperStyle={{ fontSize: 10 }} />
-                <Bar dataKey="totalDebit" fill="#16a34a" name="Debit" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="totalCredit" fill="#dc2626" name="Credit" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <SimpleBarChart
+              data={data.typeSummaries.map((t: any) => ({ ...t, type: t.type.charAt(0) + t.type.slice(1).toLowerCase() }))}
+              dataKey1="totalDebit" dataKey2="totalCredit" labelKey="type"
+              name1="Debit" name2="Credit" color1="#16a34a" color2="#dc2626"
+            />
           </CardContent>
         </Card>
 
-        {/* Voucher Status Pie */}
+        {/* Voucher Status Donut */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Voucher Status</CardTitle>
             <CardDescription className="text-[10px]">{data.counts.vouchers} total vouchers</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie
-                  data={data.voucherStatusCounts.map((v: any) => ({ name: v.status, value: v._count.status }))}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={85}
-                  dataKey="value"
-                  label={({ name, value }) => `${name}: ${value}`}
-                  labelLine={{ strokeWidth: 1 }}
-                >
-                  {data.voucherStatusCounts.map((_: any, i: number) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+            <SimpleDonutChart
+              data={data.voucherStatusCounts.map((v: any) => ({ name: v.status, value: v._count.status }))}
+              colors={COLORS}
+              total={data.counts.vouchers}
+            />
           </CardContent>
         </Card>
       </div>
