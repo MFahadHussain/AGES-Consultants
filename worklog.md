@@ -136,3 +136,43 @@ Stage Summary:
 - Dev script uses webpack + 4GB memory limit for stability
 - Server is stable at ~960-1275 MB RSS after warmup
 - All features verified working: handlePrint, Client module, Attachment UI
+
+---
+Task ID: 8
+Agent: Main
+Task: Fix hydration errors and add Client-wise Project report
+
+Work Log:
+- Fixed hydration error in chart-of-accounts.tsx: replaced `<div key={account.id}>` with `<React.Fragment key={account.id}>` inside `<TableBody>` (both main list and renderChildAccounts function)
+- Added `React` import to chart-of-accounts.tsx and reports.tsx for `React.Fragment` usage
+- Added `client_wise_project` report type to reports API (`/api/reports/route.ts`)
+  - Aggregates voucher entries by client, then by project within each client
+  - Returns client-level totals with nested project breakdown
+  - Added grand totals (grandTotalDebit, grandTotalCredit, grandBalance)
+  - Added clientId filter parameter support for all report types
+- Added Client-wise Project report to Financial Reports UI (`reports.tsx`)
+  - New report type in dropdown with description
+  - Summary cards showing Total Debit, Total Credit, Net Balance
+  - Expandable table with chevron toggle per client row
+  - Client rows: code, name (Building2 icon), industry, project count badge, financials
+  - Project sub-rows: indented, with status badge, financials
+  - Grand total row at bottom
+  - CSV export support for client-wise project data
+- Fixed segment report Status column incorrectly showing for Client-wise reports
+- Scanned all 17 module files for issues: no HTML nesting errors, no missing keys, no undefined functions, no missing imports
+- Removed 6 unused imports across modules:
+  - masters.tsx: removed Switch
+  - voucher-management.tsx: removed ScrollArea
+  - chart-of-accounts.tsx: removed ScrollArea
+  - bank-reconciliation.tsx: removed Tabs/TabsContent/TabsList/TabsTrigger
+  - budgets.tsx: removed Tabs/TabsContent/TabsList/TabsTrigger
+  - reports.tsx: removed FileBarChart
+- Switched dev script from webpack to Turbopack for faster compilation
+- All linter checks pass, all APIs return 200, server stable
+
+Stage Summary:
+- Hydration error in Chart of Accounts fully fixed (React.Fragment instead of div)
+- Client-wise Project report added with full backend API + frontend UI + CSV export
+- Codebase cleaned up (6 unused imports removed)
+- All report APIs verified working (8 report types returning 200)
+- Dev server stable on Turbopack

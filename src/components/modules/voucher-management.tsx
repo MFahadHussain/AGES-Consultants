@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Plus, Search, Eye, XCircle, Printer, Copy, CheckCircle2, Pencil, Trash2, CopyPlus,
   Filter, X, Upload, Download, FileText, FileImage, FileSpreadsheet, File,
