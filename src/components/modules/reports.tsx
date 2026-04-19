@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { FileBarChart, Download, Printer, RefreshCw, FileText } from 'lucide-react'
+import { FileBarChart, Download, Printer, RefreshCw, FileText, ChevronDown, ChevronRight, Building2 } from 'lucide-react'
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
@@ -132,6 +132,18 @@ export function FinancialReports() {
         reportData.entries.forEach((e: any) => {
           rows.push([new Date(e.voucher?.date).toLocaleDateString(), e.voucher?.voucherNumber, `${e.account?.code} - ${e.account?.name}`, e.voucher?.narration, e.debit > 0 ? e.debit : '', e.credit > 0 ? e.credit : ''])
         })
+      } else if (reportType === 'client_wise_project' && reportData.data) {
+        rows.push(['Client Code', 'Client Name', 'Industry', 'Project Code', 'Project Name', 'Project Status', 'Total Debit', 'Total Credit', 'Net Balance'])
+        reportData.data.forEach((client: any) => {
+          if (client.projects && client.projects.length > 0) {
+            client.projects.forEach((proj: any) => {
+              rows.push([client.code, client.name, client.industry || '', proj.code, proj.name, proj.status, proj.totalDebit, proj.totalCredit, proj.balance])
+            })
+          } else {
+            rows.push([client.code, client.name, client.industry || '', '', '', '', client.totalDebit, client.totalCredit, client.balance])
+          }
+        })
+        rows.push(['', '', '', '', '', 'GRAND TOTAL', reportData.grandTotalDebit, reportData.grandTotalCredit, reportData.grandBalance])
       } else {
         // Segment reports
         rows.push(['Code', 'Name', 'Total Debit', 'Total Credit', 'Net Balance'])
@@ -324,7 +336,7 @@ export function FinancialReports() {
             <TableRow key={i}>
               <TableCell className="font-mono text-xs">{d.code}</TableCell>
               <TableCell className="text-xs font-medium">{d.project || d.donor || d.location}</TableCell>
-              {reportData.reportType?.includes('project') && <TableCell className="text-xs"><Badge className="text-[9px]">{d.status}</Badge></TableCell>}
+              {reportData.reportType?.includes('project') && !reportData.reportType?.includes('Client') && <TableCell className="text-xs"><Badge className="text-[9px]">{d.status}</Badge></TableCell>}
               <TableCell className="text-xs text-right">{formatCurrency(d.totalDebit)}</TableCell>
               <TableCell className="text-xs text-right">{formatCurrency(d.totalCredit)}</TableCell>
               <TableCell className="text-xs text-right font-semibold">{formatCurrency(d.balance)}</TableCell>
@@ -332,6 +344,102 @@ export function FinancialReports() {
           ))}
         </TableBody>
       </Table>
+    )
+  }
+
+  const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set())
+
+  const toggleClientExpand = (clientId: string) => {
+    const next = new Set(expandedClients)
+    if (next.has(clientId)) next.delete(clientId)
+    else next.add(clientId)
+    setExpandedClients(next)
+  }
+
+  const renderClientWiseProject = () => {
+    if (!reportData?.data) return <p className="text-xs text-muted-foreground text-center py-8">No data</p>
+    return (
+      <div className="space-y-1">
+        {/* Summary cards */}
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <Card className="border-l-4 border-l-emerald-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Debit</p><p className="text-sm font-bold text-emerald-600">{formatCurrency(reportData.grandTotalDebit)}</p></CardContent></Card>
+          <Card className="border-l-4 border-l-red-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Credit</p><p className="text-sm font-bold text-red-600">{formatCurrency(reportData.grandTotalCredit)}</p></CardContent></Card>
+          <Card className={`border-l-4 ${reportData.grandBalance >= 0 ? 'border-l-emerald-400' : 'border-l-red-400'}`}><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Net Balance</p><p className={`text-sm font-bold ${reportData.grandBalance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(reportData.grandBalance)}</p></CardContent></Card>
+        </div>
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-[10px] w-8"></TableHead>
+              <TableHead className="text-[10px]">Client Code</TableHead>
+              <TableHead className="text-[10px]">Client Name</TableHead>
+              <TableHead className="text-[10px]">Industry</TableHead>
+              <TableHead className="text-[10px] text-center">Projects</TableHead>
+              <TableHead className="text-[10px] text-right">Total Debit</TableHead>
+              <TableHead className="text-[10px] text-right">Total Credit</TableHead>
+              <TableHead className="text-[10px] text-right">Net Balance</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {reportData.data.map((client: any) => {
+              const isExpanded = expandedClients.has(client.id)
+              const hasProjects = client.projects && client.projects.length > 0
+              return (
+                <React.Fragment key={client.id}>
+                  <TableRow className="hover:bg-accent/50 font-medium">
+                    <TableCell>
+                      {hasProjects ? (
+                        <button onClick={() => toggleClientExpand(client.id)} className="p-0.5 rounded hover:bg-muted">
+                          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                        </button>
+                      ) : (
+                        <span className="w-5 inline-block" />
+                      )}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs font-semibold">{client.code}</TableCell>
+                    <TableCell className="text-xs font-semibold">
+                      <div className="flex items-center gap-1.5">
+                        <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                        {client.name}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-[10px] text-muted-foreground">{client.industry || '-'}</TableCell>
+                    <TableCell className="text-xs text-center">
+                      {client.projectCount > 0 && (
+                        <Badge className="text-[9px] bg-amber-100 text-amber-800">{client.projectCount}</Badge>
+                      )}
+                      {client.projectCount === 0 && <span className="text-muted-foreground">-</span>}
+                    </TableCell>
+                    <TableCell className="text-xs text-right">{formatCurrency(client.totalDebit)}</TableCell>
+                    <TableCell className="text-xs text-right">{formatCurrency(client.totalCredit)}</TableCell>
+                    <TableCell className="text-xs text-right font-bold">{formatCurrency(client.balance)}</TableCell>
+                  </TableRow>
+                  {isExpanded && hasProjects && client.projects.map((proj: any) => (
+                    <TableRow key={proj.id} className="bg-muted/30 hover:bg-muted/50">
+                      <TableCell></TableCell>
+                      <TableCell className="font-mono text-[10px] text-muted-foreground">↳ {proj.code}</TableCell>
+                      <TableCell className="text-[10px] text-muted-foreground pl-6">{proj.name}</TableCell>
+                      <TableCell><Badge className="text-[8px]">{proj.status}</Badge></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell className="text-[10px] text-right text-muted-foreground">{formatCurrency(proj.totalDebit)}</TableCell>
+                      <TableCell className="text-[10px] text-right text-muted-foreground">{formatCurrency(proj.totalCredit)}</TableCell>
+                      <TableCell className="text-[10px] text-right font-medium">{formatCurrency(proj.balance)}</TableCell>
+                    </TableRow>
+                  ))}
+                </React.Fragment>
+              )
+            })}
+            {reportData.data.length > 0 && (
+              <TableRow className="font-bold bg-muted/50">
+                <TableCell colSpan={5} className="text-xs">GRAND TOTAL</TableCell>
+                <TableCell className="text-xs text-right">{formatCurrency(reportData.grandTotalDebit)}</TableCell>
+                <TableCell className="text-xs text-right">{formatCurrency(reportData.grandTotalCredit)}</TableCell>
+                <TableCell className="text-xs text-right">{formatCurrency(reportData.grandBalance)}</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     )
   }
 
@@ -343,6 +451,7 @@ export function FinancialReports() {
     { value: 'donor_wise', label: 'Donor-wise Report', desc: 'Financial summary by donor' },
     { value: 'project_wise', label: 'Project-wise Report', desc: 'Financial summary by project' },
     { value: 'location_wise', label: 'Location-wise Report', desc: 'Financial summary by location' },
+    { value: 'client_wise_project', label: 'Client-wise Project', desc: 'Financial summary by client with project breakdown' },
   ]
 
   return (
@@ -411,6 +520,7 @@ export function FinancialReports() {
             reportType === 'balance_sheet' ? renderBalanceSheet() :
             reportType === 'pnl' ? renderPnL() :
             reportType === 'cash_flow' ? renderCashFlow() :
+            reportType === 'client_wise_project' ? renderClientWiseProject() :
             renderSegmentReport()
           }
         </CardContent>

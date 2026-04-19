@@ -10,6 +10,7 @@ export async function GET(request: Request) {
     const projectId = searchParams.get('projectId')
     const donorId = searchParams.get('donorId')
     const locationId = searchParams.get('locationId')
+    const clientId = searchParams.get('clientId')
     const financialYearId = searchParams.get('financialYearId')
 
     const statusParam = searchParams.get('status') || 'posted'
@@ -30,6 +31,7 @@ export async function GET(request: Request) {
     if (projectId) voucherWhere.projectId = projectId
     if (donorId) voucherWhere.donorId = donorId
     if (locationId) voucherWhere.locationId = locationId
+    if (clientId) voucherWhere.clientId = clientId
 
     switch (reportType) {
       case 'trial_balance': {
@@ -260,6 +262,79 @@ export async function GET(request: Request) {
         }
 
         return NextResponse.json({ reportType: 'Location-wise Report', data: locationData, periodFrom: dateFrom, periodTo: dateTo })
+      }
+
+      case 'client_wise_project': {
+        // Get all clients
+        const clients = await db.client.findMany({
+          where: { isActive: true },
+          orderBy: { code: 'asc' },
+        })
+
+        const clientData = []
+
+        for (const client of clients) {
+          // Get all vouchers for this client
+          const clientVoucherWhere = { ...voucherWhere, clientId: client.id }
+
+          const clientResult = await db.voucherEntry.aggregate({
+            _sum: { debit: true, credit: true },
+            where: { voucher: clientVoucherWhere },
+          })
+
+          // Get projects associated with this client via vouchers
+          const clientProjects = await db.voucher.findMany({
+            where: { ...clientVoucherWhere, projectId: { not: null } },
+            select: { projectId: true, project: { select: { id: true, code: true, name: true, status: true } } },
+            distinct: ['projectId'],
+          })
+
+          const projects = []
+          for (const vp of clientProjects) {
+            if (!vp.project) continue
+            const projectResult = await db.voucherEntry.aggregate({
+              _sum: { debit: true, credit: true },
+              where: {
+                voucher: { ...voucherWhere, clientId: client.id, projectId: vp.project.id },
+              },
+            })
+            projects.push({
+              id: vp.project.id,
+              code: vp.project.code,
+              name: vp.project.name,
+              status: vp.project.status,
+              totalDebit: projectResult._sum.debit || 0,
+              totalCredit: projectResult._sum.credit || 0,
+              balance: (projectResult._sum.debit || 0) - (projectResult._sum.credit || 0),
+            })
+          }
+
+          clientData.push({
+            id: client.id,
+            code: client.code,
+            name: client.name,
+            industry: client.industry,
+            totalDebit: clientResult._sum.debit || 0,
+            totalCredit: clientResult._sum.credit || 0,
+            balance: (clientResult._sum.debit || 0) - (clientResult._sum.credit || 0),
+            projects,
+            projectCount: projects.length,
+          })
+        }
+
+        // Compute grand totals
+        const grandTotalDebit = clientData.reduce((s, c) => s + c.totalDebit, 0)
+        const grandTotalCredit = clientData.reduce((s, c) => s + c.totalCredit, 0)
+
+        return NextResponse.json({
+          reportType: 'Client-wise Project Report',
+          data: clientData,
+          grandTotalDebit,
+          grandTotalCredit,
+          grandBalance: grandTotalDebit - grandTotalCredit,
+          periodFrom: dateFrom,
+          periodTo: dateTo,
+        })
       }
 
       case 'account_head': {

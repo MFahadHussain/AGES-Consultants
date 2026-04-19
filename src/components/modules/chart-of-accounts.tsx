@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -223,7 +223,7 @@ export function ChartOfAccounts() {
                   const hasChildren = accounts.some(a => a.parentId === account.id)
                   const isExpanded = expandedIds.has(account.id)
                   return (
-                    <div key={account.id}>
+                    <React.Fragment key={account.id}>
                       <TableRow className={`hover:bg-accent/50 ${!account.isActive ? 'opacity-50' : ''}`}>
                         <TableCell>
                           <div className="flex items-center">
@@ -253,7 +253,7 @@ export function ChartOfAccounts() {
                         </TableCell>
                       </TableRow>
                       {isExpanded && hasChildren && renderChildAccounts(accounts, account.id, 1, expandedIds, toggleExpand, setEditingAccount, setForm, setDialogOpen, handleDeactivate)}
-                    </div>
+                    </React.Fragment>
                   )
                 })
               )}
@@ -271,7 +271,7 @@ function renderChildAccounts(allAccounts: Account[], parentId: string, level: nu
     const hasChildren = allAccounts.some(a => a.parentId === account.id)
     const isExpanded = expandedIds.has(account.id)
     return (
-      <div key={account.id}>
+      <React.Fragment key={account.id}>
         <TableRow className={`hover:bg-accent/50 ${!account.isActive ? 'opacity-50' : ''}`}>
           <TableCell>
             <div className="flex items-center" style={{ paddingLeft: `${level * 24}px` }}>
@@ -301,7 +301,7 @@ function renderChildAccounts(allAccounts: Account[], parentId: string, level: nu
           </TableCell>
         </TableRow>
         {isExpanded && hasChildren && renderChildAccounts(allAccounts, account.id, level + 1, expandedIds, toggleExpand, setEditingAccount, setForm, setDialogOpen, handleDeactivate)}
-      </div>
+      </React.Fragment>
     )
   })
 }
