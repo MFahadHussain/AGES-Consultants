@@ -26,7 +26,7 @@ const Taxation = lazy(() => import('@/components/modules/taxation').then(m => ({
 const AgingAnalysis = lazy(() => import('@/components/modules/aging').then(m => ({ default: m.AgingAnalysis })))
 const FinancialYearManagement = lazy(() => import('@/components/modules/financial-year').then(m => ({ default: m.FinancialYearManagement })))
 const FinancialReports = lazy(() => import('@/components/modules/reports').then(m => ({ default: m.FinancialReports })))
-const FixedAssetsIntegration = lazy(() => import('@/components/modules/fixed-assets').then(m => ({ default: m.FixedAssetsIntegration })))
+const FixedAssetsIntegration = lazy(() => import('@/components/modules/fixed-assets').then(m => ({ default: m.FixedAssetsModule })))
 const PayrollIntegration = lazy(() => import('@/components/modules/payroll').then(m => ({ default: m.PayrollIntegration })))
 const ImportExport = lazy(() => import('@/components/modules/import-export').then(m => ({ default: m.ImportExport })))
 const AuditTrail = lazy(() => import('@/components/modules/audit-trail').then(m => ({ default: m.AuditTrail })))

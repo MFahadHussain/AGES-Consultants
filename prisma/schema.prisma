@@ -66,8 +66,7 @@ model Account {
   budgetEntries   BudgetLine[]
   taxAccounts     TaxRate[]
   bankStatements  BankStatement[]
-  depExpenseEntries FixedAssetDepreciation[] @relation("DepExpense")
-  accumDepEntries   FixedAssetDepreciation[] @relation("AccumDep")
+
 }
 
 // ============================================================
@@ -192,7 +191,6 @@ model Supplier {
   updatedAt     DateTime @updatedAt
 
   voucherEntries VoucherEntry[]
-  fixedAssets    FixedAsset[]
 }
 
 // ============================================================
@@ -424,50 +422,173 @@ model AccountBalance {
 }
 
 // ============================================================
-// INTEGRATION: Fixed Assets (Reference tables for integration)
+// FIXED ASSETS MANAGEMENT SYSTEM (FAMS)
 // ============================================================
 
 model FixedAsset {
-  id              String   @id @default(cuid())
-  assetCode       String   @unique
-  name            String
-  category        String
-  purchaseDate    DateTime
-  purchaseCost    Float
-  usefulLife      Int      // months
-  salvageValue    Float    @default(0)
-  depreciationMethod String @default("straight_line")
-  locationId      String?
-  projectId       String?
-  donorId         String?
-  supplierId      String?
-  supplier        Supplier? @relation(fields: [supplierId], references: [id])
-  isDonorFunded   Boolean  @default(false) // Donor-funded: zero depreciation
-  status          String   @default("active") // active, disposed, transferred
-  disposalDate    DateTime?
-  disposalAmount  Float?
-  gainLoss        Float?
-  accumulatedDepreciation Float @default(0)
-  netBookValue    Float
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  assetId               String   @unique  // AST-YYYY-NNNN
+  name                  String
+  description           String?
+  category              String   // Land, Buildings, Vehicles, Furniture, Office Equipment, IT Assets, Machinery, Other
+  subCategory           String?
+  dateOfPurchase        DateTime
+  dateOfCapitalization  DateTime
+  purchasePrice         Float    // PKR
+  residualValue         Float    @default(0) // PKR
+  usefulLifeYears       Int      @default(0)
+  depreciationMethod    String   @default("Straight-Line") // Straight-Line, Declining-Balance, None
+  decliningRate         Float    @default(0) // % for declining balance
+  custodian             String?
+  location              String?
+  province              String   @default("KPK") // Punjab, Sindh, KPK, Balochistan, ICT, AJK, GB
+  donor                 String?
+  isDonorFunded         Boolean  @default(false)
+  donorRestrictions     String?
+  grantReference        String?
+  invoiceNumber         String?
+  supplierName          String?
+  supplierNTN           String?
+  warrantyExpiryDate    DateTime?
+  serialNumber          String?
+  status                String   @default("Active") // Active, Disposed, Transferred, Under Maintenance, Written Off
+  condition             String   @default("Good") // Excellent, Good, Fair, Poor
+  insuranceValue        Float    @default(0)
+  insurancePolicyNumber String?
+  insuranceExpiryDate   DateTime?
+  costCenter            String?
+  project               String?
+  fundCode              String?
+  donorCode             String?
+  glAssetAccount        String?
+  glAccDepAccount       String?
+  glDepExpAccount       String?
+  taxCategory           String?
+  taxRate               Float    @default(0)
+  taxMethod             String   @default("Declining-Balance")
+  approvalStatus        String   @default("Draft") // Draft, Pending Approval, Approved, Rejected
+  approvedBy            String?
+  createdBy             String?
+  journalStatus         String   @default("Pending Export") // Pending Export, Exported
+  notes                 String?
+  accumulatedDepreciation Float  @default(0)
+  netBookValue          Float    @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  depreciationEntries FixedAssetDepreciation[]
+  depreciationRecords   FixedAssetDepreciation[]
+  transactions          AssetTransaction[]
 }
 
 model FixedAssetDepreciation {
-  id          String     @id @default(cuid())
-  assetId     String
-  asset       FixedAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  period      String     // "2024-01"
-  amount      Float
-  depExpenseAccountId String
-  depExpenseAccount   Account @relation("DepExpense", fields: [depExpenseAccountId], references: [id])
-  accumDepAccountId   String
-  accumDepAccount     Account @relation("AccumDep", fields: [accumDepAccountId], references: [id])
-  voucherId   String?   // Posted JV reference
-  postedAt    DateTime?
-  createdAt   DateTime  @default(now())
+  id                      String   @id @default(cuid())
+  assetId                 String
+  asset                   FixedAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  financialYear           String   // "2024-25"
+  period                  String   // "Jul-2024"
+  monthNumber             Int      // 1-12 (1=July)
+  openingNBV              Float
+  depreciationCharge      Float
+  accumulatedDepreciation Float
+  closingNBV              Float
+  isPosted                Boolean  @default(false)
+  journalRef              String?
+  journalStatus           String   @default("Pending Export") // Pending Export, Exported
+  isTaxDepreciation       Boolean  @default(false) // true for FBR tax depreciation
+  taxOpeningWDV           Float    @default(0)
+  taxCharge               Float    @default(0)
+  taxClosingWDV           Float    @default(0)
+  createdAt               DateTime @default(now())
+}
+
+model AssetTransaction {
+  id              String   @id @default(cuid())
+  txnId           String   @unique  // TXN-YYYY-NNNN
+  assetId         String
+  asset           FixedAsset @relation(fields: [assetId], references: [id])
+  type            String   // Addition, Disposal, Transfer, Adjustment, Reversal
+  date            DateTime
+  description     String?
+  amount          Float    @default(0)
+  fromLocation    String?
+  toLocation      String?
+  fromCustodian   String?
+  toCustodian     String?
+  fromCostCenter  String?
+  toCostCenter    String?
+  proceeds        Float    @default(0) // For disposal
+  gainLoss        Float    @default(0) // Positive = gain, negative = loss
+  disposalMethod  String?  // Sale, Scrap, Donation, Write-Off, Transfer to Govt
+  adjustmentType  String?  // Upward Revaluation, Downward (Impairment), Correction
+  newValue        Float?   // For adjustments/revaluations
+  transferCertNo  String?  // TC-YYYY-NNNN
+  approvedBy      String?
+  status          String   @default("Draft") // Draft, Approved, Posted, Reversed, Pending Acknowledgment
+  journalRef      String?
+  journalStatus   String   @default("Pending Export") // Pending Export, Exported, N/A
+  notes           String?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+}
+
+model FAMSFiscalYear {
+  id            String   @id @default(cuid())
+  label         String   @unique // "2024-25"
+  startDate     DateTime
+  endDate       DateTime
+  status        String   @default("Open") // Open, Closed
+  depRunStatus  String   @default("{}") // JSON: {"Jul-2024": "Complete", "Aug-2024": "Pending", ...}
+  openedBy      String?
+  openedAt      DateTime @default(now())
+  closedBy      String?
+  closedAt      DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model FAMSJournal {
+  id              String   @id @default(cuid())
+  journalNumber   String   @unique  // JV-FAMS-YYYY-NNNN
+  type            String   // Addition, Depreciation, Disposal, Adjustment
+  date            DateTime
+  narration       String?
+  assetId         String?
+  assetName       String?
+  drAccountCode   String?
+  drAccountName   String?
+  drAmount        Float    @default(0)
+  crAccountCode   String?
+  crAccountName   String?
+  crAmount        Float    @default(0)
+  costCenter      String?
+  project         String?
+  fundCode        String?
+  source          String   @default("FAMS")
+  status          String   @default("Pending Export") // Pending Export, Exported, Reversed
+  exportBatchId   String?
+  createdAt       DateTime @default(now())
+  exportedAt      DateTime?
+}
+
+model FAMSExportBatch {
+  id              String   @id @default(cuid())
+  batchRef        String   @unique  // EXP-YYYY-NNNN
+  exportDate      DateTime @default(now())
+  exportedBy      String?
+  entryCount      Int      @default(0)
+  totalDrAmount   Float    @default(0)
+  totalCrAmount   Float    @default(0)
+  csvContent      String?  // Store the CSV content for re-download
+  createdAt       DateTime @default(now())
+}
+
+model FAMSSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  category  String   @default("fams") // fams, gl-mapping, thresholds, tax-rates
+  description String?
+  updatedAt DateTime @updatedAt
 }
 
 // ============================================================
