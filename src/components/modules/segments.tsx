@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, FolderTree, Heart, MapPin, Pencil, Trash2, Loader2 } from 'lucide-react'
+import { Plus, FolderTree, Heart, MapPin, Pencil, Trash2, Loader2, Briefcase } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 // Projects Module
@@ -519,6 +519,221 @@ export function Locations() {
           </Card>
         ))}
       </div>
+    </div>
+  )
+}
+
+// Clients Module
+export function Clients() {
+  const [data, setData] = useState<any[]>([])
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({ code: '', name: '', contactPerson: '', email: '', phone: '', address: '', industry: '', taxNumber: '', isActive: true })
+  const { toast } = useToast()
+
+  const fetchData = async () => {
+    try {
+      const res = await fetch('/api/clients')
+      const json = await res.json()
+      setData(Array.isArray(json) ? json : [])
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load clients', variant: 'destructive' })
+    }
+  }
+  useEffect(() => { queueMicrotask(() => fetchData()) }, [])
+
+  const openCreate = () => {
+    setEditingId(null)
+    setForm({ code: '', name: '', contactPerson: '', email: '', phone: '', address: '', industry: '', taxNumber: '', isActive: true })
+    setDialogOpen(true)
+  }
+
+  const openEdit = (c: any) => {
+    setEditingId(c.id)
+    setForm({
+      code: c.code,
+      name: c.name,
+      contactPerson: c.contactPerson || '',
+      email: c.email || '',
+      phone: c.phone || '',
+      address: c.address || '',
+      industry: c.industry || '',
+      taxNumber: c.taxNumber || '',
+      isActive: c.isActive ?? true,
+    })
+    setDialogOpen(true)
+  }
+
+  const handleSave = async () => {
+    if (!form.code || !form.name) {
+      toast({ title: 'Error', description: 'Code and name required', variant: 'destructive' })
+      return
+    }
+    setSaving(true)
+    try {
+      const payload = { ...form, industry: form.industry || undefined, taxNumber: form.taxNumber || undefined, contactPerson: form.contactPerson || undefined, email: form.email || undefined, phone: form.phone || undefined, address: form.address || undefined }
+      if (editingId) {
+        const res = await fetch('/api/clients', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingId, ...payload }),
+        })
+        const result = await res.json()
+        if (!res.ok) { toast({ title: 'Error', description: result.error, variant: 'destructive' }); setSaving(false); return }
+        toast({ title: 'Updated', description: `Client ${form.code} updated` })
+      } else {
+        const res = await fetch('/api/clients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        const result = await res.json()
+        if (!res.ok) { toast({ title: 'Error', description: result.error, variant: 'destructive' }); setSaving(false); return }
+        toast({ title: 'Created', description: `Client ${form.code} created` })
+      }
+      setDialogOpen(false)
+      setForm({ code: '', name: '', contactPerson: '', email: '', phone: '', address: '', industry: '', taxNumber: '', isActive: true })
+      setEditingId(null)
+      fetchData()
+    } catch {
+      toast({ title: 'Error', description: 'Operation failed', variant: 'destructive' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      const res = await fetch(`/api/clients?id=${id}`, { method: 'DELETE' })
+      const result = await res.json()
+      if (!res.ok) {
+        toast({ title: 'Cannot Delete', description: result.error, variant: 'destructive' })
+        return
+      }
+      toast({ title: 'Deleted', description: 'Client deleted successfully' })
+      fetchData()
+    } catch {
+      toast({ title: 'Error', description: 'Failed to delete client', variant: 'destructive' })
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  const industryColors: Record<string, string> = {
+    Government: 'bg-blue-100 text-blue-800',
+    NGO: 'bg-green-100 text-green-800',
+    Corporate: 'bg-purple-100 text-purple-800',
+    Individual: 'bg-amber-100 text-amber-800',
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold flex items-center gap-2"><Briefcase className="h-4 w-4" />Clients</h3>
+        <Button size="sm" className="h-8 text-xs" onClick={openCreate}>
+          <Plus className="h-3.5 w-3.5 mr-1" />New Client
+        </Button>
+      </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle className="text-sm">{editingId ? 'Edit Client' : 'New Client'}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label className="text-xs">Code *</Label><Input className="h-8 text-xs" value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value }))} /></div>
+              <div><Label className="text-xs">Name *</Label><Input className="h-8 text-xs" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label className="text-xs">Contact Person</Label><Input className="h-8 text-xs" value={form.contactPerson} onChange={e => setForm(p => ({ ...p, contactPerson: e.target.value }))} /></div>
+              <div><Label className="text-xs">Industry</Label>
+                <Select value={form.industry || '_none'} onValueChange={v => setForm(p => ({ ...p, industry: v === '_none' ? '' : v }))}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">None</SelectItem>
+                    <SelectItem value="Government">Government</SelectItem>
+                    <SelectItem value="NGO">NGO</SelectItem>
+                    <SelectItem value="Corporate">Corporate</SelectItem>
+                    <SelectItem value="Individual">Individual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label className="text-xs">Email</Label><Input className="h-8 text-xs" type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} /></div>
+              <div><Label className="text-xs">Phone</Label><Input className="h-8 text-xs" value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label className="text-xs">Tax Number</Label><Input className="h-8 text-xs" value={form.taxNumber} onChange={e => setForm(p => ({ ...p, taxNumber: e.target.value }))} /></div>
+              <div className="flex items-center gap-2 pt-5">
+                <input type="checkbox" id="clientActive" checked={form.isActive} onChange={e => setForm(p => ({ ...p, isActive: e.target.checked }))} className="h-4 w-4 rounded" />
+                <Label htmlFor="clientActive" className="text-xs cursor-pointer">Active</Label>
+              </div>
+            </div>
+            <div><Label className="text-xs">Address</Label><Input className="h-8 text-xs" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleSave} disabled={saving}>
+              {saving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+              {editingId ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Card><CardContent className="p-0">
+        <Table>
+          <TableHeader><TableRow>
+            <TableHead className="text-[10px]">Code</TableHead>
+            <TableHead className="text-[10px]">Name</TableHead>
+            <TableHead className="text-[10px]">Contact</TableHead>
+            <TableHead className="text-[10px]">Industry</TableHead>
+            <TableHead className="text-[10px]">Email</TableHead>
+            <TableHead className="text-[10px]">Phone</TableHead>
+            <TableHead className="text-[10px]">Status</TableHead>
+            <TableHead className="text-[10px] w-20">Actions</TableHead>
+          </TableRow></TableHeader>
+          <TableBody>
+            {data.length === 0 ? (
+              <TableRow><TableCell colSpan={8} className="text-center text-xs py-8 text-muted-foreground">No clients found. Create your first client.</TableCell></TableRow>
+            ) : data.map(c => (
+              <TableRow key={c.id} className={!c.isActive ? 'opacity-50' : ''}>
+                <TableCell className="font-mono text-xs font-semibold">{c.code}</TableCell>
+                <TableCell className="text-xs font-medium">{c.name}</TableCell>
+                <TableCell className="text-xs">{c.contactPerson || '-'}</TableCell>
+                <TableCell>{c.industry ? <Badge className={`text-[9px] ${industryColors[c.industry] || 'bg-gray-100 text-gray-800'}`}>{c.industry}</Badge> : <span className="text-xs text-muted-foreground">-</span>}</TableCell>
+                <TableCell className="text-xs">{c.email || '-'}</TableCell>
+                <TableCell className="text-xs">{c.phone || '-'}</TableCell>
+                <TableCell>{c.isActive ? <Badge className="text-[9px] bg-green-100 text-green-800">Active</Badge> : <Badge className="text-[9px] bg-gray-100 text-gray-800">Inactive</Badge>}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(c)}><Pencil className="h-3 w-3" /></Button>
+                    <AlertDialog open={deletingId === c.id} onOpenChange={(open) => { if (!open) setDeletingId(null) }}>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeletingId(c.id)}><Trash2 className="h-3 w-3" /></Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-sm">Delete Client?</AlertDialogTitle>
+                          <AlertDialogDescription className="text-xs">
+                            Are you sure you want to delete &quot;{c.name}&quot; ({c.code})? This action cannot be undone. Clients with associated vouchers cannot be deleted.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="text-xs">Cancel</AlertDialogCancel>
+                          <AlertDialogAction className="text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => handleDelete(c.id)}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent></Card>
     </div>
   )
 }

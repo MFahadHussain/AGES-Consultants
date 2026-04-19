@@ -11,6 +11,7 @@ export type ModuleKey =
   | 'projects'
   | 'donors'
   | 'locations'
+  | 'clients'
   | 'budgets'
   | 'taxation'
   | 'aging'

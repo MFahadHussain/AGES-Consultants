@@ -12,6 +12,7 @@ import {
   FolderTree,
   Heart,
   MapPin,
+  Briefcase,
   PieChart,
   Receipt,
   Clock,
@@ -66,6 +67,7 @@ const navigation: NavGroup[] = [
       { key: 'projects', label: 'Projects', icon: FolderTree },
       { key: 'donors', label: 'Donors', icon: Heart },
       { key: 'locations', label: 'Locations', icon: MapPin },
+      { key: 'clients', label: 'Clients', icon: Briefcase },
     ],
   },
   {

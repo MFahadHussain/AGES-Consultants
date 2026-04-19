@@ -45,6 +45,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         project: true,
         donor: true,
         location: true,
+        client: true,
       },
     })
     if (!voucher) return NextResponse.json({ error: 'Voucher not found' }, { status: 404 })
@@ -250,6 +251,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       if (data.projectId !== undefined) updateData.projectId = data.projectId || null
       if (data.donorId !== undefined) updateData.donorId = data.donorId || null
       if (data.locationId !== undefined) updateData.locationId = data.locationId || null
+      if (data.clientId !== undefined) updateData.clientId = data.clientId || null
 
       if (data.entries) {
         const totalDebit = data.entries.reduce((sum: number, e: any) => sum + (e.debit || 0), 0)
@@ -282,7 +284,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       const voucher = await db.voucher.update({
         where: { id },
         data: updateData,
-        include: { entries: { include: { account: true } }, project: true, donor: true, location: true },
+        include: { entries: { include: { account: true } }, project: true, donor: true, location: true, client: true },
       })
 
       await createApproval('UPDATE', current.status, updateData.status || current.status, 'Voucher edited')

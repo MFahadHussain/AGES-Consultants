@@ -134,6 +134,23 @@ model Location {
   vouchers    Voucher[]
 }
 
+model Client {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  contactPerson String?
+  email         String?
+  phone         String?
+  address       String?
+  industry      String?  // e.g., Government, NGO, Corporate, Individual
+  taxNumber     String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  vouchers    Voucher[]
+}
+
 // ============================================================
 // CUSTOMERS & SUPPLIERS (Sub-Ledger Masters)
 // ============================================================
@@ -204,6 +221,8 @@ model Voucher {
   donor           Donor?    @relation(fields: [donorId], references: [id])
   locationId      String?
   location        Location? @relation(fields: [locationId], references: [id])
+  clientId        String?
+  client          Client?   @relation(fields: [clientId], references: [id])
   totalDebit      Float     @default(0)
   totalCredit     Float     @default(0)
   isPayrollPosted Boolean   @default(false) // INTEGRATION: Payroll → GL

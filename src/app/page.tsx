@@ -9,7 +9,7 @@ import { ChartOfAccounts } from '@/components/modules/chart-of-accounts'
 import { VoucherManagement } from '@/components/modules/voucher-management'
 import { Ledgers } from '@/components/modules/ledgers'
 import { Customers, Suppliers } from '@/components/modules/masters'
-import { Projects, Donors, Locations } from '@/components/modules/segments'
+import { Projects, Donors, Locations, Clients } from '@/components/modules/segments'
 import { BudgetManagement } from '@/components/modules/budgets'
 import { BankReconciliation } from '@/components/modules/bank-reconciliation'
 import { Taxation } from '@/components/modules/taxation'
@@ -36,6 +36,7 @@ const moduleComponents: Record<ModuleKey, React.ComponentType> = {
   projects: Projects,
   donors: Donors,
   locations: Locations,
+  clients: Clients,
   budgets: BudgetManagement,
   taxation: Taxation,
   aging: AgingAnalysis,

@@ -25,6 +25,7 @@ export async function GET(request: Request) {
     const projectId = searchParams.get('projectId')
     const donorId = searchParams.get('donorId')
     const locationId = searchParams.get('locationId')
+    const clientId = searchParams.get('clientId')
 
     // Pagination & sorting
     const page = parseInt(searchParams.get('page') || '1')
@@ -80,6 +81,9 @@ export async function GET(request: Request) {
     // Location filter
     if (locationId) where.locationId = locationId
 
+    // Client filter
+    if (clientId) where.clientId = clientId
+
     // Determine sort order
     let orderBy: any = { createdAt: 'desc' }
     if (sort === 'date') orderBy = { date: 'desc' }
@@ -96,6 +100,7 @@ export async function GET(request: Request) {
           project: { select: { name: true } },
           donor: { select: { name: true } },
           location: { select: { name: true } },
+          client: { select: { name: true } },
           _count: { select: { entries: true, attachments: true } },
         },
         orderBy,
@@ -118,6 +123,7 @@ export async function GET(request: Request) {
     if (projectId) activeFilters.projectId = projectId
     if (donorId) activeFilters.donorId = donorId
     if (locationId) activeFilters.locationId = locationId
+    if (clientId) activeFilters.clientId = clientId
 
     return NextResponse.json({
       data: vouchers,
@@ -136,7 +142,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const data = await request.json()
-    const { voucherType, voucherTypeName, date, narration, reference, payeeName, chequeNumber, chequeDate, voucherNo, amountInWords, financialYearId, projectId, donorId, locationId, entries, autoPost } = data
+    const { voucherType, voucherTypeName, date, narration, reference, payeeName, chequeNumber, chequeDate, voucherNo, amountInWords, financialYearId, projectId, donorId, locationId, clientId, entries, autoPost } = data
 
     if (!voucherType || !date || !narration || !entries?.length) {
       return NextResponse.json({ error: 'Voucher type, date, narration, and entries are required' }, { status: 400 })
@@ -178,6 +184,7 @@ export async function POST(request: Request) {
         projectId: projectId || null,
         donorId: donorId || null,
         locationId: locationId || null,
+        clientId: clientId || null,
         totalDebit,
         totalCredit,
         createdBy: systemUserId,

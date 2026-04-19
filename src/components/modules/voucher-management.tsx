@@ -182,6 +182,7 @@ interface Voucher {
   project?: { name: string } | null
   donor?: { name: string } | null
   location?: { name: string } | null
+  client?: { name: string } | null
   _count?: { entries: number; attachments: number }
 }
 interface Account { id: string; code: string; name: string; accountType: string }
@@ -201,6 +202,7 @@ const defaultForm = {
   donorId: '',
   donorName: '',
   locationId: '',
+  clientId: '',
   autoPost: true as boolean,
   entries: [{ accountId: '', debit: 0, credit: 0, description: '' }] as { accountId: string; debit: number; credit: number; description: string }[],
 }
@@ -211,6 +213,7 @@ export function VoucherManagement() {
   const [projects, setProjects] = useState<any[]>([])
   const [donors, setDonors] = useState<any[]>([])
   const [locations, setLocations] = useState<any[]>([])
+  const [clients, setClients] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -223,7 +226,7 @@ export function VoucherManagement() {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [advFilters, setAdvFilters] = useState({
     partyName: '', dateFrom: '', dateTo: '', amountMin: '', amountMax: '',
-    projectId: '', donorId: '', locationId: '',
+    projectId: '', donorId: '', locationId: '', clientId: '',
   })
   const activeFilterCount = Object.values(advFilters).filter(v => v).length + (typeFilter !== 'all' ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0) + (search ? 1 : 0)
 
@@ -291,6 +294,7 @@ export function VoucherManagement() {
       if (af.projectId) params.set('projectId', af.projectId)
       if (af.donorId) params.set('donorId', af.donorId)
       if (af.locationId) params.set('locationId', af.locationId)
+      if (af.clientId) params.set('clientId', af.clientId)
       params.set('page', String(p))
       params.set('limit', '20')
       const res = await fetch(`/api/vouchers?${params}`)
@@ -307,16 +311,18 @@ export function VoucherManagement() {
 
   const fetchReferenceData = useCallback(async () => {
     try {
-      const [accRes, projRes, donorRes, locRes] = await Promise.all([
+      const [accRes, projRes, donorRes, locRes, clientRes] = await Promise.all([
         fetch('/api/accounts?isActive=true'),
         fetch('/api/projects'),
         fetch('/api/donors'),
         fetch('/api/locations'),
+        fetch('/api/clients'),
       ])
       setAccounts(await accRes.json())
       setProjects(await projRes.json())
       setDonors(await donorRes.json())
       setLocations(await locRes.json())
+      setClients(await clientRes.json())
     } catch {
       console.error('Failed to load reference data')
     }
@@ -405,7 +411,7 @@ export function VoucherManagement() {
           autoPost: form.autoPost && hasPermission('quick_post', currentRole), entries: validEntries, financialYearId: activeFy.id,
           voucherTypeName: voucherTypes.find(v => v.value === form.voucherType)?.label,
           projectId: form.projectId || undefined, donorId: form.donorId || undefined,
-          locationId: form.locationId || undefined, userRole: currentRole,
+          locationId: form.locationId || undefined, clientId: form.clientId || undefined, userRole: currentRole,
         }),
       })
       const result = await res.json()
@@ -439,6 +445,7 @@ export function VoucherManagement() {
         chequeNumber: data.chequeNumber || '', chequeDate: data.chequeDate ? new Date(data.chequeDate).toISOString().split('T')[0] : '',
         voucherNo: data.voucherNo || '', amountInWords: data.amountInWords || '', financialYearId: data.financialYearId || '',
         projectId: data.projectId || '', donorId: data.donorId || '', donorName: '', locationId: data.locationId || '',
+        clientId: data.clientId || '',
         autoPost: false,
         entries: data.entries?.map((e: any) => ({ accountId: e.accountId, debit: e.debit || 0, credit: e.credit || 0, description: e.description || '' })) || [{ accountId: '', debit: 0, credit: 0, description: '' }],
       })
@@ -464,7 +471,7 @@ export function VoucherManagement() {
           chequeDate: form.chequeDate || null, voucherNo: form.voucherNo || null,
           amountInWords: form.amountInWords || autoAmountInWords || null,
           projectId: form.projectId || null, donorId: form.donorId || null,
-          locationId: form.locationId || null, entries: validEntries, userRole: currentRole,
+          locationId: form.locationId || null, clientId: form.clientId || null, entries: validEntries, userRole: currentRole,
         }),
       })
       const result = await res.json()
@@ -515,6 +522,7 @@ export function VoucherManagement() {
         chequeNumber: '', chequeDate: '', voucherNo: '', amountInWords: '',
         financialYearId: data.financialYearId || '', projectId: data.projectId || '',
         donorId: data.donorId || '', donorName: '', locationId: data.locationId || '',
+        clientId: data.clientId || '',
         autoPost: false,
         entries: data.entries?.map((e: any) => ({ accountId: e.accountId, debit: e.debit || 0, credit: e.credit || 0, description: e.description || '' })) || [{ accountId: '', debit: 0, credit: 0, description: '' }],
       })
@@ -560,7 +568,12 @@ export function VoucherManagement() {
   const removeEntry = (i: number) => setForm(p => ({ ...p, entries: p.entries.filter((_, idx) => idx !== i) }))
   const updateEntry = (i: number, field: string, value: any) => setForm(p => ({ ...p, entries: p.entries.map((e, idx) => idx === i ? { ...e, [field]: value } : e) }))
   const voucherTypeColor = (type: string) => voucherTypes.find(v => v.value === type)?.color || 'bg-gray-100 text-gray-800'
-  const clearAllFilters = () => { setSearch(''); setTypeFilter('all'); setStatusFilter('all'); setAdvFilters({ partyName: '', dateFrom: '', dateTo: '', amountMin: '', amountMax: '', projectId: '', donorId: '', locationId: '' }) }
+  const clearAllFilters = () => { setSearch(''); setTypeFilter('all'); setStatusFilter('all'); setAdvFilters({ partyName: '', dateFrom: '', dateTo: '', amountMin: '', amountMax: '', projectId: '', donorId: '', locationId: '', clientId: '' }) }
+
+  const handlePrint = (voucher: any) => {
+    setPrintVoucher(voucher)
+    setPrintOpen(true)
+  }
 
   const handlePrintAction = () => {
     const el = document.getElementById('voucher-print-area')
@@ -590,7 +603,7 @@ export function VoucherManagement() {
         <div><Label className="text-xs">Cheque No</Label><Input className="h-8 text-xs" placeholder="Cheque number" value={form.chequeNumber} onChange={e => setForm(p => ({ ...p, chequeNumber: e.target.value }))} /></div>
         <div><Label className="text-xs">Cheque Date</Label><Input type="date" className="h-8 text-xs" value={form.chequeDate} onChange={e => setForm(p => ({ ...p, chequeDate: e.target.value }))} /></div>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div><Label className="text-xs">Project</Label>
           <Select value={form.projectId || '_none'} onValueChange={v => setForm(p => ({ ...p, projectId: v === '_none' ? '' : v }))}>
             <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
@@ -607,6 +620,12 @@ export function VoucherManagement() {
           <Select value={form.locationId || '_none'} onValueChange={v => setForm(p => ({ ...p, locationId: v === '_none' ? '' : v }))}>
             <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
             <SelectContent><SelectItem value="_none">None</SelectItem>{locations.map(l => <SelectItem key={l.id} value={l.id}>{l.code} - {l.name}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div><Label className="text-xs">Client</Label>
+          <Select value={form.clientId || '_none'} onValueChange={v => setForm(p => ({ ...p, clientId: v === '_none' ? '' : v }))}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
+            <SelectContent><SelectItem value="_none">None</SelectItem>{clients.map(c => <SelectItem key={c.id} value={c.id}>{c.code} - {c.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
       </div>
@@ -757,6 +776,12 @@ export function VoucherManagement() {
                 <SelectContent><SelectItem value="_none">All Locations</SelectItem>{locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+            <div><Label className="text-[10px]">Client</Label>
+              <Select value={advFilters.clientId || '_none'} onValueChange={v => setAdvFilters(p => ({ ...p, clientId: v === '_none' ? '' : v }))}>
+                <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="All" /></SelectTrigger>
+                <SelectContent><SelectItem value="_none">All Clients</SelectItem>{clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent></Card>
       )}
@@ -780,7 +805,12 @@ export function VoucherManagement() {
               <TableRow><TableCell colSpan={7} className="text-center text-xs py-8 text-muted-foreground">No vouchers found</TableCell></TableRow>
             ) : vouchers.map(v => (
               <TableRow key={v.id} className="hover:bg-accent/50">
-                <TableCell className="font-mono text-xs font-semibold">{v.voucherNo || v.voucherNumber}</TableCell>
+                <TableCell className="font-mono text-xs font-semibold">
+                  <div className="flex items-center gap-1">
+                    {v.voucherNo || v.voucherNumber}
+                    {v._count?.attachments ? <Paperclip className="h-2.5 w-2.5 text-muted-foreground" /> : null}
+                  </div>
+                </TableCell>
                 <TableCell><Badge className={`text-[9px] ${voucherTypeColor(v.voucherType)}`}>{v.voucherTypeName}</Badge></TableCell>
                 <TableCell className="text-xs font-medium">{v.payeeName || '-'}</TableCell>
                 <TableCell className="text-xs">{new Date(v.date).toLocaleDateString()}</TableCell>
@@ -893,11 +923,12 @@ export function VoucherManagement() {
                   <span className="text-xs font-semibold italic">{detailVoucher.amountInWords}</span>
                 </div>
               )}
-              {(detailVoucher.project || detailVoucher.donor || detailVoucher.location) && (
+              {(detailVoucher.project || detailVoucher.donor || detailVoucher.location || detailVoucher.client) && (
                 <div className="flex gap-3 text-xs">
                   {detailVoucher.project && <Badge variant="outline" className="text-[9px]">Project: {detailVoucher.project.name}</Badge>}
                   {detailVoucher.donor && <Badge variant="outline" className="text-[9px]">Donor: {detailVoucher.donor.name}</Badge>}
                   {detailVoucher.location && <Badge variant="outline" className="text-[9px]">Location: {detailVoucher.location.name}</Badge>}
+                  {detailVoucher.client && <Badge variant="outline" className="text-[9px]">Client: {detailVoucher.client.name}</Badge>}
                 </div>
               )}
               <div className="text-xs"><span className="text-muted-foreground">Narration:</span> {detailVoucher.narration}</div>
@@ -1098,8 +1129,8 @@ export function VoucherManagement() {
                 <div className="text-right"><p><strong>Name:</strong> {printVoucher.payeeName || '-'}</p><p><strong>Cheque No:</strong> {printVoucher.chequeNumber || '-'}</p><p><strong>Cheque Date:</strong> {printVoucher.chequeDate ? new Date(printVoucher.chequeDate).toLocaleDateString() : '-'}</p></div>
               </div>
               <div className="mb-4"><strong>Narration:</strong> {printVoucher.narration}</div>
-              {(printVoucher.project || printVoucher.donor || printVoucher.location) && (
-                <div className="mb-4 flex gap-4">{printVoucher.project && <span><strong>Project:</strong> {printVoucher.project.name}</span>}{printVoucher.donor && <span><strong>Donor:</strong> {printVoucher.donor.name}</span>}{printVoucher.location && <span><strong>Location:</strong> {printVoucher.location.name}</span>}</div>
+              {(printVoucher.project || printVoucher.donor || printVoucher.location || printVoucher.client) && (
+                <div className="mb-4 flex gap-4">{printVoucher.project && <span><strong>Project:</strong> {printVoucher.project.name}</span>}{printVoucher.donor && <span><strong>Donor:</strong> {printVoucher.donor.name}</span>}{printVoucher.location && <span><strong>Location:</strong> {printVoucher.location.name}</span>}{printVoucher.client && <span><strong>Client:</strong> {printVoucher.client.name}</span>}</div>
               )}
               <table className="w-full border-collapse mb-4"><thead><tr><th className="border border-black px-2 py-1 text-left">#</th><th className="border border-black px-2 py-1 text-left">Account Code</th><th className="border border-black px-2 py-1 text-left">Account Name</th><th className="border border-black px-2 py-1 text-right">Debit (PKR)</th><th className="border border-black px-2 py-1 text-right">Credit (PKR)</th></tr></thead>
                 <tbody>
