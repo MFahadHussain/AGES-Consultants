@@ -535,3 +535,17 @@ model ExportLog {
   exportedBy  String
   createdAt   DateTime @default(now())
 }
+
+// ============================================================
+// SYSTEM SETTINGS
+// ============================================================
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique  // e.g., company_name, base_currency, fiscal_year_start_month
+  value     String   // JSON string for complex values, plain string for simple ones
+  category  String   @default("general") // general, voucher, security, integration, appearance
+  description String? // Human-readable description of the setting
+  isPublic  Boolean  @default(false) // Whether this setting is safe to expose to client
+  updatedAt DateTime @updatedAt
+}
