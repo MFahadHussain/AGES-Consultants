@@ -38,3 +38,27 @@ Stage Summary:
 - 55 settings across 4 categories (fams, gl-mapping, thresholds, tax-rates)
 - AFMS CSV export integration working
 - All PKR amounts properly formatted
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Fix preview not showing - dev server stability issues
+
+Work Log:
+- Investigated dev server crash in sandbox environment
+- Root cause: sandbox kills all user (z) background processes when bash shell exits
+- Verified all FAMS APIs work correctly (assets, seed, settings, etc.)
+- Verified lint passes with 0 errors (4 warnings only)
+- Confirmed Caddy on port 81 proxies correctly to port 3000
+- Tested multiple approaches to keep server alive (nohup, setsid, FIFO, unshare, systemd, cron, etc.)
+- All background process approaches fail because sandbox kills them when the Bash tool command completes
+- Server stays alive only while the Bash tool command is actively running
+- Updated .zscripts/dev.sh with proper port cleanup and auto-restart logic
+- Fixed .zscripts/dev.sh EADDRINUSE bug (original dev.sh tried to start on already-used port)
+
+Stage Summary:
+- All FAMS backend and frontend code is verified working
+- 11 assets loaded, APIs returning correct data
+- Dev server runs fine but sandbox kills background processes after shell exits
+- .zscripts/dev.sh fixed for next container restart
+- User needs to check Preview Panel quickly after server start
