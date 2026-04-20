@@ -22,7 +22,7 @@ import {
   CheckCircle2, XCircle, Eye, Edit, Trash2, FileText, BarChart3,
   Settings, Calendar, MapPin, User, Shield, Wrench, DollarSign,
   PieChart as PieChartIcon, Loader2, ChevronDown, Info, ArrowRight,
-  Save, Send, Landmark, Car, Monitor, Armchair, Server, Cog, Map,
+  Save, Send, Landmark, Car, Monitor, Armchair, Server, Cog, Map as MapIcon,
   CircleDot, FileSpreadsheet, RefreshCw, X, Check, RotateCcw
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
@@ -286,7 +286,7 @@ const initialWizardForm: WizardForm = {
 
 const getCategoryIcon = (category: string) => {
   switch (category) {
-    case 'Land': return <Map className="h-4 w-4" />
+    case 'Land': return <MapIcon className="h-4 w-4" />
     case 'Buildings': return <Building2 className="h-4 w-4" />
     case 'Vehicles': return <Car className="h-4 w-4" />
     case 'Furniture': return <Armchair className="h-4 w-4" />
