@@ -538,7 +538,7 @@ export function FixedAssetsModule() {
       const res = await fetch('/api/fams/fiscal-years')
       if (res.ok) {
         const data = await res.json()
-        setFiscalYears(data)
+        setFiscalYears(Array.isArray(data) ? data : data.fiscalYears || [])
       }
     } catch (err) {
       console.error('Error fetching fiscal years:', err)
