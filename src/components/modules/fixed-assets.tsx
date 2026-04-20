@@ -602,13 +602,7 @@ export function FixedAssetsModule() {
 
   // Initial data load
   useEffect(() => {
-    const seedAndLoad = async () => {
-      try {
-        await fetch('/api/fams/seed')
-      } catch { /* ignore */ }
-      await fetchAssets(1)
-    }
-    seedAndLoad()
+    fetchAssets(1)
   }, [fetchAssets])
 
   useEffect(() => {

@@ -558,3 +558,38 @@ export async function GET() {
     )
   }
 }
+
+/**
+ * DELETE /api/fams/seed - Clear all FAMS demo/seed data
+ */
+export async function DELETE() {
+  try {
+    // Delete in correct order to respect foreign key constraints
+    const depResult = await db.fixedAssetDepreciation.deleteMany({})
+    const txnResult = await db.assetTransaction.deleteMany({})
+    const journalResult = await db.fAMSJournal.deleteMany({})
+    const batchResult = await db.fAMSExportBatch.deleteMany({})
+    const assetResult = await db.fixedAsset.deleteMany({})
+    const fyResult = await db.fAMSFiscalYear.deleteMany({})
+    const settingResult = await db.fAMSSetting.deleteMany({})
+
+    return NextResponse.json({
+      message: 'All FAMS data cleared successfully',
+      deleted: {
+        assets: assetResult.count,
+        depreciationRecords: depResult.count,
+        transactions: txnResult.count,
+        journals: journalResult.count,
+        exportBatches: batchResult.count,
+        fiscalYears: fyResult.count,
+        settings: settingResult.count,
+      },
+    })
+  } catch (error) {
+    console.error('FAMS Seed DELETE error:', error)
+    return NextResponse.json(
+      { error: 'Failed to clear FAMS data', details: String(error) },
+      { status: 500 }
+    )
+  }
+}
