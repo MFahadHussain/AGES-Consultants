@@ -66,6 +66,7 @@ model Account {
   budgetEntries   BudgetLine[]
   taxAccounts     TaxRate[]
   bankStatements  BankStatement[]
+  bankReconciliations BankReconciliation[]
 
 }
 
@@ -225,6 +226,8 @@ model Voucher {
   totalCredit     Float     @default(0)
   isPayrollPosted Boolean   @default(false) // INTEGRATION: Payroll → GL
   isAssetPosted   Boolean   @default(false) // INTEGRATION: Fixed Assets → GL
+  isReconciled    Boolean   @default(false) // BANK RECONCILIATION: Whether this voucher has been cleared in bank reconciliation
+  clearanceDate   DateTime? // BANK RECONCILIATION: Date when the voucher was cleared on bank statement
   createdBy       String
   reviewedBy      String?   // Manager who moved to Pending
   approvedBy      String?   // Manager/Admin who approved
@@ -334,6 +337,26 @@ model BankReconciliationItem {
   status              String   @default("matched") // matched, unmatched, outstanding
   reconciledBy        String
   createdAt           DateTime @default(now())
+}
+
+model BankReconciliation {
+  id                String   @id @default(cuid())
+  accountId         String
+  account           Account  @relation(fields: [accountId], references: [id])
+  period            String   // "2025-01" format (YYYY-MM)
+  statementBalance  Float    // User-entered bank statement balance (CR)
+  bookBalance       Float    // Computed book balance (DR)
+  unpresentedTotal  Float    @default(0) // Sum of unchecked payments
+  uncreditedTotal   Float    @default(0) // Sum of unchecked receipts
+  adjustedBookBalance  Float @default(0)
+  adjustedBankBalance  Float @default(0)
+  status            String   @default("draft") // draft, finalized
+  finalizedBy       String?
+  finalizedAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([accountId, period])
 }
 
 // ============================================================
