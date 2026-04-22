@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
+import { findAccountsByRole } from '@/lib/account-roles'
 
 // ============================================================
 // Bank Reconciliation API
@@ -19,17 +20,13 @@ export async function GET(request: Request) {
 
     switch (action) {
       case 'init': {
-        // Get bank accounts from Chart of Accounts (code starts with '112', subType = CURRENT_ASSET)
-        const bankAccounts = await db.account.findMany({
-          where: {
-            subType: 'CURRENT_ASSET',
-            code: { startsWith: '112' },
-            allowPosting: true,
-            isActive: true,
-          },
-          select: { id: true, code: true, name: true, accountType: true, subType: true },
-          orderBy: { code: 'asc' },
-        })
+        // Get bank accounts from Chart of Accounts (subType = BANK)
+        const bankAccountResults = await findAccountsByRole('BANK_ACCOUNT')
+        const bankAccounts = bankAccountResults.map(a => ({
+          ...a,
+          accountType: 'ASSET' as const,
+          subType: 'BANK' as const,
+        }))
 
         // Get last reconciled period per bank account
         const reconciliations = await db.bankReconciliation.findMany({

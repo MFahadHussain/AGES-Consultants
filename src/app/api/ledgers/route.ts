@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { findAccountsByRole } from '@/lib/account-roles'
 
 export async function GET(request: Request) {
   try {
@@ -125,10 +126,10 @@ export async function GET(request: Request) {
 
       case 'bank': {
         // Bank Ledger - entries grouped by bank account with running balances
-        const bankAccounts = await db.account.findMany({
-          where: { subType: 'CURRENT_ASSET', code: { startsWith: '112' }, allowPosting: true },
-          select: { id: true, code: true, name: true, accountType: true },
-        })
+        const bankAccountResults = await findAccountsByRole('BANK_ACCOUNT')
+        const bankAccounts = bankAccountResults.map(a => ({
+          id: a.id, code: a.code, name: a.name, accountType: 'ASSET' as const,
+        }))
 
         if (bankAccounts.length === 0) {
           return NextResponse.json([])

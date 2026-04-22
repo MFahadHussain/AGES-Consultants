@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { findAccountsByRole } from '@/lib/account-roles'
 
 export async function GET(request: Request) {
   try {
@@ -163,9 +164,7 @@ export async function GET(request: Request) {
 
       case 'cash_flow': {
         // Cash flow based on bank/cash account movements
-        const cashAccounts = await db.account.findMany({
-          where: { isActive: true, subType: 'CURRENT_ASSET', code: { startsWith: '11' } },
-        })
+        const cashAccounts = await findAccountsByRole('CASH_AND_BANK')
 
         const entries = await db.voucherEntry.findMany({
           where: {

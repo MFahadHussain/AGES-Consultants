@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { findAccountByRole, findFirstBankAccount } from '@/lib/account-roles'
 
 export async function GET(request: Request) {
   try {
@@ -38,13 +39,13 @@ export async function POST(request: Request) {
       if (batch.postedToGL) return NextResponse.json({ error: 'Already posted to GL' }, { status: 400 })
 
       // Get required accounts
-      const salaryAccount = await db.account.findFirst({ where: { code: '7110' } })
-      const bankAccount = await db.account.findFirst({ where: { code: '1121' } })
-      const incomeTaxPayable = await db.account.findFirst({ where: { code: '3310' } })
-      const eobiPayable = await db.account.findFirst({ where: { code: '3410' } })
-      const pfPayable = await db.account.findFirst({ where: { code: '3420' } })
-      const salaryPayable = await db.account.findFirst({ where: { code: '3430' } })
-      const socialCharges = await db.account.findFirst({ where: { code: '7700' } })
+      const salaryAccount = await findAccountByRole('SALARY_EXPENSE')
+      const bankAccount = await findFirstBankAccount()
+      const incomeTaxPayable = await findAccountByRole('INCOME_TAX_PAYABLE')
+      const eobiPayable = await findAccountByRole('EOBI_PAYABLE')
+      const pfPayable = await findAccountByRole('PROVIDENT_FUND_PAYABLE')
+      const salaryPayable = await findAccountByRole('SALARY_PAYABLE')
+      const socialCharges = await findAccountByRole('SOCIAL_CHARGES')
 
       if (!salaryAccount || !bankAccount) {
         return NextResponse.json({ error: 'Required GL accounts not found' }, { status: 400 })

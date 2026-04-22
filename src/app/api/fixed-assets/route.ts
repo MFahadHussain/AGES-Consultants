@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { findDepExpenseForCategory, findAccDepForCategory } from '@/lib/account-roles'
 
 export async function GET(request: Request) {
   try {
@@ -53,12 +54,8 @@ export async function POST(request: Request) {
         const monthlyDepreciation = depreciableAmount / asset.usefulLife
 
         // Find depreciation expense and accumulated depreciation accounts
-        const depExpenseAccount = await db.account.findFirst({
-          where: { code: { startsWith: '76' }, name: { contains: asset.category } },
-        })
-        const accumDepAccount = await db.account.findFirst({
-          where: { code: { startsWith: '22' }, name: { contains: asset.category } },
-        })
+        const depExpenseAccount = await findDepExpenseForCategory(asset.category)
+        const accumDepAccount = await findAccDepForCategory(asset.category)
 
         if (!depExpenseAccount || !accumDepAccount) {
           results.push({ asset: asset.assetCode, error: 'Depreciation accounts not found' })

@@ -415,7 +415,7 @@ export function BankReconciliation() {
               </SelectContent>
             </Select>
             {bankAccounts.length === 0 && !initializing && (
-              <p className="text-[10px] text-amber-600">No bank accounts found in Chart of Accounts (code 112x)</p>
+              <p className="text-[10px] text-amber-600">No bank accounts found in Chart of Accounts</p>
             )}
           </div>
 

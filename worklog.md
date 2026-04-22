@@ -1,42 +1,31 @@
 ---
 Task ID: 1
 Agent: Main Agent
-Task: Add Bank Reconciliation screen to existing ERP dashboard
+Task: Replace existing Chart of Accounts with new comprehensive COA and update all references
 
 Work Log:
-- Explored existing codebase: dashboard layout (page.tsx, sidebar, header), module loading system, Zustand store, component patterns
-- Read all key files: Prisma schema, API routes (accounts, vouchers, ledgers, bank-reconciliation), UI components
-- Identified bank accounts in COA: code starts with '112', subType='CURRENT_ASSET' (Meezan Bank - Main, HBL - Operating, ABL - Main)
-- Updated Prisma schema:
-  - Added `isReconciled` (Boolean, default false) and `clearanceDate` (DateTime?) to Voucher model
-  - Added `BankReconciliation` model with accountId, period, statementBalance, bookBalance, status, etc. with unique constraint on (accountId, period)
-  - Added `bankReconciliations` relation to Account model
-- Ran `prisma db push` to sync database
-- Regenerated Prisma client
-- Rewrote `/api/bank-reconciliation/route.ts` with comprehensive API:
-  - GET ?action=init → bank accounts from COA + last reconciled period
-  - GET ?action=vouchers → payments (BP) and receipts (BR) for selected bank account
-  - GET ?action=book-balance → computed book balance from ledger entries
-  - GET ?action=reconciliation-status → check if period is finalized
-  - POST action=finalize → mark vouchers as reconciled, create reconciliation record
-  - Preserved legacy endpoints (reconcile, create-statement)
-- Completely rewrote `bank-reconciliation.tsx` frontend component:
-  - Step A: Initialization Panel with bank account dropdown, period picker, statement balance input, auto-computed book balance
-  - Step B: Reconciliation Grid with Payments/Receipts tabs, checkboxes, search, select all/deselect all, status badges
-  - Step C: Live Summary Panel (sticky) with Proof of Bank Balance, Adjusted Book Balance, Adjusted Bank Balance
-  - Finalization flow: confirmation modal, lock period, mark vouchers as reconciled
-  - PDF export (print window)
-  - Consistent styling with existing dashboard (same card/badge/button/table patterns)
-- Navigation was already set up in sidebar (Accounting → Bank Reconciliation) and header breadcrumbs
-- Restarted dev server to pick up new Prisma client model
-- Verified API endpoints work correctly
-- Passed lint check with 0 errors
+- Explored full codebase to identify all hardcoded account code dependencies (dashboard, payroll, fixed-assets, reports, bank-reconciliation, ledgers, FAMS settings/seed)
+- Created /src/lib/account-roles.ts - shared utility for semantic role-based account lookups (replaces hardcoded code lookups)
+- Designed comprehensive Pakistani NGO COA with 134 accounts across 5 types (Assets, Liabilities, Equity, Income, Expenses)
+- Rewrote /src/app/api/seed/route.ts to completely replace the COA (deletes all old data, creates new COA, validates no duplicates/legacy)
+- Updated /src/app/api/dashboard/route.ts - replaced code-based lookups with findAccountByRole/findAccountsByRole
+- Updated /src/app/api/payroll/route.ts - replaced 7 hardcoded account codes with role-based lookups
+- Updated /src/app/api/fixed-assets/route.ts - replaced '76'/'22' prefix lookups with findDepExpenseForCategory/findAccDepForCategory
+- Updated /src/app/api/reports/route.ts - replaced '11' prefix lookup with findAccountsByRole('CASH_AND_BANK')
+- Updated /src/app/api/bank-reconciliation/route.ts - replaced '112' prefix lookup with findAccountsByRole('BANK_ACCOUNT')
+- Updated /src/app/api/ledgers/route.ts - replaced '112' prefix lookup with findAccountsByRole('BANK_ACCOUNT')
+- Updated /src/app/api/fams/settings/route.ts - updated all GL mapping codes (1210→1510, 1215→1515, 1220→1520, 1225→1525, 1230→1530, 1235→1535, 1240→1540, 1300→1600, 5300→5600, 4500→4430, 5400→5910, 3200→3300, 1110→1121, plus category-specific acc dep/dep exp)
+- Updated /src/app/api/fams/seed/route.ts - updated all GL account codes in asset definitions and FAMS settings
+- Updated /src/components/modules/bank-reconciliation.tsx - removed hardcoded code reference from hint text
+- Reseeded database - 134 accounts created, 0 duplicates, 0 missing, 0 legacy accounts
+- Verified all API endpoints work correctly with new COA
+- Lint check passes with 0 errors
 
 Stage Summary:
-- Bank Reconciliation screen fully integrated into existing ERP dashboard
-- All data sourced from existing Chart of Accounts and Vouchers - no mock/hardcoded data
-- 3 bank accounts detected from COA: 1121 Meezan Bank, 1122 HBL, 1123 ABL
-- Book balance computed from actual ledger entries
-- Payments/receipts pulled from real BP/BR voucher entries
-- Reconciliation workflow: select vouchers → check balances match → finalize → lock period
-- Prisma schema updated with isReconciled, clearanceDate on Voucher and new BankReconciliation model
+- New COA: 134 accounts (42 Assets, 21 Liabilities, 7 Equity, 18 Income, 46 Expenses)
+- All 134 accounts marked as isSystem: true (shared, cannot be deleted)
+- 102 posting accounts, 32 control/group accounts
+- All hardcoded account code lookups replaced with semantic role-based utility
+- New subType taxonomy: CASH, BANK, RECEIVABLE, PAYABLE, PAYROLL_LIABILITY, FIXED_ASSET, ACCUMULATED_DEPRECIATION, DEPRECIATION, SALARY, SOCIAL_CHARGES, GAIN_ON_DISPOSAL, LOSS_ON_DISPOSAL, REVALUATION_RESERVE, etc.
+- Bank accounts now use subType='BANK' instead of code prefix '112' for discovery
+- System is fully decoupled from specific account numbering scheme

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { findAccountByRole, findAccountsByRole } from '@/lib/account-roles'
 
 export async function GET() {
   try {
@@ -7,9 +8,7 @@ export async function GET() {
     const now = new Date()
 
     // Cash Position - bank account balances
-    const bankAccounts = await db.account.findMany({
-      where: { code: { startsWith: '112' }, isActive: true },
-    })
+    const bankAccounts = await findAccountsByRole('BANK_ACCOUNT')
     let cashPosition = 0
     for (const acc of bankAccounts) {
       const result = await db.voucherEntry.aggregate({
@@ -20,7 +19,7 @@ export async function GET() {
     }
 
     // Cash in hand
-    const cashAccount = await db.account.findFirst({ where: { code: '1110' } })
+    const cashAccount = await findAccountByRole('CASH_IN_HAND')
     let cashInHand = 0
     if (cashAccount) {
       const result = await db.voucherEntry.aggregate({
@@ -31,7 +30,7 @@ export async function GET() {
     }
 
     // Total Receivables
-    const receivablesAccount = await db.account.findFirst({ where: { code: '1200' } })
+    const receivablesAccount = await findAccountByRole('ACCOUNTS_RECEIVABLE')
     let totalReceivables = 0
     if (receivablesAccount) {
       const result = await db.voucherEntry.aggregate({
@@ -42,7 +41,7 @@ export async function GET() {
     }
 
     // Total Payables
-    const payablesAccount = await db.account.findFirst({ where: { code: '3100' } })
+    const payablesAccount = await findAccountByRole('ACCOUNTS_PAYABLE')
     let totalPayables = 0
     if (payablesAccount) {
       const result = await db.voucherEntry.aggregate({
