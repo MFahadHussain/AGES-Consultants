@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { findAccDepForCategory, findDepExpenseForCategory } from '@/lib/account-roles'
 
 // GET /api/fams/depreciation
 export async function GET(request: NextRequest) {
@@ -85,7 +86,10 @@ export async function POST(request: NextRequest) {
         data: { accumulatedDepreciation: Math.round(newAccDep), netBookValue: Math.round(Math.max(newNBV, asset.residualValue)) },
       })
 
-      // Create journal entry
+      // Create journal entry — use account-roles for GL account resolution
+      const depExpAccount = await findDepExpenseForCategory(asset.category)
+      const accDepAccount = await findAccDepForCategory(asset.category)
+
       const jPrefix = `JV-FAMS-${new Date().getFullYear()}-`
       const lastJ = await db.fAMSJournal.findFirst({ where: { journalNumber: { startsWith: jPrefix } }, orderBy: { journalNumber: 'desc' } })
       let jNum = 1
@@ -97,10 +101,15 @@ export async function POST(request: NextRequest) {
           type: 'Depreciation', date: new Date(),
           narration: `Depreciation: ${asset.name} (${asset.assetId}) - ${period}`,
           assetId: asset.assetId, assetName: asset.name,
-          drAccountCode: asset.glDepExpAccount || '5300', drAccountName: 'Depreciation Expense',
+          drAccountCode: depExpAccount?.code || asset.glDepExpAccount || '5600',
+          drAccountName: depExpAccount?.name || 'Depreciation Expense',
           drAmount: Math.round(monthlyCharge),
-          crAccountCode: asset.glAccDepAccount || '1300', crAccountName: 'Accumulated Depreciation',
+          crAccountCode: accDepAccount?.code || asset.glAccDepAccount || '1600',
+          crAccountName: accDepAccount?.name || 'Accumulated Depreciation',
           crAmount: Math.round(monthlyCharge),
+          costCenter: asset.costCenter || undefined,
+          project: asset.project || undefined,
+          fundCode: asset.fundCode || undefined,
           status: 'Pending Export',
         },
       })

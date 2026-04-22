@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { findAccountByRole, findAccDepForCategory, findDepExpenseForCategory } from '@/lib/account-roles'
 
 // GET /api/fams/assets - List assets
 export async function GET() {
@@ -31,6 +32,18 @@ export async function GET() {
   }
 }
 
+// GL account mapping — matches the new COA (Pakistani NGO)
+const GL_CATEGORY_MAP: Record<string, { asset: string; accDep: string; depExp: string }> = {
+  'Land':              { asset: '1510', accDep: '1610', depExp: '5670' },
+  'Buildings':         { asset: '1515', accDep: '1610', depExp: '5610' },
+  'Vehicles':          { asset: '1520', accDep: '1620', depExp: '5620' },
+  'Furniture':         { asset: '1525', accDep: '1630', depExp: '5630' },
+  'Office Equipment':  { asset: '1530', accDep: '1640', depExp: '5640' },
+  'IT Assets':         { asset: '1535', accDep: '1650', depExp: '5650' },
+  'Machinery':         { asset: '1540', accDep: '1660', depExp: '5660' },
+  'Other':             { asset: '1545', accDep: '1670', depExp: '5670' },
+}
+
 // POST /api/fams/assets - Create new asset
 export async function POST(request: NextRequest) {
   try {
@@ -53,8 +66,19 @@ export async function POST(request: NextRequest) {
     const assetId = `${prefix}${String(num).padStart(4, '0')}`
 
     const FBR: Record<string, number> = { Land: 0, Buildings: 10, Vehicles: 15, Furniture: 15, 'Office Equipment': 15, 'IT Assets': 30, Machinery: 15, Other: 15 }
-    const GL: Record<string, { a: string; d: string; e: string }> = { Land: { a: '1210', d: '1300', e: '5300' }, Buildings: { a: '1215', d: '1300', e: '5300' }, Vehicles: { a: '1220', d: '1300', e: '5300' }, Furniture: { a: '1225', d: '1300', e: '5300' }, 'Office Equipment': { a: '1230', d: '1300', e: '5300' }, 'IT Assets': { a: '1235', d: '1300', e: '5300' }, Machinery: { a: '1240', d: '1300', e: '5300' }, Other: { a: '1250', d: '1300', e: '5300' } }
-    const gl = GL[body.category] || GL.Other
+
+    // Resolve GL accounts using account-roles utility first, then fall back to category mapping
+    const glDefaults = GL_CATEGORY_MAP[body.category] || GL_CATEGORY_MAP.Other
+
+    // Try account-roles for more accurate mapping
+    const assetAccount = await findAccountByRole(`FA_${body.category.toUpperCase().replace(/\s+/g, '_').replace(/_EQUIPMENT/, '_EQUIP').replace(/_ASSETS/, '_ASSETS')}`)
+    const accDepAccount = await findAccDepForCategory(body.category)
+    const depExpAccount = await findDepExpenseForCategory(body.category)
+
+    const glAssetCode = assetAccount?.code || body.glAssetAccount || glDefaults.asset
+    const glAccDepCode = accDepAccount?.code || body.glAccDepAccount || glDefaults.accDep
+    const glDepExpCode = depExpAccount?.code || body.glDepExpAccount || glDefaults.depExp
+
     const nbv = body.purchasePrice - (body.accumulatedDepreciation || 0)
 
     const asset = await db.fixedAsset.create({
@@ -72,8 +96,10 @@ export async function POST(request: NextRequest) {
         status: 'Active', condition: body.condition || 'Good',
         insuranceValue: body.insuranceValue || 0, insurancePolicyNumber: body.insurancePolicyNumber || null,
         costCenter: body.costCenter || null, project: body.project || null, fundCode: body.fundCode || null,
-        donorCode: body.donorCode || null, glAssetAccount: body.glAssetAccount || gl.a,
-        glAccDepAccount: body.glAccDepAccount || gl.d, glDepExpAccount: body.glDepExpAccount || gl.e,
+        donorCode: body.donorCode || null,
+        glAssetAccount: glAssetCode,
+        glAccDepAccount: glAccDepCode,
+        glDepExpAccount: glDepExpCode,
         taxCategory: body.category, taxRate: FBR[body.category] ?? 15,
         taxMethod: body.taxMethod || 'Declining-Balance', approvalStatus: body.approvalStatus || 'Draft',
         createdBy: 'system', journalStatus: 'Pending Export', notes: body.notes || null,

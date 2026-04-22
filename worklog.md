@@ -63,3 +63,59 @@ Stage Summary:
 - Print and CSV exports include filter metadata
 - Seed route now creates 4 donors, 4 clients, 5 locations, 6 projects for testing
 - No backend API changes needed - existing endpoints already supported all filter params
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Remove Khyber Development Trust from Fixed Assets, integrate with Accounting, add more sub-types to COA
+
+Work Log:
+- Rewrote /src/app/api/fams/seed/route.ts to remove all "Khyber Development Trust" branding:
+  - Changed org name from "Khyber Development Trust" to "Organization" (generic)
+  - Removed all demo assets (10 active + 1 disposed) — FAMS starts clean
+  - Changed user emails from @kdt.org to @erp.local
+  - Added GL mapping for Other Fixed Assets (1545/1670/5670) and CWIP (1550)
+  - Updated FBR tax rates to match new COA (Buildings: 10%, same as FAMS settings)
+- Created /src/app/api/fams/gl-post/route.ts — full GL integration API:
+  - POST action "post-all": Posts all pending FAMS journals as Voucher+VoucherEntry records to the GL
+  - POST action "post-acquisition": Posts approved asset acquisitions (Dr: Fixed Asset, Cr: Bank)
+  - POST action "post-selected": Posts selected journal IDs
+  - GET: Returns GL posting status (pending journals, assets needing acquisition posting)
+  - Uses account-roles utility for GL account resolution
+  - Creates audit logs for all postings
+  - Marks journals as exported after posting
+- Updated /src/app/api/fams/assets/route.ts:
+  - Replaced old GL code mapping (1210-1250, 1300, 5300) with new COA codes (1510-1545, 1610-1670, 5610-5670)
+  - Added account-roles lookups (findAccountByRole, findAccDepForCategory, findDepExpenseForCategory) for dynamic GL resolution
+- Updated /src/app/api/fams/depreciation/route.ts:
+  - Added account-roles imports (findAccDepForCategory, findDepExpenseForCategory)
+  - Journal entries now use role-based account lookups with fallback to asset GL fields
+  - Added costCenter, project, fundCode to journal entries
+- Updated /src/components/modules/fixed-assets.tsx:
+  - Added handlePostToGL function (post-all, post-acquisition, post-selected)
+  - Added glPostStatus state and fetchGLPostStatus
+  - Added "Post to GL" button in Asset Register action bar
+  - Added "Post Acquisitions" button (appears when assets need acquisition posting)
+  - Added "Post to General Ledger" button in Dashboard quick actions
+  - Renamed "Export to AFMS" to "Export CSV"
+  - Added GL Integration status card on dashboard (shows pending journals/acquisitions with action buttons)
+  - Added fetchGLPostStatus to refreshAll and initial load
+- Updated /src/components/modules/chart-of-accounts.tsx:
+  - Expanded ASSET sub-types: CURRENT_ASSET, CASH, BANK, RECEIVABLE, FIXED_ASSET, ACCUMULATED_DEPRECIATION, NON_CURRENT_ASSET, CONTRA_ASSET
+  - Expanded LIABILITY sub-types: CURRENT_LIABILITY, PAYABLE, PAYROLL_LIABILITY, NON_CURRENT_LIABILITY, LONG_TERM_LIABILITY
+  - Expanded EQUITY sub-types: GENERAL_FUND, ACCUMULATED_SURPLUS, REVALUATION_RESERVE, RESTRICTED_FUND, ENDOWMENT_FUND
+  - Expanded INCOME sub-types: GRANT_INCOME, DONATION_INCOME, PROGRAM_INCOME, OTHER_INCOME, GAIN_ON_DISPOSAL, SERVICE_REVENUE
+  - Expanded EXPENSE sub-types: SALARY, PERSONNEL, SOCIAL_CHARGES, TRAVEL, OFFICE, PROFESSIONAL, DEPRECIATION, PROGRAM, FINANCIAL, LOSS_ON_DISPOSAL, OTHER_EXPENSE, PAYROLL_EXPENSE, OPERATING_EXPENSE
+- Tested end-to-end GL integration flow:
+  - Created test asset (Dell Laptop, IT Assets, PKR 150,000)
+  - Ran depreciation (PKR 4,167/month)
+  - Posted depreciation to GL → Voucher JV-00001 (Dr: 5650, Cr: 1650) ✓
+  - Posted acquisition to GL → Voucher BP-00001 (Dr: 1535, Cr: 1121) ✓
+- Lint check passes with 0 errors
+
+Stage Summary:
+- FAMS seed no longer contains "Khyber Development Trust" or demo assets — starts clean
+- Full GL integration: FAMS journals and acquisitions can be posted to the General Ledger as real vouchers
+- GL account resolution uses account-roles utility (findAccDepForCategory, findDepExpenseForCategory)
+- Chart of Accounts sub-types now match the actual COA (28 sub-types across 5 account types)
+- All GL accounts correctly map to new COA (1535 for IT Assets, 1650 for Acc Dep, 5650 for Dep Exp, etc.)

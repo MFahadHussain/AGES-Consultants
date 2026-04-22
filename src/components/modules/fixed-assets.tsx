@@ -610,7 +610,8 @@ export function FixedAssetsModule() {
     fetchTransactions()
     fetchJournals()
     fetchSettings()
-  }, [fetchFiscalYears, fetchTransactions, fetchJournals, fetchSettings])
+    fetchGLPostStatus()
+  }, [fetchFiscalYears, fetchTransactions, fetchJournals, fetchSettings, fetchGLPostStatus])
 
   useEffect(() => {
     fetchDepreciation()
@@ -628,7 +629,8 @@ export function FixedAssetsModule() {
     fetchJournals()
     fetchSettings()
     fetchDepreciation()
-  }, [fetchAssets, fetchFiscalYears, fetchTransactions, fetchJournals, fetchSettings, fetchDepreciation, currentPage])
+    fetchGLPostStatus()
+  }, [fetchAssets, fetchFiscalYears, fetchTransactions, fetchJournals, fetchSettings, fetchDepreciation, fetchGLPostStatus, currentPage])
 
   // ─── Computed Values ────────────────────────────────────────────────────
 
@@ -892,6 +894,37 @@ export function FixedAssetsModule() {
     }
   }
 
+  const handlePostToGL = async (action: 'post-all' | 'post-acquisition' | 'post-selected', journalIds?: string[]) => {
+    try {
+      const res = await fetch('/api/fams/gl-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, journalIds }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast({ title: 'Posted to GL', description: data.message || `${data.journalCount || 0} entries posted to General Ledger` })
+        refreshAll()
+      } else {
+        toast({ title: 'Error', description: data.error || 'Failed to post to GL', variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to post to GL', variant: 'destructive' })
+    }
+  }
+
+  const [glPostStatus, setGlPostStatus] = useState<{ pendingJournals: number; pendingAmount: number; assetsNeedingAcquisition: number; acquisitionAmount: number } | null>(null)
+
+  const fetchGLPostStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/fams/gl-post')
+      if (res.ok) {
+        const data = await res.json()
+        setGlPostStatus(data)
+      }
+    } catch { /* ignore */ }
+  }, [])
+
   const handleDisposal = async (form: { assetId: string; date: string; disposalMethod: string; proceeds: number; description: string }) => {
     try {
       const res = await fetch('/api/fams/transactions', {
@@ -1105,6 +1138,39 @@ export function FixedAssetsModule() {
         </Card>
       </div>
 
+      {/* GL Integration Status */}
+      {glPostStatus && (glPostStatus.pendingJournals > 0 || glPostStatus.assetsNeedingAcquisition > 0) && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-primary/10 p-2.5"><Landmark className="h-5 w-5 text-primary" /></div>
+                <div>
+                  <p className="text-sm font-semibold">GL Integration</p>
+                  <p className="text-xs text-muted-foreground">
+                    {glPostStatus.pendingJournals > 0 && `${glPostStatus.pendingJournals} pending journal(s) (${pkr(glPostStatus.pendingAmount)})`}
+                    {glPostStatus.pendingJournals > 0 && glPostStatus.assetsNeedingAcquisition > 0 && ' • '}
+                    {glPostStatus.assetsNeedingAcquisition > 0 && `${glPostStatus.assetsNeedingAcquisition} asset(s) need acquisition posting (${pkr(glPostStatus.acquisitionAmount)})`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {glPostStatus.pendingJournals > 0 && (
+                  <Button size="sm" className="h-8 text-xs gap-1" onClick={() => handlePostToGL('post-all')}>
+                    <Landmark className="h-3.5 w-3.5" />Post Journals to GL
+                  </Button>
+                )}
+                {glPostStatus.assetsNeedingAcquisition > 0 && (
+                  <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => handlePostToGL('post-acquisition')}>
+                    <Building2 className="h-3.5 w-3.5" />Post Acquisitions
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card>
@@ -1235,7 +1301,12 @@ export function FixedAssetsModule() {
             )}
             {canExportJournals && (
               <Button variant="outline" className="w-full justify-start gap-2 h-10" onClick={handleExport}>
-                <Download className="h-4 w-4" />Export to AFMS
+                <Download className="h-4 w-4" />Export to CSV
+              </Button>
+            )}
+            {canExportJournals && (
+              <Button variant="outline" className="w-full justify-start gap-2 h-10 border-primary/30 text-primary hover:bg-primary/5" onClick={() => handlePostToGL('post-all')}>
+                <Landmark className="h-4 w-4" />Post to General Ledger
               </Button>
             )}
             <Separator />
@@ -1279,7 +1350,9 @@ export function FixedAssetsModule() {
       <div className="flex flex-wrap items-center gap-2">
         {canCreate && <Button size="sm" className="h-8 text-xs gap-1" onClick={openAddWizard}><Plus className="h-3.5 w-3.5" />Add Asset</Button>}
         {canRunDepreciation && <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => setActiveTab('depreciation')}><TrendingDown className="h-3.5 w-3.5" />Run Depreciation</Button>}
-        {canExportJournals && <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={handleExport}><Download className="h-3.5 w-3.5" />Export to AFMS</Button>}
+        {canExportJournals && <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={handleExport}><Download className="h-3.5 w-3.5" />Export CSV</Button>}
+        {canExportJournals && <Button variant="outline" size="sm" className="h-8 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/5" onClick={() => handlePostToGL('post-all')}><Landmark className="h-3.5 w-3.5" />Post to GL</Button>}
+        {canExportJournals && glPostStatus && glPostStatus.assetsNeedingAcquisition > 0 && <Button variant="outline" size="sm" className="h-8 text-xs gap-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50" onClick={() => handlePostToGL('post-acquisition')}><Building2 className="h-3.5 w-3.5" />Post Acquisitions ({glPostStatus.assetsNeedingAcquisition})</Button>}
         {canCreate && <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => setCsvImportOpen(true)}><Upload className="h-3.5 w-3.5" />Import CSV</Button>}
         <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => window.print()}><Printer className="h-3.5 w-3.5" />Print</Button>
         <div className="flex-1" />
