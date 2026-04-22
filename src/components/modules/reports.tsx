@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,10 +9,26 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Download, Printer, RefreshCw, FileText, ChevronDown, ChevronRight, Building2 } from 'lucide-react'
+import { Download, Printer, RefreshCw, FileText, ChevronDown, ChevronRight, Building2, Filter, X } from 'lucide-react'
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
+}
+
+interface FilterOption {
+  id: string
+  name: string
+  code?: string
+  status?: string
+  industry?: string
+}
+
+interface FilterData {
+  projects: FilterOption[]
+  clients: FilterOption[]
+  donors: FilterOption[]
+  locations: FilterOption[]
+  financialYears: FilterOption[]
 }
 
 export function FinancialReports() {
@@ -22,22 +38,134 @@ export function FinancialReports() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0])
 
-  const generateReport = async () => {
+  // Filter state
+  const [projectId, setProjectId] = useState<string>('all')
+  const [clientId, setClientId] = useState<string>('all')
+  const [donorId, setDonorId] = useState<string>('all')
+  const [locationId, setLocationId] = useState<string>('all')
+  const [financialYearId, setFinancialYearId] = useState<string>('all')
+  const [showFilters, setShowFilters] = useState(false)
+
+  // Filter options data
+  const [filterData, setFilterData] = useState<FilterData>({
+    projects: [],
+    clients: [],
+    donors: [],
+    locations: [],
+    financialYears: [],
+  })
+
+  // Fetch filter options on mount
+  useEffect(() => {
+    const fetchFilters = async () => {
+      try {
+        const [projectsRes, clientsRes, donorsRes, locationsRes, fyRes] = await Promise.all([
+          fetch('/api/projects'),
+          fetch('/api/clients'),
+          fetch('/api/donors'),
+          fetch('/api/locations'),
+          fetch('/api/financial-year'),
+        ])
+        const [projects, clients, donors, locations, financialYears] = await Promise.all([
+          projectsRes.json(),
+          clientsRes.json(),
+          donorsRes.json(),
+          locationsRes.json(),
+          fyRes.json(),
+        ])
+        setFilterData({
+          projects: Array.isArray(projects) ? projects : projects.data || [],
+          clients: Array.isArray(clients) ? clients : clients.data || [],
+          donors: Array.isArray(donors) ? donors : donors.data || [],
+          locations: Array.isArray(locations) ? locations : locations.data || [],
+          financialYears: Array.isArray(financialYears) ? financialYears : financialYears.data || [],
+        })
+      } catch (e) {
+        console.error('Failed to fetch filter options:', e)
+      }
+    }
+    fetchFilters()
+  }, [])
+
+  const generateReport = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams({ reportType, dateFrom, dateTo })
+    if (projectId && projectId !== 'all') params.set('projectId', projectId)
+    if (clientId && clientId !== 'all') params.set('clientId', clientId)
+    if (donorId && donorId !== 'all') params.set('donorId', donorId)
+    if (locationId && locationId !== 'all') params.set('locationId', locationId)
+    if (financialYearId && financialYearId !== 'all') params.set('financialYearId', financialYearId)
     try {
       const res = await fetch(`/api/reports?${params}`)
       setReportData(await res.json())
     } catch (e) { console.error(e) }
     setLoading(false)
+  }, [reportType, dateFrom, dateTo, projectId, clientId, donorId, locationId, financialYearId])
+
+  useEffect(() => { queueMicrotask(() => generateReport()) }, [reportType, generateReport])
+
+  const clearFilters = () => {
+    setProjectId('all')
+    setClientId('all')
+    setDonorId('all')
+    setLocationId('all')
+    setFinancialYearId('all')
   }
 
-  useEffect(() => { queueMicrotask(() => generateReport()) }, [reportType])
+  const hasActiveFilters = projectId !== 'all' || clientId !== 'all' || donorId !== 'all' || locationId !== 'all' || financialYearId !== 'all'
+
+  // Determine which filters are relevant for the current report type
+  const getRelevantFilters = () => {
+    const common = ['project', 'client', 'donor', 'location', 'financialYear']
+    switch (reportType) {
+      case 'trial_balance':
+      case 'balance_sheet':
+      case 'pnl':
+        return common
+      case 'cash_flow':
+        return ['project', 'client', 'donor', 'location', 'financialYear']
+      case 'donor_wise':
+        return ['project', 'client', 'location', 'financialYear'] // donor is the grouping dimension
+      case 'project_wise':
+        return ['client', 'donor', 'location', 'financialYear'] // project is the grouping dimension
+      case 'location_wise':
+        return ['project', 'client', 'donor', 'financialYear'] // location is the grouping dimension
+      case 'client_wise_project':
+        return ['project', 'donor', 'location', 'financialYear'] // client is the grouping dimension
+      default:
+        return common
+    }
+  }
+
+  const relevantFilters = getRelevantFilters()
 
   const handlePrint = () => {
     const printContent = document.getElementById('report-content')
     if (printContent) {
       const reportTitle = reportTypes.find(r => r.value === reportType)?.label || reportType.replace(/_/g, ' ').toUpperCase()
+      const activeFilterLabels: string[] = []
+      if (projectId !== 'all') {
+        const p = filterData.projects.find(p => p.id === projectId)
+        if (p) activeFilterLabels.push(`Project: ${p.name}`)
+      }
+      if (clientId !== 'all') {
+        const c = filterData.clients.find(c => c.id === clientId)
+        if (c) activeFilterLabels.push(`Client: ${c.name}`)
+      }
+      if (donorId !== 'all') {
+        const d = filterData.donors.find(d => d.id === donorId)
+        if (d) activeFilterLabels.push(`Donor: ${d.name}`)
+      }
+      if (locationId !== 'all') {
+        const l = filterData.locations.find(l => l.id === locationId)
+        if (l) activeFilterLabels.push(`Location: ${l.name}`)
+      }
+      if (financialYearId !== 'all') {
+        const fy = filterData.financialYears.find(fy => fy.id === financialYearId)
+        if (fy) activeFilterLabels.push(`FY: ${fy.name}`)
+      }
+      const filterMeta = activeFilterLabels.length > 0 ? activeFilterLabels.join(' • ') : 'All'
+
       const win = window.open('', '', 'width=1000,height=750')
       win?.document.write(`<html><head><title>${reportTitle} - AcctFin ERP</title>
         <style>
@@ -81,7 +209,7 @@ export function FinancialReports() {
         </div>
         <div class="report-meta">
           <span>${dateFrom ? `Period: ${dateFrom} to ${dateTo}` : `As at: ${dateTo || new Date().toLocaleDateString()}`}</span>
-          <span>Report Type: ${reportTitle}</span>
+          <span>Filters: ${filterMeta}</span>
           <span>Printed by: Admin</span>
         </div>
         ${printContent.innerHTML}
@@ -104,7 +232,6 @@ export function FinancialReports() {
     let extension: string
 
     if (format === 'CSV') {
-      // Generate CSV
       const rows: string[][] = []
       if (reportType === 'trial_balance' && reportData.data) {
         rows.push(['Code', 'Account Name', 'Type', 'Debit', 'Credit', 'Balance', 'Balance Type'])
@@ -145,7 +272,6 @@ export function FinancialReports() {
         })
         rows.push(['', '', '', '', '', 'GRAND TOTAL', reportData.grandTotalDebit, reportData.grandTotalCredit, reportData.grandBalance])
       } else {
-        // Segment reports
         rows.push(['Code', 'Name', 'Total Debit', 'Total Credit', 'Net Balance'])
         reportData.data?.forEach((d: any) => {
           rows.push([d.code, d.project || d.donor || d.location, d.totalDebit, d.totalCredit, d.balance])
@@ -360,7 +486,6 @@ export function FinancialReports() {
     if (!reportData?.data) return <p className="text-xs text-muted-foreground text-center py-8">No data</p>
     return (
       <div className="space-y-1">
-        {/* Summary cards */}
         <div className="grid grid-cols-3 gap-3 mb-4">
           <Card className="border-l-4 border-l-emerald-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Debit</p><p className="text-sm font-bold text-emerald-600">{formatCurrency(reportData.grandTotalDebit)}</p></CardContent></Card>
           <Card className="border-l-4 border-l-red-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Credit</p><p className="text-sm font-bold text-red-600">{formatCurrency(reportData.grandTotalCredit)}</p></CardContent></Card>
@@ -454,6 +579,34 @@ export function FinancialReports() {
     { value: 'client_wise_project', label: 'Client-wise Project', desc: 'Financial summary by client with project breakdown' },
   ]
 
+  // Get active filter labels for display
+  const getActiveFilterLabels = () => {
+    const labels: { key: string; label: string; value: string }[] = []
+    if (projectId !== 'all') {
+      const p = filterData.projects.find(p => p.id === projectId)
+      if (p) labels.push({ key: 'project', label: 'Project', value: p.name })
+    }
+    if (clientId !== 'all') {
+      const c = filterData.clients.find(c => c.id === clientId)
+      if (c) labels.push({ key: 'client', label: 'Client', value: c.name })
+    }
+    if (donorId !== 'all') {
+      const d = filterData.donors.find(d => d.id === donorId)
+      if (d) labels.push({ key: 'donor', label: 'Donor', value: d.name })
+    }
+    if (locationId !== 'all') {
+      const l = filterData.locations.find(l => l.id === locationId)
+      if (l) labels.push({ key: 'location', label: 'Location', value: l.name })
+    }
+    if (financialYearId !== 'all') {
+      const fy = filterData.financialYears.find(fy => fy.id === financialYearId)
+      if (fy) labels.push({ key: 'fy', label: 'Fin. Year', value: fy.name })
+    }
+    return labels
+  }
+
+  const activeFilterLabels = getActiveFilterLabels()
+
   return (
     <div className="space-y-4">
       {/* Report Controls */}
@@ -480,21 +633,206 @@ export function FinancialReports() {
             <Button size="sm" className="h-8 text-xs" onClick={generateReport} disabled={loading}>
               <RefreshCw className="h-3.5 w-3.5 mr-1" />Generate
             </Button>
+            <Button
+              variant={showFilters ? 'default' : 'outline'}
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <Filter className="h-3.5 w-3.5 mr-1" />
+              Filters
+              {hasActiveFilters && (
+                <Badge className="ml-1.5 h-4 w-4 p-0 text-[8px] flex items-center justify-center rounded-full">{activeFilterLabels.length}</Badge>
+              )}
+            </Button>
             <div className="flex gap-1 ml-auto">
               <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handlePrint} disabled={!reportData}><Printer className="h-3.5 w-3.5 mr-1" />Print</Button>
               <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => handleExport('CSV')} disabled={!reportData}><Download className="h-3.5 w-3.5 mr-1" />CSV</Button>
               <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => handleExport('JSON')} disabled={!reportData}><Download className="h-3.5 w-3.5 mr-1" />JSON</Button>
             </div>
           </div>
+
+          {/* Expandable Filter Panel */}
+          {showFilters && (
+            <div className="mt-3 pt-3 border-t">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium">Advanced Filters</span>
+                  <span className="text-[10px] text-muted-foreground">— Filter report data by specific dimensions</span>
+                </div>
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" className="h-6 text-[10px] text-muted-foreground hover:text-destructive" onClick={clearFilters}>
+                    <X className="h-3 w-3 mr-1" />Clear All
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                {/* Project Filter */}
+                {relevantFilters.includes('project') && (
+                  <div>
+                    <Label className="text-[10px] font-medium">
+                      Project
+                      {filterData.projects.length === 0 && <span className="text-muted-foreground ml-1">(none)</span>}
+                    </Label>
+                    <Select value={projectId} onValueChange={setProjectId}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="All Projects" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Projects</SelectItem>
+                        {filterData.projects.map(p => (
+                          <SelectItem key={p.id} value={p.id}>
+                            <span className="font-mono text-[10px] text-muted-foreground mr-1">{p.code}</span>
+                            {p.name}
+                            {p.status && <span className="ml-1 text-[9px] text-muted-foreground">({p.status})</span>}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Client Filter */}
+                {relevantFilters.includes('client') && (
+                  <div>
+                    <Label className="text-[10px] font-medium">
+                      Client
+                      {filterData.clients.length === 0 && <span className="text-muted-foreground ml-1">(none)</span>}
+                    </Label>
+                    <Select value={clientId} onValueChange={setClientId}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="All Clients" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Clients</SelectItem>
+                        {filterData.clients.map(c => (
+                          <SelectItem key={c.id} value={c.id}>
+                            <span className="font-mono text-[10px] text-muted-foreground mr-1">{c.code}</span>
+                            {c.name}
+                            {c.industry && <span className="ml-1 text-[9px] text-muted-foreground">({c.industry})</span>}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Donor Filter */}
+                {relevantFilters.includes('donor') && (
+                  <div>
+                    <Label className="text-[10px] font-medium">
+                      Donor
+                      {filterData.donors.length === 0 && <span className="text-muted-foreground ml-1">(none)</span>}
+                    </Label>
+                    <Select value={donorId} onValueChange={setDonorId}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="All Donors" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Donors</SelectItem>
+                        {filterData.donors.map(d => (
+                          <SelectItem key={d.id} value={d.id}>
+                            <span className="font-mono text-[10px] text-muted-foreground mr-1">{d.code}</span>
+                            {d.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Location Filter */}
+                {relevantFilters.includes('location') && (
+                  <div>
+                    <Label className="text-[10px] font-medium">
+                      Location
+                      {filterData.locations.length === 0 && <span className="text-muted-foreground ml-1">(none)</span>}
+                    </Label>
+                    <Select value={locationId} onValueChange={setLocationId}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="All Locations" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Locations</SelectItem>
+                        {filterData.locations.map(l => (
+                          <SelectItem key={l.id} value={l.id}>
+                            <span className="font-mono text-[10px] text-muted-foreground mr-1">{l.code}</span>
+                            {l.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Financial Year Filter */}
+                {relevantFilters.includes('financialYear') && (
+                  <div>
+                    <Label className="text-[10px] font-medium">Financial Year</Label>
+                    <Select value={financialYearId} onValueChange={setFinancialYearId}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="All Years" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Financial Years</SelectItem>
+                        {filterData.financialYears.map(fy => (
+                          <SelectItem key={fy.id} value={fy.id}>
+                            {fy.name}
+                            <span className="ml-1 text-[9px] text-muted-foreground">({fy.status})</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              {/* Active Filter Tags */}
+              {activeFilterLabels.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2 border-t border-dashed">
+                  <span className="text-[10px] text-muted-foreground mr-1">Active:</span>
+                  {activeFilterLabels.map(f => (
+                    <Badge key={f.key} variant="secondary" className="text-[9px] gap-1 pr-1">
+                      {f.label}: {f.value}
+                      <button
+                        onClick={() => {
+                          if (f.key === 'project') setProjectId('all')
+                          if (f.key === 'client') setClientId('all')
+                          if (f.key === 'donor') setDonorId('all')
+                          if (f.key === 'location') setLocationId('all')
+                          if (f.key === 'fy') setFinancialYearId('all')
+                        }}
+                        className="ml-0.5 rounded-full hover:bg-muted p-0.5"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Report Description */}
-      <div className="flex items-center gap-2">
-        <FileText className="h-4 w-4 text-muted-foreground" />
-        <p className="text-xs text-muted-foreground">
-          {reportTypes.find(r => r.value === reportType)?.desc}
-        </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-muted-foreground" />
+          <p className="text-xs text-muted-foreground">
+            {reportTypes.find(r => r.value === reportType)?.desc}
+          </p>
+        </div>
+        {activeFilterLabels.length > 0 && !showFilters && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {activeFilterLabels.map(f => (
+              <Badge key={f.key} variant="outline" className="text-[9px]">
+                {f.label}: {f.value}
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Report Content */}
@@ -504,6 +842,9 @@ export function FinancialReports() {
             <CardTitle className="text-sm">{reportData?.reportType || reportTypes.find(r => r.value === reportType)?.label}</CardTitle>
             <CardDescription className="text-[10px]">
               {dateFrom && `From: ${dateFrom}`} {dateTo && `To: ${dateTo}`} | Generated: {new Date().toLocaleString()}
+              {activeFilterLabels.length > 0 && (
+                <> | Filtered: {activeFilterLabels.map(f => `${f.label}: ${f.value}`).join(', ')}</>
+              )}
             </CardDescription>
           </div>
         </CardHeader>

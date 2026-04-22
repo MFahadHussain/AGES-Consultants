@@ -29,3 +29,37 @@ Stage Summary:
 - New subType taxonomy: CASH, BANK, RECEIVABLE, PAYABLE, PAYROLL_LIABILITY, FIXED_ASSET, ACCUMULATED_DEPRECIATION, DEPRECIATION, SALARY, SOCIAL_CHARGES, GAIN_ON_DISPOSAL, LOSS_ON_DISPOSAL, REVALUATION_RESERVE, etc.
 - Bank accounts now use subType='BANK' instead of code prefix '112' for discovery
 - System is fully decoupled from specific account numbering scheme
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Add Project, Client, Donor, Location, Financial Year filter options to Financial Reports
+
+Work Log:
+- Analyzed current Financial Reports component (reports.tsx) and API (api/reports/route.ts)
+- Discovered the API already supports projectId, clientId, donorId, locationId, financialYearId query parameters but the frontend didn't expose them
+- Rewrote reports.tsx to add comprehensive filter panel:
+  - Added "Filters" button with active filter count badge
+  - Expandable "Advanced Filters" panel with 5 dropdown filters: Project, Client, Donor, Location, Financial Year
+  - Context-aware filters (e.g., hides "Project" filter for project_wise report since project is the grouping dimension)
+  - Active filter tags with individual remove (X) buttons and "Clear All" option
+  - Filter tags also shown below report description when filter panel is collapsed
+  - Print template updated to include active filters in metadata
+  - Report header description includes filtered dimensions
+- Updated seed route (api/seed/route.ts) to create sample segment data:
+  - 4 Donors: USAID Pakistan, EU Delegation, UNDP Pakistan, DFID (FCDO)
+  - 4 Clients: Government of Punjab, UNICEF Pakistan, WHO, Engro Foundation
+  - 5 Locations: Islamabad, Lahore, Karachi, Peshawar, Quetta
+  - 6 Projects: Education Enhancement, Health & Nutrition, WASH KPK, Livelihood Balochistan, Capacity Building, COVID-19 Response
+- Fixed seed data to match actual Prisma schema (removed isActive from Donor/Location, removed clientId/donorId/locationId from Project - those are at Voucher level)
+- Reseeded database successfully with all segment data
+- Verified all filter APIs return data correctly
+- Lint check passes with 0 errors
+
+Stage Summary:
+- Financial Reports now has 5 filter dropdowns (Project, Client, Donor, Location, Financial Year)
+- Filters are context-aware per report type (grouping dimension hidden from filters)
+- Active filter tags shown in UI with remove/clear functionality
+- Print and CSV exports include filter metadata
+- Seed route now creates 4 donors, 4 clients, 5 locations, 6 projects for testing
+- No backend API changes needed - existing endpoints already supported all filter params

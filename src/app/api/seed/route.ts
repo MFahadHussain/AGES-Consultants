@@ -296,6 +296,37 @@ export async function GET() {
     }
 
     // ═══════════════════════════════════════════════════════════
+    // STEP 2b: Create sample segment data (Projects, Clients, Donors, Locations)
+    // ═══════════════════════════════════════════════════════════
+
+    // Donors
+    const donor1 = await db.donor.create({ data: { code: 'DON-001', name: 'USAID Pakistan', contactPerson: 'Sarah Johnson', email: 'sarah.johnson@usaid.gov', phone: '+1-202-712-0000', address: 'U.S. Embassy, Islamabad' } })
+    const donor2 = await db.donor.create({ data: { code: 'DON-002', name: 'European Union Delegation', contactPerson: 'Marc Dupont', email: 'marc.dupont@eeas.europa.eu', phone: '+32-2-584-0000', address: 'EU Delegation, Islamabad' } })
+    const donor3 = await db.donor.create({ data: { code: 'DON-003', name: 'UNDP Pakistan', contactPerson: 'Ahmed Khan', email: 'ahmed.khan@undp.org', phone: '+92-51-835-5000', address: 'UN House, Serena Business Complex, Islamabad' } })
+    const donor4 = await db.donor.create({ data: { code: 'DON-004', name: 'DFID (FCDO)', contactPerson: 'Emily Clarke', email: 'emily.clarke@fcdo.gov.uk', phone: '+44-20-7008-5000', address: 'British High Commission, Islamabad' } })
+
+    // Clients
+    const client1 = await db.client.create({ data: { code: 'CLI-001', name: 'Government of Punjab', contactPerson: 'Rana Mashhood', email: 'info@punjab.gov.pk', phone: '+92-42-9921-0000', address: 'Civil Secretariat, Lahore', industry: 'Government', taxNumber: 'NTN-1234567-1', isActive: true } })
+    const client2 = await db.client.create({ data: { code: 'CLI-002', name: 'UNICEF Pakistan', contactPerson: 'Aida Girma', email: 'aida.girma@unicef.org', phone: '+92-51-227-0000', address: 'UNICEF House, Islamabad', industry: 'NGO', taxNumber: 'NTN-7654321-2', isActive: true } })
+    const client3 = await db.client.create({ data: { code: 'CLI-003', name: 'World Health Organization', contactPerson: 'Dr. Palitha Mahipala', email: 'mahipala@who.int', phone: '+92-51-926-0000', address: 'WHO Office, Islamabad', industry: 'NGO', taxNumber: 'NTN-9876543-3', isActive: true } })
+    const client4 = await db.client.create({ data: { code: 'CLI-004', name: 'Engro Foundation', contactPerson: 'Favad Soomro', email: 'favad.soomro@engro.com', phone: '+92-21-111-364-776', address: 'Engro Tower, Karachi', industry: 'Corporate', taxNumber: 'NTN-5555555-4', isActive: true } })
+
+    // Locations
+    const loc1 = await db.location.create({ data: { code: 'LOC-ISB', name: 'Islamabad', address: 'Federal Capital Territory' } })
+    const loc2 = await db.location.create({ data: { code: 'LOC-LHR', name: 'Lahore', address: 'Punjab Province' } })
+    const loc3 = await db.location.create({ data: { code: 'LOC-KHI', name: 'Karachi', address: 'Sindh Province' } })
+    const loc4 = await db.location.create({ data: { code: 'LOC-PESH', name: 'Peshawar', address: 'KPK Province' } })
+    const loc5 = await db.location.create({ data: { code: 'LOC-QTA', name: 'Quetta', address: 'Balochistan Province' } })
+
+    // Projects (client/donor/location associations are at voucher level)
+    const proj1 = await db.project.create({ data: { code: 'PRJ-001', name: 'Education Enhancement Program', description: 'Improving quality of education in rural Punjab', startDate: new Date('2025-07-01'), endDate: new Date('2026-06-30'), status: 'active' } })
+    const proj2 = await db.project.create({ data: { code: 'PRJ-002', name: 'Health & Nutrition Initiative', description: 'Maternal and child health program in Sindh', startDate: new Date('2025-08-01'), endDate: new Date('2026-12-31'), status: 'active' } })
+    const proj3 = await db.project.create({ data: { code: 'PRJ-003', name: 'WASH Program KPK', description: 'Water, sanitation and hygiene in KPK', startDate: new Date('2025-09-01'), endDate: new Date('2026-08-31'), status: 'active' } })
+    const proj4 = await db.project.create({ data: { code: 'PRJ-004', name: 'Livelihood Support Balochistan', description: 'Skills training and livelihood in Balochistan', startDate: new Date('2025-10-01'), endDate: new Date('2027-03-31'), status: 'active' } })
+    const proj5 = await db.project.create({ data: { code: 'PRJ-005', name: 'Capacity Building Islamabad', description: 'Institutional capacity building at HQ level', startDate: new Date('2025-07-01'), endDate: new Date('2026-06-30'), status: 'active' } })
+    const proj6 = await db.project.create({ data: { code: 'PRJ-006', name: 'COVID-19 Response', description: 'Pandemic response and vaccination support', startDate: new Date('2024-01-01'), endDate: new Date('2025-06-30'), status: 'completed' } })
+
+    // ═══════════════════════════════════════════════════════════
     // STEP 3: Ensure open Financial Year exists
     // ═══════════════════════════════════════════════════════════
     let financialYearName: string | null = null
