@@ -212,10 +212,10 @@ export function ChartOfAccounts() {
                   </Select>
                 </div>
                 <div><Label className="text-xs">Sub Type</Label>
-                  <Select value={form.subType} onValueChange={v => setForm(p => ({ ...p, subType: v }))}>
+                  <Select value={form.subType || '__none__'} onValueChange={v => setForm(p => ({ ...p, subType: v === '__none__' ? '' : v }))}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent className="max-h-64">
-                      <SelectItem value="">— None —</SelectItem>
+                      <SelectItem value="__none__">— None —</SelectItem>
                       {(subTypes[form.accountType] || []).map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</SelectItem>)}
                     </SelectContent>
                   </Select>
