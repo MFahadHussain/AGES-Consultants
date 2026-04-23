@@ -26,7 +26,8 @@ export async function POST() {
     })
     const csvContent = [headers, ...rows].join('\n')
 
-    // Create batch
+    // Create batch record for audit trail (but do NOT change journal status)
+    // Journal status should only change when gl-post processes them
     const year = new Date().getFullYear()
     const prefix = `EXP-${year}-`
     const lastBatch = await db.fAMSExportBatch.findFirst({ where: { batchRef: { startsWith: prefix } }, orderBy: { batchRef: 'desc' } })
@@ -43,11 +44,11 @@ export async function POST() {
       },
     })
 
-    // Mark journals as exported
-    await db.fAMSJournal.updateMany({
-      where: { status: 'Pending Export' },
-      data: { status: 'Exported', exportedAt: new Date(), exportBatchId: batch.id },
-    })
+    // NOTE: Journals remain "Pending Export" — status only changes when gl-post
+    // creates actual Voucher/VoucherEntry records in the General Ledger.
+    // Previously this route marked them as "Exported" which caused them to be
+    // skipped by gl-post (it only looks for "Pending Export"), resulting in
+    // orphaned journals with no corresponding GL vouchers.
 
     return NextResponse.json({ batch, csvContent, exportedCount: journals.length })
   } catch (error) {

@@ -34,7 +34,7 @@ export async function GET() {
 
 // GL account mapping — matches the new COA (Pakistani NGO)
 const GL_CATEGORY_MAP: Record<string, { asset: string; accDep: string; depExp: string }> = {
-  'Land':              { asset: '1510', accDep: '1610', depExp: '5670' },
+  'Land':              { asset: '1510', accDep: '', depExp: '' },  // Land doesn't depreciate
   'Buildings':         { asset: '1515', accDep: '1610', depExp: '5610' },
   'Vehicles':          { asset: '1520', accDep: '1620', depExp: '5620' },
   'Furniture':         { asset: '1525', accDep: '1630', depExp: '5630' },
@@ -76,8 +76,10 @@ export async function POST(request: NextRequest) {
     const depExpAccount = await findDepExpenseForCategory(body.category)
 
     const glAssetCode = assetAccount?.code || body.glAssetAccount || glDefaults.asset
-    const glAccDepCode = accDepAccount?.code || body.glAccDepAccount || glDefaults.accDep
-    const glDepExpCode = depExpAccount?.code || body.glDepExpAccount || glDefaults.depExp
+    // Land doesn't depreciate — always clear acc dep and dep exp codes
+    const isNonDepreciating = body.category === 'Land' || body.depreciationMethod === 'None'
+    const glAccDepCode = isNonDepreciating ? '' : (accDepAccount?.code || body.glAccDepAccount || glDefaults.accDep)
+    const glDepExpCode = isNonDepreciating ? '' : (depExpAccount?.code || body.glDepExpAccount || glDefaults.depExp)
 
     const nbv = body.purchasePrice - (body.accumulatedDepreciation || 0)
 

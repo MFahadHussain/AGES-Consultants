@@ -100,106 +100,152 @@ async function handleJournalPosting(body: { journalIds?: string[] }, userId: str
     byType[key].push(j)
   }
 
+  // Pre-validate all journal account lookups to avoid partial/unbalanced vouchers
+  const validJournals: typeof journals = []
+  const skippedJournals: Array<{ id: string; journalNumber: string; reason: string }> = []
+
+  for (const j of journals) {
+    const drAccount = await findAccountByCode(j.drAccountCode)
+    const crAccount = await findAccountByCode(j.crAccountCode)
+    if (!drAccount || !crAccount) {
+      const missing = []
+      if (!drAccount) missing.push(`Dr account ${j.drAccountCode || '(empty)'}`)
+      if (!crAccount) missing.push(`Cr account ${j.crAccountCode || '(empty)'}`)
+      const reason = `Missing account(s): ${missing.join(', ')}`
+      console.warn(`FAMS GL Post: Skipping journal ${j.journalNumber} — ${reason}`)
+      skippedJournals.push({ id: j.id, journalNumber: j.journalNumber, reason })
+      // Update skipped journal with a note but keep as Pending Export
+      await db.fAMSJournal.update({
+        where: { id: j.id },
+        data: { narration: `${j.narration || ''} [GL POST SKIPPED: ${reason}]` },
+      })
+    } else {
+      validJournals.push(j)
+    }
+  }
+
+  if (validJournals.length === 0) {
+    return NextResponse.json({
+      success: false,
+      message: 'No valid journals to post — all journals have missing GL accounts',
+      skipped: skippedJournals,
+    }, { status: 400 })
+  }
+
+  // Re-group valid journals by type
+  const validByType: Record<string, typeof validJournals> = {}
+  for (const j of validJournals) {
+    const key = j.type || 'Other'
+    if (!validByType[key]) validByType[key] = []
+    validByType[key].push(j)
+  }
+
   const postedVouchers: string[] = []
   let totalDebit = 0
   let totalCredit = 0
+  const validJournalIds = validJournals.map(j => j.id)
 
-  for (const [type, typeJournals] of Object.entries(byType)) {
-    // Create one voucher per type batch
-    const voucherType = getVoucherType(type)
-    const voucherNumber = await generateVoucherNumber(voucherType)
+  // Wrap entire voucher creation + status update in a transaction
+  await db.$transaction(async (tx) => {
+    for (const [type, typeJournals] of Object.entries(validByType)) {
+      // Create one voucher per type batch
+      const voucherType = getVoucherType(type)
+      const voucherNumber = await generateVoucherNumber(voucherType)
 
-    const narration = type === 'Depreciation'
-      ? `FAMS: Depreciation posting — ${typeJournals.length} asset(s)`
-      : type === 'Disposal'
-      ? `FAMS: Asset disposal posting — ${typeJournals.length} asset(s)`
-      : `FAMS: ${type} posting — ${typeJournals.length} entry(s)`
+      const narration = type === 'Depreciation'
+        ? `FAMS: Depreciation posting — ${typeJournals.length} asset(s)`
+        : type === 'Disposal'
+        ? `FAMS: Asset disposal posting — ${typeJournals.length} asset(s)`
+        : `FAMS: ${type} posting — ${typeJournals.length} entry(s)`
 
-    const totalDr = typeJournals.reduce((s, j) => s + j.drAmount, 0)
-    const totalCr = typeJournals.reduce((s, j) => s + j.crAmount, 0)
+      const totalDr = typeJournals.reduce((s, j) => s + j.drAmount, 0)
+      const totalCr = typeJournals.reduce((s, j) => s + j.crAmount, 0)
 
-    const voucher = await db.voucher.create({
-      data: {
-        voucherNumber,
-        voucherType,
-        voucherTypeName: getVoucherTypeName(voucherType),
-        date: new Date(),
-        narration,
-        reference: `FAMS-${type}`,
-        status: 'posted',
-        financialYearId,
-        totalDebit: Math.round(totalDr),
-        totalCredit: Math.round(totalCr),
-        createdBy: userId,
-        isAssetPosted: true,
-      },
-    })
+      const voucher = await tx.voucher.create({
+        data: {
+          voucherNumber,
+          voucherType,
+          voucherTypeName: getVoucherTypeName(voucherType),
+          date: new Date(),
+          narration,
+          reference: `FAMS-${type}`,
+          status: 'posted',
+          financialYearId,
+          totalDebit: Math.round(totalDr),
+          totalCredit: Math.round(totalCr),
+          createdBy: userId,
+          isAssetPosted: true,
+        },
+      })
 
-    // Create voucher entries for each journal
-    let lineNumber = 1
-    for (const j of typeJournals) {
-      // Debit entry
-      const drAccount = await findAccountByCode(j.drAccountCode)
-      if (drAccount) {
-        await db.voucherEntry.create({
-          data: {
-            voucherId: voucher.id,
-            lineNumber: lineNumber++,
-            accountId: drAccount.id,
-            debit: Math.round(j.drAmount),
-            credit: 0,
-            description: j.narration || `${type}: ${j.assetName || 'N/A'}`,
-          },
-        })
+      // Create voucher entries for each journal
+      let lineNumber = 1
+      for (const j of typeJournals) {
+        // Debit entry
+        const drAccount = await findAccountByCode(j.drAccountCode)
+        if (drAccount) {
+          await tx.voucherEntry.create({
+            data: {
+              voucherId: voucher.id,
+              lineNumber: lineNumber++,
+              accountId: drAccount.id,
+              debit: Math.round(j.drAmount),
+              credit: 0,
+              description: j.narration || `${type}: ${j.assetName || 'N/A'}`,
+              assetRef: j.assetId || null,
+            },
+          })
+        }
+
+        // Credit entry
+        const crAccount = await findAccountByCode(j.crAccountCode)
+        if (crAccount) {
+          await tx.voucherEntry.create({
+            data: {
+              voucherId: voucher.id,
+              lineNumber: lineNumber++,
+              accountId: crAccount.id,
+              debit: 0,
+              credit: Math.round(j.crAmount),
+              description: j.narration || `${type}: ${j.assetName || 'N/A'}`,
+              assetRef: j.assetId || null,
+            },
+          })
+        }
       }
 
-      // Credit entry
-      const crAccount = await findAccountByCode(j.crAccountCode)
-      if (crAccount) {
-        await db.voucherEntry.create({
-          data: {
-            voucherId: voucher.id,
-            lineNumber: lineNumber++,
-            accountId: crAccount.id,
-            debit: 0,
-            credit: Math.round(j.crAmount),
-            description: j.narration || `${type}: ${j.assetName || 'N/A'}`,
-          },
-        })
-      }
+      postedVouchers.push(voucherNumber)
+      totalDebit += totalDr
+      totalCredit += totalCr
     }
 
-    postedVouchers.push(voucherNumber)
-    totalDebit += totalDr
-    totalCredit += totalCr
-  }
-
-  // Mark journals as exported (posted to GL)
-  await db.fAMSJournal.updateMany({
-    where: { id: { in: journals.map(j => j.id) } },
-    data: {
-      status: 'Exported',
-      exportedAt: new Date(),
-    },
-  })
-
-  // Mark related depreciation records as posted
-  for (const j of journals.filter(j => j.type === 'Depreciation' && j.assetId)) {
-    await db.fixedAssetDepreciation.updateMany({
-      where: {
-        asset: { assetId: j.assetId },
-        journalStatus: 'Pending Export',
-        isTaxDepreciation: false,
-      },
+    // Mark valid journals as exported (posted to GL)
+    await tx.fAMSJournal.updateMany({
+      where: { id: { in: validJournalIds } },
       data: {
-        isPosted: true,
-        journalStatus: 'Exported',
-        journalRef: j.journalNumber,
+        status: 'Exported',
+        exportedAt: new Date(),
       },
     })
-  }
 
-  // Audit log
+    // Mark related depreciation records as posted
+    for (const j of validJournals.filter(j => j.type === 'Depreciation' && j.assetId)) {
+      await tx.fixedAssetDepreciation.updateMany({
+        where: {
+          asset: { assetId: j.assetId },
+          journalStatus: 'Pending Export',
+          isTaxDepreciation: false,
+        },
+        data: {
+          isPosted: true,
+          journalStatus: 'Exported',
+          journalRef: j.journalNumber,
+        },
+      })
+    }
+  })
+
+  // Audit log (outside transaction — non-critical)
   await db.auditLog.create({
     data: {
       userId,
@@ -208,20 +254,22 @@ async function handleJournalPosting(body: { journalIds?: string[] }, userId: str
       entityId: 'batch',
       details: JSON.stringify({
         vouchers: postedVouchers,
-        journalCount: journals.length,
+        journalCount: validJournals.length,
         totalDebit: Math.round(totalDebit),
         totalCredit: Math.round(totalCredit),
+        skipped: skippedJournals.length > 0 ? skippedJournals : undefined,
       }),
     },
   })
 
   return NextResponse.json({
     success: true,
-    message: `${journals.length} journal(s) posted to General Ledger`,
+    message: `${validJournals.length} journal(s) posted to General Ledger${skippedJournals.length > 0 ? `, ${skippedJournals.length} skipped (missing accounts)` : ''}`,
     vouchers: postedVouchers,
-    journalCount: journals.length,
+    journalCount: validJournals.length,
     totalDebit: Math.round(totalDebit),
     totalCredit: Math.round(totalCredit),
+    skipped: skippedJournals.length > 0 ? skippedJournals : undefined,
   })
 }
 
@@ -248,82 +296,98 @@ async function handleAcquisitionPosting(
   const postedAssets: string[] = []
   let totalAmount = 0
 
-  for (const asset of assets) {
-    // Resolve GL account codes using account-roles utility
-    const assetAccountCode = asset.glAssetAccount || await getDefaultAssetAccount(asset.category)
-    const bankAccount = await findFirstBankAccount()
+  // Pre-validate assets that have valid GL accounts
+  const validAssets: Array<{ asset: typeof assets[0]; assetAccount: NonNullable<Awaited<ReturnType<typeof findAccountByCode>>>; creditAccount: NonNullable<Awaited<ReturnType<typeof findFirstBankAccount>>> }> = []
+  const skippedAssets: Array<{ assetId: string; name: string; reason: string }> = []
 
+  for (const asset of assets) {
+    const assetAccountCode = asset.glAssetAccount || await getDefaultAssetAccount(asset.category)
     if (!assetAccountCode) {
-      console.warn(`No GL asset account found for ${asset.name} (${asset.category})`)
+      skippedAssets.push({ assetId: asset.assetId, name: asset.name, reason: `No GL asset account for category ${asset.category}` })
       continue
     }
-
     const assetAccount = await findAccountByCode(assetAccountCode)
     if (!assetAccount) {
-      console.warn(`GL account ${assetAccountCode} not found in COA for asset ${asset.name}`)
+      skippedAssets.push({ assetId: asset.assetId, name: asset.name, reason: `GL account ${assetAccountCode} not found in COA` })
       continue
     }
-
+    const bankAccount = await findFirstBankAccount()
     const creditAccount = bankAccount || await findAccountByRole('CASH_IN_HAND')
     if (!creditAccount) {
-      console.warn('No bank or cash account found for acquisition posting')
+      skippedAssets.push({ assetId: asset.assetId, name: asset.name, reason: 'No bank or cash account found' })
       continue
     }
-
-    const voucherNumber = await generateVoucherNumber('BP')
-    const narration = `FAMS: Asset Acquisition — ${asset.name} (${asset.assetId})`
-
-    const voucher = await db.voucher.create({
-      data: {
-        voucherNumber,
-        voucherType: 'BP',
-        voucherTypeName: 'Bank Payment',
-        date: asset.dateOfCapitalization || asset.dateOfPurchase || new Date(),
-        narration,
-        reference: `FAMS-ACQ-${asset.assetId}`,
-        payeeName: asset.supplierName || undefined,
-        status: 'posted',
-        financialYearId,
-        totalDebit: Math.round(asset.purchasePrice),
-        totalCredit: Math.round(asset.purchasePrice),
-        createdBy: userId,
-        isAssetPosted: true,
-      },
-    })
-
-    // Debit: Fixed Asset Account
-    await db.voucherEntry.create({
-      data: {
-        voucherId: voucher.id,
-        lineNumber: 1,
-        accountId: assetAccount.id,
-        debit: Math.round(asset.purchasePrice),
-        credit: 0,
-        description: `Acquisition: ${asset.name} (${asset.assetId})`,
-      },
-    })
-
-    // Credit: Bank Account
-    await db.voucherEntry.create({
-      data: {
-        voucherId: voucher.id,
-        lineNumber: 2,
-        accountId: creditAccount.id,
-        debit: 0,
-        credit: Math.round(asset.purchasePrice),
-        description: `Payment for: ${asset.name} (${asset.assetId})`,
-      },
-    })
-
-    // Update asset journal status
-    await db.fixedAsset.update({
-      where: { id: asset.id },
-      data: { journalStatus: 'Exported' },
-    })
-
-    postedAssets.push(asset.assetId)
-    totalAmount += asset.purchasePrice
+    validAssets.push({ asset, assetAccount, creditAccount })
   }
+
+  if (validAssets.length === 0) {
+    return NextResponse.json({
+      success: false,
+      message: 'No valid assets to post — all assets have missing GL accounts',
+      skipped: skippedAssets,
+    }, { status: 400 })
+  }
+
+  // Wrap all acquisition postings in a transaction
+  await db.$transaction(async (tx) => {
+    for (const { asset, assetAccount, creditAccount } of validAssets) {
+      const voucherNumber = await generateVoucherNumber('BP')
+      const narration = `FAMS: Asset Acquisition — ${asset.name} (${asset.assetId})`
+
+      const voucher = await tx.voucher.create({
+        data: {
+          voucherNumber,
+          voucherType: 'BP',
+          voucherTypeName: 'Bank Payment',
+          date: asset.dateOfCapitalization || asset.dateOfPurchase || new Date(),
+          narration,
+          reference: `FAMS-ACQ-${asset.assetId}`,
+          payeeName: asset.supplierName || undefined,
+          status: 'posted',
+          financialYearId,
+          totalDebit: Math.round(asset.purchasePrice),
+          totalCredit: Math.round(asset.purchasePrice),
+          createdBy: userId,
+          isAssetPosted: true,
+        },
+      })
+
+      // Debit: Fixed Asset Account
+      await tx.voucherEntry.create({
+        data: {
+          voucherId: voucher.id,
+          lineNumber: 1,
+          accountId: assetAccount.id,
+          debit: Math.round(asset.purchasePrice),
+          credit: 0,
+          description: `Acquisition: ${asset.name} (${asset.assetId})`,
+          assetRef: asset.assetId,
+        },
+      })
+
+      // Credit: Bank Account
+      await tx.voucherEntry.create({
+        data: {
+          voucherId: voucher.id,
+          lineNumber: 2,
+          accountId: creditAccount.id,
+          debit: 0,
+          credit: Math.round(asset.purchasePrice),
+          description: `Payment for: ${asset.name} (${asset.assetId})`,
+          assetRef: asset.assetId,
+        },
+      })
+
+      // Update asset journal status
+      await tx.fixedAsset.update({
+        where: { id: asset.id },
+        data: { journalStatus: 'Exported' },
+      })
+
+      postedAssets.push(asset.assetId)
+      totalAmount += asset.purchasePrice
+    }
+  })
 
   // Audit log
   await db.auditLog.create({
@@ -401,6 +465,7 @@ function getVoucherType(type: string): string {
   switch (type) {
     case 'Depreciation': return 'JV'
     case 'Disposal': return 'JV'
+    case 'Transfer': return 'JV'
     case 'Acquisition': return 'BP'
     case 'Revaluation': return 'JV'
     default: return 'JV'

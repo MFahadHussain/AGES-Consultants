@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
+import { findAccountByRole, findFirstBankAccount } from '@/lib/account-roles'
 
 // GET /api/fams/transactions
 export async function GET(request: NextRequest) {
@@ -62,43 +63,91 @@ export async function POST(request: NextRequest) {
       // Update asset status
       await db.fixedAsset.update({ where: { id: asset.id }, data: { status: 'Disposed' } })
 
-      // Create disposal journal
+      // Resolve account codes using account-roles (fallback to asset GL fields, then defaults)
+      const bankAccount = await findFirstBankAccount()
+      const gainOnDisposalAccount = await findAccountByRole('GAIN_ON_DISPOSAL')
+      const lossOnDisposalAccount = await findAccountByRole('LOSS_ON_DISPOSAL')
+      const accDepCode = asset.glAccDepAccount || '1610'
+      const assetCode = asset.glAssetAccount || '1510'
+      const bankCode = bankAccount?.code || '1121'
+      const gainCode = gainOnDisposalAccount?.code || '4430'
+      const lossCode = lossOnDisposalAccount?.code || '5910'
+
+      // Create disposal journal entries
       const jPrefix = `JV-FAMS-${year}-`
       const lastJ = await db.fAMSJournal.findFirst({ where: { journalNumber: { startsWith: jPrefix } }, orderBy: { journalNumber: 'desc' } })
       let jNum = 1
       if (lastJ) { const p = lastJ.journalNumber.split('-'); const n = parseInt(p[p.length - 1] || '0'); if (!isNaN(n)) jNum = n + 1 }
 
-      // Dr. Accumulated Depreciation, Cr. Asset Cost (remove from books)
+      // Journal 1: Remove asset from books
+      // Dr. Accumulated Depreciation, Cr. Asset Cost
       await db.fAMSJournal.create({
         data: {
           journalNumber: `${jPrefix}${String(jNum).padStart(4, '0')}`,
           type: 'Disposal', date: new Date(),
           narration: `Disposal: ${asset.name} (${asset.assetId}) - ${body.disposalMethod || 'Sale'}`,
           assetId: asset.assetId, assetName: asset.name,
-          drAccountCode: asset.glAccDepAccount || '1610', drAccountName: 'Accumulated Depreciation',
+          drAccountCode: accDepCode, drAccountName: 'Accumulated Depreciation',
           drAmount: Math.round(asset.accumulatedDepreciation),
-          crAccountCode: asset.glAssetAccount || '1510', crAccountName: `Fixed Asset - ${asset.category}`,
+          crAccountCode: assetCode, crAccountName: `Fixed Asset - ${asset.category}`,
           crAmount: Math.round(asset.purchasePrice),
           status: 'Pending Export',
         },
       })
 
-      // If there's a gain or loss, create a second journal entry
-      if (Math.abs(gainLoss) > 0) {
+      // Journal 2: Record proceeds and gain/loss
+      if (proceeds > 0 || Math.abs(gainLoss) > 0) {
         const isGain = gainLoss > 0
         const jvNum2 = `${jPrefix}${String(jNum + 1).padStart(4, '0')}`
+
+        if (isGain) {
+          // Dr. Bank (for proceeds), Cr. Gain on Disposal (for gain)
+          await db.fAMSJournal.create({
+            data: {
+              journalNumber: jvNum2,
+              type: 'Disposal', date: new Date(),
+              narration: `Disposal gain: ${asset.name} (${asset.assetId}) - ${body.disposalMethod || 'Sale'}`,
+              assetId: asset.assetId, assetName: asset.name,
+              drAccountCode: bankCode, drAccountName: bankAccount?.name || 'Bank',
+              drAmount: Math.round(proceeds),
+              crAccountCode: gainCode, crAccountName: gainOnDisposalAccount?.name || 'Gain on Disposal',
+              crAmount: Math.round(proceeds),
+              status: 'Pending Export',
+            },
+          })
+        } else {
+          // Dr. Loss on Disposal (for loss), Cr. Bank (for proceeds)
+          const lossAmount = Math.round(Math.abs(gainLoss))
+          const proceedsAmount = Math.round(proceeds)
+          await db.fAMSJournal.create({
+            data: {
+              journalNumber: jvNum2,
+              type: 'Disposal', date: new Date(),
+              narration: `Disposal loss: ${asset.name} (${asset.assetId}) - ${body.disposalMethod || 'Sale'}`,
+              assetId: asset.assetId, assetName: asset.name,
+              drAccountCode: lossCode, drAccountName: lossOnDisposalAccount?.name || 'Loss on Disposal',
+              drAmount: lossAmount + proceedsAmount,
+              crAccountCode: bankCode, crAccountName: bankAccount?.name || 'Bank',
+              crAmount: lossAmount + proceedsAmount,
+              status: 'Pending Export',
+            },
+          })
+        }
+      }
+
+      // Journal 3: If no proceeds but there's a loss (write-off/scrap), record the loss
+      if (proceeds === 0 && asset.netBookValue > 0) {
+        const jvNum3 = `${jPrefix}${String(jNum + 2).padStart(4, '0')}`
         await db.fAMSJournal.create({
           data: {
-            journalNumber: jvNum2,
+            journalNumber: jvNum3,
             type: 'Disposal', date: new Date(),
-            narration: `Disposal ${isGain ? 'gain' : 'loss'}: ${asset.name} (${asset.assetId}) - ${body.disposalMethod || 'Sale'}`,
+            narration: `Write-off loss: ${asset.name} (${asset.assetId}) - NBV written off`,
             assetId: asset.assetId, assetName: asset.name,
-            drAccountCode: isGain ? '1121' : '5910',
-            drAccountName: isGain ? 'Bank' : 'Loss on Disposal',
-            drAmount: isGain ? Math.round(proceeds) : Math.round(Math.abs(gainLoss)),
-            crAccountCode: isGain ? '4430' : '1121',
-            crAccountName: isGain ? 'Gain on Disposal' : 'Bank',
-            crAmount: isGain ? Math.round(gainLoss) : Math.round(proceeds),
+            drAccountCode: lossCode, drAccountName: lossOnDisposalAccount?.name || 'Loss on Disposal',
+            drAmount: Math.round(asset.netBookValue),
+            crAccountCode: assetCode, crAccountName: `Fixed Asset - ${asset.category}`,
+            crAmount: Math.round(asset.netBookValue),
             status: 'Pending Export',
           },
         })
@@ -116,12 +165,38 @@ export async function POST(request: NextRequest) {
       if (lastTC?.transferCertNo) { const p = lastTC.transferCertNo.split('-'); const n = parseInt(p[p.length - 1]); if (!isNaN(n)) tcNum = n + 1 }
       data.transferCertNo = `${tcPrefix}${String(tcNum).padStart(4, '0')}`
       data.status = 'Pending Acknowledgment'
-      data.journalStatus = 'N/A'
+      data.journalStatus = 'Pending Export'
 
       // Update asset location/custodian
       await db.fixedAsset.update({
         where: { id: asset.id },
         data: { location: body.toLocation || asset.location, custodian: body.toCustodian || asset.custodian, costCenter: body.toCostCenter || asset.costCenter },
+      })
+
+      // Create transfer journal entry for GL traceability
+      const jPrefix = `JV-FAMS-${year}-`
+      const lastJ = await db.fAMSJournal.findFirst({ where: { journalNumber: { startsWith: jPrefix } }, orderBy: { journalNumber: 'desc' } })
+      let jNum = 1
+      if (lastJ) { const p = lastJ.journalNumber.split('-'); const n = parseInt(p[p.length - 1] || '0'); if (!isNaN(n)) jNum = n + 1 }
+
+      const fromDesc = [asset.location, asset.costCenter].filter(Boolean).join(' / ') || 'N/A'
+      const toDesc = [body.toLocation, body.toCostCenter].filter(Boolean).join(' / ') || 'N/A'
+      const assetCode = asset.glAssetAccount || '1510'
+
+      await db.fAMSJournal.create({
+        data: {
+          journalNumber: `${jPrefix}${String(jNum).padStart(4, '0')}`,
+          type: 'Transfer', date: new Date(),
+          narration: `Transfer: ${asset.name} (${asset.assetId}) from ${fromDesc} to ${toDesc}`,
+          assetId: asset.assetId, assetName: asset.name,
+          drAccountCode: assetCode, drAccountName: `Fixed Asset - ${asset.category} (from)`,
+          drAmount: Math.round(asset.netBookValue),
+          crAccountCode: assetCode, crAccountName: `Fixed Asset - ${asset.category} (to)`,
+          crAmount: Math.round(asset.netBookValue),
+          costCenter: body.toCostCenter || asset.costCenter || undefined,
+          project: asset.project || undefined,
+          status: 'Pending Export',
+        },
       })
     } else if (type === 'Adjustment') {
       data.adjustmentType = body.adjustmentType || 'Correction'

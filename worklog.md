@@ -148,3 +148,137 @@ Stage Summary:
 - FAMS-Accounting integration fully functional: asset creation, depreciation runs, disposal, and GL posting all use correct account codes
 - Chart of Accounts now has 24 ASSET, 12 LIABILITY, 11 EQUITY, 17 INCOME, and 32 EXPENSE sub-types
 - Sub-types display in human-readable format throughout the COA table
+
+---
+Task ID: 4
+Agent: Sub-Type Addition Agent
+Task: Add more sub-types to Chart of Accounts for NGO/development sector compliance
+
+Work Log:
+- Read existing worklog and chart-of-accounts component to understand current state
+- Component already had 24 ASSET, 12 LIABILITY, 11 EQUITY, 17 INCOME, 32 EXPENSE sub-types (96 total)
+- Added 4 new ASSET sub-types:
+  - LEASEHOLD_ASSET (for IFRS 16 lease accounting)
+  - CONSTRUCTION_IN_PROGRESS (for CWIP - Construction Work In Progress)
+  - RIGHT_OF_USE (for IFRS 16 right-of-use assets)
+  - BIOLOGICAL_ASSET (for agricultural NGOs per IAS 41)
+- Added 3 new LIABILITY sub-types:
+  - INTEREST_PAYABLE (for accrued interest obligations)
+  - RELATED_PARTY_PAYABLE (for IAS 24 related party transactions)
+  - LEASE_LIABILITY (for IFRS 16 lease liabilities)
+- Added 2 new EQUITY sub-types:
+  - DESIGNATED_FUND (for board-designated funds)
+  - CAPITAL_GRANT (for capital grant equity)
+- Added 3 new INCOME sub-types:
+  - GOVERNMENT_GRANT (for government grant income per IAS 20)
+  - ASSET_DISPOSAL_INCOME (for income from asset disposals)
+  - CROWDFUNDING_INCOME (for crowdfunding revenue)
+- Added 4 new EXPENSE sub-types:
+  - DEPRECIATION_TAX (for FBR tax depreciation, separate from book depreciation)
+  - AMORTIZATION (for intangible asset amortization per IAS 38)
+  - LEASE_EXPENSE (for IFRS 16 lease expenses)
+  - GRANT_EXPENSE (for pass-through grants)
+- All new sub-types placed in logical positions within each array
+- Sub-types automatically display in human-readable format via existing formatSubType helper
+- Lint check passes with 0 errors (4 pre-existing warnings unrelated to changes)
+
+Stage Summary:
+- Total new sub-types added: 16 (4 ASSET + 3 LIABILITY + 2 EQUITY + 3 INCOME + 4 EXPENSE)
+- New totals: 28 ASSET, 15 LIABILITY, 13 EQUITY, 20 INCOME, 36 EXPENSE sub-types (112 total)
+- All new sub-types comply with IFRS 16, IAS 20, IAS 24, IAS 38, IAS 41 standards
+- FBR tax depreciation (DEPRECIATION_TAX) separate from book depreciation (DEPRECIATION)
+- No backend changes needed — sub-types are stored as strings and displayed via formatSubType
+
+---
+Task ID: 5
+Agent: FAMS-GL Integration Fix Agent
+Task: Fix and improve FAMS integration with Accounting (General Ledger) — 6 critical/important issues
+
+Work Log:
+
+**Issue 1: Silent Skipped Voucher Entries (CRITICAL)**
+- File: /src/app/api/fams/gl-post/route.ts (handleJournalPosting function)
+- Problem: When findAccountByCode() returned null, the debit/credit entry was silently skipped, creating unbalanced vouchers in GL
+- Fix: Added pre-validation loop (lines 103-125) that checks all Dr/Cr account lookups BEFORE creating any vouchers
+  - Journals with missing accounts are skipped entirely (not partially posted)
+  - Skipped journals get their narration updated with "[GL POST SKIPPED: ...]" note
+  - Skipped journals remain "Pending Export" status so they can be fixed and retried
+  - If ALL journals are invalid, returns 400 with details of skipped journals
+  - Response includes `skipped` array with journalNumber and reason for each skipped entry
+
+**Issue 2: CSV Export Marks Journals as "Exported" Without Creating Vouchers (CRITICAL)**
+- File: /src/app/api/fams/export/route.ts (POST handler)
+- Problem: Export route marked journals as "Exported" but didn't create Voucher/VoucherEntry records. Then gl-post couldn't find them (only looks for "Pending Export")
+- Fix: Removed the `db.fAMSJournal.updateMany()` call that changed status to "Exported" (lines 47-51 removed)
+  - Export batch record is still created for audit trail
+  - Journals remain "Pending Export" until gl-post processes them
+  - Added explanatory comment about why status must not change during CSV export
+
+**Issue 3: Populate VoucherEntry.assetRef (Important)**
+- File: /src/app/api/fams/gl-post/route.ts (handleJournalPosting + handleAcquisitionPosting)
+- Problem: assetRef was never set on VoucherEntry records, so FAMS vouchers couldn't be traced back to specific assets
+- Fix: Added `assetRef: j.assetId || null` to all voucher entry creates in handleJournalPosting (lines 195, 211)
+  - Added `assetRef: asset.assetId` to both Dr and Cr entries in handleAcquisitionPosting (lines 364, 377)
+
+**Issue 4: Add $transaction() Wrapping (Important)**
+- File: /src/app/api/fams/gl-post/route.ts (handleJournalPosting + handleAcquisitionPosting)
+- Problem: Voucher creation + journal status update weren't in a Prisma $transaction(), risking partial state on failure
+- Fix: Wrapped all database writes in handleJournalPosting inside `db.$transaction()` (lines 149-246)
+  - Voucher creation, voucher entry creation, journal status update, and depreciation record updates all in one transaction
+  - Audit log creation remains outside transaction (non-critical, should not roll back the posting)
+  - Also wrapped handleAcquisitionPosting in `db.$transaction()` (lines 332-390)
+  - Pre-validation (account lookups) happens outside the transaction to avoid long-running transactions
+
+**Issue 5: Disposal/Transfer GL Posting Missing (Important)**
+- File: /src/app/api/fams/transactions/route.ts (POST handler)
+- Problem: Disposal had hardcoded account codes ('1121', '5910', '4430'); Transfer had NO FAMSJournal entry at all
+- Fix for Disposal:
+  - Added imports: findAccountByRole, findFirstBankAccount from account-roles
+  - Replaced hardcoded account codes with role-based lookups (findAccountByRole('GAIN_ON_DISPOSAL'), findAccountByRole('LOSS_ON_DISPOSAL'), findFirstBankAccount())
+  - Fallback to asset GL fields, then to default codes
+  - Fixed gain journal: Dr. Bank = proceeds, Cr. Gain on Disposal = proceeds (balanced)
+  - Fixed loss journal: Dr. Loss + proceeds, Cr. Bank = loss + proceeds (balanced)
+  - Added Journal 3 for write-off/scrap (no proceeds, NBV > 0): Dr. Loss on Disposal, Cr. Asset
+- Fix for Transfer:
+  - Added FAMSJournal creation with type: 'Transfer'
+  - Journal entry: Dr. Asset account (from), Cr. Asset account (to) at NBV — balanced memo entry
+  - Narration includes from/to location and cost center details
+  - Changed journalStatus from 'N/A' to 'Pending Export' so it can be posted to GL
+  - Added costCenter and project to journal entry
+- Also added 'Transfer' case to getVoucherType() in gl-post/route.ts (returns 'JV')
+
+**Issue 6: Fix Land Acc Dep Code Duplication (Low)**
+- File: /src/app/api/fams/assets/route.ts (GL_CATEGORY_MAP + POST handler)
+- Problem: Land's Acc Dep code (1610) duplicated with Buildings — Land shouldn't depreciate
+- Fix: Changed Land's GL_CATEGORY_MAP entry from {accDep: '1610', depExp: '5670'} to {accDep: '', depExp: ''}
+  - Added isNonDepreciating check: if category is 'Land' OR depreciationMethod is 'None', acc dep and dep exp codes are forced to empty strings
+  - This prevents findAccDepForCategory('Land') from accidentally resolving to a generic acc dep account
+
+Lint: 0 errors, 4 warnings (all pre-existing unused eslint-disable directives)
+
+Stage Summary:
+- FAMS GL posting is now atomic (transactions wrap all DB writes)
+- No more unbalanced vouchers — invalid journals are skipped with clear warnings
+- CSV export no longer orphaned journals — status only changes via gl-post
+- All VoucherEntry records now have assetRef for traceability
+- Disposal journals use role-based account lookups instead of hardcoded codes
+- Transfer transactions now create FAMSJournal entries for GL posting
+- Land assets no longer get spurious accumulated depreciation GL codes
+
+---
+Task ID: 6
+Agent: Main Agent
+Task: Fix 'Cannot access fetchGLPostStatus before initialization' error in fixed-assets.tsx and complete all pending tasks
+
+Work Log:
+- Fixed temporal dead zone error: moved `glPostStatus` state declaration and `fetchGLPostStatus` useCallback from line 916-926 to before the useEffect at line 603 that references them
+- Verified "Khyber Development Trust" already removed from all source code (confirmed by grep)
+- Delegated FAMS-Accounting integration fixes to subagent (6 critical/important issues)
+- Delegated COA sub-type additions to subagent (16 new sub-types across 5 account types)
+- All changes pass lint (0 errors, 4 pre-existing warnings)
+
+Stage Summary:
+- Temporal dead zone error fixed — fetchGLPostStatus now defined before its usage in useEffect
+- FAMS-GL integration fully functional with atomic transactions, account validation, assetRef traceability
+- COA now has 112 sub-types (28 ASSET, 15 LIABILITY, 13 EQUITY, 20 INCOME, 36 EXPENSE)
+- All 4 user-requested tasks completed

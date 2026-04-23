@@ -600,6 +600,19 @@ export function FixedAssetsModule() {
     }
   }, [])
 
+  // GL Post Status
+  const [glPostStatus, setGlPostStatus] = useState<{ pendingJournals: number; pendingAmount: number; assetsNeedingAcquisition: number; acquisitionAmount: number } | null>(null)
+
+  const fetchGLPostStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/fams/gl-post')
+      if (res.ok) {
+        const data = await res.json()
+        setGlPostStatus(data)
+      }
+    } catch { /* ignore */ }
+  }, [])
+
   // Initial data load
   useEffect(() => {
     fetchAssets(1)
@@ -912,18 +925,6 @@ export function FixedAssetsModule() {
       toast({ title: 'Error', description: 'Failed to post to GL', variant: 'destructive' })
     }
   }
-
-  const [glPostStatus, setGlPostStatus] = useState<{ pendingJournals: number; pendingAmount: number; assetsNeedingAcquisition: number; acquisitionAmount: number } | null>(null)
-
-  const fetchGLPostStatus = useCallback(async () => {
-    try {
-      const res = await fetch('/api/fams/gl-post')
-      if (res.ok) {
-        const data = await res.json()
-        setGlPostStatus(data)
-      }
-    } catch { /* ignore */ }
-  }, [])
 
   const handleDisposal = async (form: { assetId: string; date: string; disposalMethod: string; proceeds: number; description: string }) => {
     try {
