@@ -2525,13 +2525,12 @@ export function FixedAssetsModule() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editMode ? 'Edit Asset' : 'Add New Asset'} — Step {wizardStep} of 7</DialogTitle>
-            <DialogDescription>
-              <div className="flex gap-1 mt-2">
-                {[1, 2, 3, 4, 5, 6, 7].map(s => (
-                  <div key={s} className={`h-1.5 flex-1 rounded-full ${s <= wizardStep ? 'bg-primary' : 'bg-muted'}`} />
-                ))}
-              </div>
-            </DialogDescription>
+            <DialogDescription>Fill in the asset details step by step</DialogDescription>
+            <div className="flex gap-1 mt-2">
+              {[1, 2, 3, 4, 5, 6, 7].map(s => (
+                <div key={s} className={`h-1.5 flex-1 rounded-full ${s <= wizardStep ? 'bg-primary' : 'bg-muted'}`} />
+              ))}
+            </div>
           </DialogHeader>
           <div className="py-4">
             <div className="mb-3 text-xs text-muted-foreground">
