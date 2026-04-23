@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 /** Default FAMS settings aligned with spec */
 const DEFAULT_SETTINGS = [
   // Organization
-  { key: 'org_name', value: 'Khyber Development Trust', category: 'fams', description: 'Organization name' },
+  { key: 'org_name', value: 'Organization', category: 'fams', description: 'Organization name' },
   { key: 'org_province', value: 'KPK', category: 'fams', description: 'Organization province' },
   { key: 'org_city', value: 'Peshawar', category: 'fams', description: 'Organization city' },
   // GL Account Mapping (per spec)

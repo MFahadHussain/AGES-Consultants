@@ -2472,7 +2472,7 @@ export function FixedAssetsModule() {
               <Shield className="h-3 w-3 mr-1" />{ROLES[currentRole]?.label}
             </Badge>
           </h2>
-          <p className="text-xs text-muted-foreground">Khyber Development Trust — FAMS Module</p>
+          <p className="text-xs text-muted-foreground">Fixed Assets Management System (FAMS)</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5">

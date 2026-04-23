@@ -61,6 +61,42 @@ const ACCOUNT_ROLES: Record<string, { accountType?: string; subType?: string; co
 
   // Cash flow
   CASH_AND_BANK:      { accountType: 'ASSET', subType: 'CURRENT_ASSET', allowPosting: true },
+
+  // Additional roles for expanded COA sub-types
+  ADVANCE:            { accountType: 'ASSET', subType: 'ADVANCE', allowPosting: true },
+  DEPOSIT:            { accountType: 'ASSET', subType: 'DEPOSIT', allowPosting: true },
+  PREPAYMENT:         { accountType: 'ASSET', subType: 'PREPAYMENT', allowPosting: true },
+  INVENTORY:          { accountType: 'ASSET', subType: 'INVENTORY', allowPosting: true },
+  TAX_RECEIVABLE:     { accountType: 'ASSET', subType: 'TAX_RECEIVABLE', allowPosting: true },
+  WORK_IN_PROGRESS:   { accountType: 'ASSET', subType: 'WORK_IN_PROGRESS', allowPosting: true },
+  INVESTMENT:         { accountType: 'ASSET', subType: 'INVESTMENT', allowPosting: true },
+  INTANGIBLE_ASSET:   { accountType: 'ASSET', subType: 'INTANGIBLE_ASSET', allowPosting: true },
+  ACCRUAL:            { accountType: 'LIABILITY', subType: 'ACCRUAL', allowPosting: true },
+  TAX_PAYABLE:        { accountType: 'LIABILITY', subType: 'TAX_PAYABLE', allowPosting: true },
+  PROVISION:          { accountType: 'LIABILITY', subType: 'PROVISION', allowPosting: true },
+  UNEARNED_REVENUE:   { accountType: 'LIABILITY', subType: 'UNEARNED_REVENUE', allowPosting: true },
+  LONG_TERM_LOAN:     { accountType: 'LIABILITY', subType: 'LONG_TERM_LOAN', allowPosting: true },
+  DEFERRED_INCOME:    { accountType: 'LIABILITY', subType: 'DEFERRED_INCOME', allowPosting: true },
+  GRANT_LIABILITY:    { accountType: 'LIABILITY', subType: 'GRANT_LIABILITY', allowPosting: true },
+  DONOR_PAYABLE:      { accountType: 'LIABILITY', subType: 'DONOR_PAYABLE', allowPosting: true },
+  CAPITAL_FUND:       { accountType: 'EQUITY', subType: 'CAPITAL_FUND', allowPosting: true },
+  ENDOWMENT_FUND:     { accountType: 'EQUITY', subType: 'ENDOWMENT_FUND', allowPosting: true },
+  CONSULTANCY_INCOME: { accountType: 'INCOME', subType: 'CONSULTANCY_INCOME', allowPosting: true },
+  TRAINING_INCOME:    { accountType: 'INCOME', subType: 'TRAINING_INCOME', allowPosting: true },
+  RENTAL_INCOME:      { accountType: 'INCOME', subType: 'RENTAL_INCOME', allowPosting: true },
+  INVESTMENT_INCOME:  { accountType: 'INCOME', subType: 'INVESTMENT_INCOME', allowPosting: true },
+  RENT_EXPENSE:       { accountType: 'EXPENSE', subType: 'RENT_EXPENSE', allowPosting: true },
+  UTILITY_EXPENSE:    { accountType: 'EXPENSE', subType: 'UTILITY_EXPENSE', allowPosting: true },
+  COMMUNICATION_EXPENSE: { accountType: 'EXPENSE', subType: 'COMMUNICATION_EXPENSE', allowPosting: true },
+  MAINTENANCE_EXPENSE: { accountType: 'EXPENSE', subType: 'MAINTENANCE_EXPENSE', allowPosting: true },
+  AUDIT_FEE:          { accountType: 'EXPENSE', subType: 'AUDIT_FEE', allowPosting: true },
+  LEGAL_FEE:          { accountType: 'EXPENSE', subType: 'LEGAL_FEE', allowPosting: true },
+  BANK_CHARGES:       { accountType: 'EXPENSE', subType: 'BANK_CHARGES', allowPosting: true },
+  INSURANCE_EXPENSE:  { accountType: 'EXPENSE', subType: 'INSURANCE_EXPENSE', allowPosting: true },
+  TRAINING_EXPENSE:   { accountType: 'EXPENSE', subType: 'TRAINING_EXPENSE', allowPosting: true },
+  CONSULTANCY_EXPENSE: { accountType: 'EXPENSE', subType: 'CONSULTANCY_EXPENSE', allowPosting: true },
+  BAD_DEBT:           { accountType: 'EXPENSE', subType: 'BAD_DEBT', allowPosting: true },
+  IMPAIRMENT_LOSS:    { accountType: 'EXPENSE', subType: 'IMPAIRMENT_LOSS', allowPosting: true },
 }
 
 /**

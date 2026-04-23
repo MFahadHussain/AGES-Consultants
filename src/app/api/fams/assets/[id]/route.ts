@@ -16,14 +16,14 @@ const FBR_TAX_RATES: Record<string, { category: string; rate: number }> = {
 }
 
 const GL_ACCOUNT_MAP: Record<string, { asset: string; accDep: string; depExp: string }> = {
-  'Land': { asset: '1210', accDep: '1300', depExp: '5300' },
-  'Buildings': { asset: '1215', accDep: '1300', depExp: '5300' },
-  'Vehicles': { asset: '1220', accDep: '1300', depExp: '5300' },
-  'Furniture': { asset: '1225', accDep: '1300', depExp: '5300' },
-  'Office Equipment': { asset: '1230', accDep: '1300', depExp: '5300' },
-  'IT Assets': { asset: '1235', accDep: '1300', depExp: '5300' },
-  'Machinery': { asset: '1240', accDep: '1300', depExp: '5300' },
-  'Other': { asset: '1250', accDep: '1300', depExp: '5300' },
+  'Land':              { asset: '1510', accDep: '1610', depExp: '5670' },
+  'Buildings':         { asset: '1515', accDep: '1610', depExp: '5610' },
+  'Vehicles':          { asset: '1520', accDep: '1620', depExp: '5620' },
+  'Furniture':         { asset: '1525', accDep: '1630', depExp: '5630' },
+  'Office Equipment':  { asset: '1530', accDep: '1640', depExp: '5640' },
+  'IT Assets':         { asset: '1535', accDep: '1650', depExp: '5650' },
+  'Machinery':         { asset: '1540', accDep: '1660', depExp: '5660' },
+  'Other':             { asset: '1545', accDep: '1670', depExp: '5670' },
 }
 
 /**
@@ -391,10 +391,10 @@ export async function DELETE(
         narration: `Write-off: Remove ${existing.name} (${existing.assetId}) — cost & accumulated depreciation`,
         assetId: existing.assetId,
         assetName: existing.name,
-        drAccountCode: existing.glAccDepAccount || '1300',
+        drAccountCode: existing.glAccDepAccount || '1610',
         drAccountName: `Accumulated Depreciation - ${existing.category}`,
         drAmount: Math.round(existing.accumulatedDepreciation),
-        crAccountCode: existing.glAssetAccount || '1215',
+        crAccountCode: existing.glAssetAccount || '1510',
         crAccountName: `Fixed Asset - ${existing.category}`,
         crAmount: Math.round(existing.purchasePrice),
         costCenter: existing.costCenter,
@@ -416,10 +416,10 @@ export async function DELETE(
           narration: `Write-off loss: ${existing.name} (${existing.assetId}) — NBV written off`,
           assetId: existing.assetId,
           assetName: existing.name,
-          drAccountCode: '5400',
+          drAccountCode: existing.glDepExpAccount || '5910',
           drAccountName: 'Loss on Disposal / Write-Off of Assets',
           drAmount: Math.round(writeOffNBV),
-          crAccountCode: existing.glAssetAccount || '1215',
+          crAccountCode: existing.glAssetAccount || '1510',
           crAccountName: `Fixed Asset - ${existing.category}`,
           crAmount: Math.round(writeOffNBV),
           costCenter: existing.costCenter,

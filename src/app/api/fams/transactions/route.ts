@@ -68,20 +68,41 @@ export async function POST(request: NextRequest) {
       let jNum = 1
       if (lastJ) { const p = lastJ.journalNumber.split('-'); const n = parseInt(p[p.length - 1] || '0'); if (!isNaN(n)) jNum = n + 1 }
 
-      // Dr. Accumulated Depreciation, Dr. Bank (proceeds), Cr. Asset Cost, Cr./Dr. Gain/Loss
+      // Dr. Accumulated Depreciation, Cr. Asset Cost (remove from books)
       await db.fAMSJournal.create({
         data: {
           journalNumber: `${jPrefix}${String(jNum).padStart(4, '0')}`,
           type: 'Disposal', date: new Date(),
           narration: `Disposal: ${asset.name} (${asset.assetId}) - ${body.disposalMethod || 'Sale'}`,
           assetId: asset.assetId, assetName: asset.name,
-          drAccountCode: asset.glAccDepAccount || '1300', drAccountName: 'Accumulated Depreciation',
+          drAccountCode: asset.glAccDepAccount || '1610', drAccountName: 'Accumulated Depreciation',
           drAmount: Math.round(asset.accumulatedDepreciation),
-          crAccountCode: asset.glAssetAccount || '1200', crAccountName: `Fixed Asset - ${asset.category}`,
+          crAccountCode: asset.glAssetAccount || '1510', crAccountName: `Fixed Asset - ${asset.category}`,
           crAmount: Math.round(asset.purchasePrice),
           status: 'Pending Export',
         },
       })
+
+      // If there's a gain or loss, create a second journal entry
+      if (Math.abs(gainLoss) > 0) {
+        const isGain = gainLoss > 0
+        const jvNum2 = `${jPrefix}${String(jNum + 1).padStart(4, '0')}`
+        await db.fAMSJournal.create({
+          data: {
+            journalNumber: jvNum2,
+            type: 'Disposal', date: new Date(),
+            narration: `Disposal ${isGain ? 'gain' : 'loss'}: ${asset.name} (${asset.assetId}) - ${body.disposalMethod || 'Sale'}`,
+            assetId: asset.assetId, assetName: asset.name,
+            drAccountCode: isGain ? '1121' : '5910',
+            drAccountName: isGain ? 'Bank' : 'Loss on Disposal',
+            drAmount: isGain ? Math.round(proceeds) : Math.round(Math.abs(gainLoss)),
+            crAccountCode: isGain ? '4430' : '1121',
+            crAccountName: isGain ? 'Gain on Disposal' : 'Bank',
+            crAmount: isGain ? Math.round(gainLoss) : Math.round(proceeds),
+            status: 'Pending Export',
+          },
+        })
+      }
     } else if (type === 'Transfer') {
       data.fromLocation = asset.location
       data.toLocation = body.toLocation || null

@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
           depreciationCharge: monthlyCharge,
           accumulatedDepreciation: Math.round(newAccDep * 100) / 100,
           closingNBV: Math.round(Math.max(newNBV, asset.residualValue) * 100) / 100,
-          isPosted: true, journalStatus: 'Pending Export',
+          isPosted: false, journalStatus: 'Pending Export',
         },
       })
 

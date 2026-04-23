@@ -30,28 +30,51 @@ const typeColors: Record<string, string> = {
 }
 
 const accountTypes = ['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE']
+
+const formatSubType = (s: string | null) => {
+  if (!s) return '-'
+  return s.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+}
+
 const subTypes: Record<string, string[]> = {
   ASSET: [
-    'CURRENT_ASSET', 'CASH', 'BANK', 'RECEIVABLE', 'FIXED_ASSET',
+    'CURRENT_ASSET', 'CASH', 'BANK', 'RECEIVABLE', 'ADVANCE',
+    'DEPOSIT', 'PREPAYMENT', 'INVENTORY', 'TAX_RECEIVABLE',
+    'FIXED_ASSET', 'LAND', 'BUILDING', 'VEHICLE', 'FURNITURE',
+    'OFFICE_EQUIPMENT', 'IT_ASSET', 'MACHINERY', 'OTHER_FIXED_ASSET',
     'ACCUMULATED_DEPRECIATION', 'NON_CURRENT_ASSET', 'CONTRA_ASSET',
+    'INTANGIBLE_ASSET', 'WORK_IN_PROGRESS', 'INVESTMENT',
   ],
   LIABILITY: [
-    'CURRENT_LIABILITY', 'PAYABLE', 'PAYROLL_LIABILITY',
-    'NON_CURRENT_LIABILITY', 'LONG_TERM_LIABILITY',
+    'CURRENT_LIABILITY', 'PAYABLE', 'ACCRUAL', 'TAX_PAYABLE',
+    'PAYROLL_LIABILITY', 'PROVISION', 'UNEARNED_REVENUE',
+    'NON_CURRENT_LIABILITY', 'LONG_TERM_LOAN', 'DEFERRED_INCOME',
+    'GRANT_LIABILITY', 'DONOR_PAYABLE',
   ],
   EQUITY: [
-    'GENERAL_FUND', 'ACCUMULATED_SURPLUS', 'REVALUATION_RESERVE',
-    'RESTRICTED_FUND', 'ENDOWMENT_FUND',
+    'GENERAL_FUND', 'ACCUMULATED_SURPLUS', 'ACCUMULATED_DEFICIT',
+    'REVALUATION_RESERVE', 'RESTRICTED_FUND', 'ENDOWMENT_FUND',
+    'CAPITAL_FUND', 'RESERVE_FUND', 'SURPLUS_FUND',
+    'RETAINED_EARNINGS', 'PRIOR_PERIOD_ADJUSTMENT',
   ],
   INCOME: [
     'GRANT_INCOME', 'DONATION_INCOME', 'PROGRAM_INCOME',
     'OTHER_INCOME', 'GAIN_ON_DISPOSAL', 'SERVICE_REVENUE',
+    'CONSULTANCY_INCOME', 'TRAINING_INCOME', 'RENTAL_INCOME',
+    'INVESTMENT_INCOME', 'MEMBERSHIP_FEE', 'SUBSCRIPTION_INCOME',
+    'SPONSORSHIP_INCOME', 'CASH_CONTRIBUTION', 'INKIND_CONTRIBUTION',
+    'INTEREST_INCOME', 'FOREX_GAIN',
   ],
   EXPENSE: [
     'SALARY', 'PERSONNEL', 'SOCIAL_CHARGES', 'TRAVEL', 'OFFICE',
     'PROFESSIONAL', 'DEPRECIATION', 'PROGRAM', 'FINANCIAL',
     'LOSS_ON_DISPOSAL', 'OTHER_EXPENSE', 'PAYROLL_EXPENSE',
-    'OPERATING_EXPENSE',
+    'OPERATING_EXPENSE', 'RENT_EXPENSE', 'UTILITY_EXPENSE',
+    'COMMUNICATION_EXPENSE', 'VEHICLE_EXPENSE', 'MAINTENANCE_EXPENSE',
+    'AUDIT_FEE', 'LEGAL_FEE', 'BANK_CHARGES', 'INSURANCE_EXPENSE',
+    'TRAINING_EXPENSE', 'CONSULTANCY_EXPENSE', 'PRINTING_EXPENSE',
+    'SUPPLIES_EXPENSE', 'CONFERENCE_EXPENSE', 'CAPITAL_EXPENDITURE',
+    'TAX_EXPENSE', 'FOREX_LOSS', 'IMPAIRMENT_LOSS', 'BAD_DEBT',
   ],
 }
 
@@ -166,7 +189,7 @@ export function ChartOfAccounts() {
               <Plus className="h-3.5 w-3.5 mr-1" /> New Account
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <DialogTitle className="text-sm">{editingAccount ? 'Edit Account' : 'New Account'}</DialogTitle>
             </DialogHeader>
@@ -185,8 +208,9 @@ export function ChartOfAccounts() {
                 <div><Label className="text-xs">Sub Type</Label>
                   <Select value={form.subType} onValueChange={v => setForm(p => ({ ...p, subType: v }))}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>
-                      {(subTypes[form.accountType] || []).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    <SelectContent className="max-h-64">
+                      <SelectItem value="">— None —</SelectItem>
+                      {(subTypes[form.accountType] || []).map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -253,7 +277,7 @@ export function ChartOfAccounts() {
                         </TableCell>
                         <TableCell className="text-xs font-medium">{account.name}</TableCell>
                         <TableCell><Badge className={`text-[9px] ${typeColors[account.accountType]}`}>{account.accountType}</Badge></TableCell>
-                        <TableCell className="text-[10px] text-muted-foreground">{account.subType || '-'}</TableCell>
+                        <TableCell className="text-[10px] text-muted-foreground">{formatSubType(account.subType)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
                             {account.isActive ? <Badge className="text-[9px] bg-green-100 text-green-800">Active</Badge> : <Badge className="text-[9px] bg-gray-100 text-gray-800">Inactive</Badge>}
@@ -301,7 +325,7 @@ function renderChildAccounts(allAccounts: Account[], parentId: string, level: nu
           </TableCell>
           <TableCell className="text-xs" style={{ paddingLeft: `${level * 8}px` }}>{account.name}</TableCell>
           <TableCell><Badge className={`text-[9px] ${typeColors[account.accountType]}`}>{account.accountType}</Badge></TableCell>
-          <TableCell className="text-[10px] text-muted-foreground">{account.subType || '-'}</TableCell>
+          <TableCell className="text-[10px] text-muted-foreground">{formatSubType(account.subType)}</TableCell>
           <TableCell>
             <div className="flex items-center gap-1">
               {account.isActive ? <Badge className="text-[9px] bg-green-100 text-green-800">Active</Badge> : <Badge className="text-[9px] bg-gray-100 text-gray-800">Inactive</Badge>}
