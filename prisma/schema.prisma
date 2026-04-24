@@ -474,6 +474,14 @@ model FixedAsset {
   supplierNTN           String?
   warrantyExpiryDate    DateTime?
   serialNumber          String?
+  make                  String?   // e.g., Toyota, Dell, HP
+  model                 String?   // e.g., Corolla, Latitude 5520
+  modelYear             Int?      // e.g., 2023
+  priorApprovalNo       String?   // Prior approval reference number
+  purchaseOrderNo       String?   // Purchase order number
+  receiptVoucherNo      String?   // Receipt voucher reference
+  checkRegisterNo       String?   // Check register reference
+  stockRegisterPageNo   String?   // Stock register page number
   status                String   @default("Active") // Active, Disposed, Transferred, Under Maintenance, Written Off
   condition             String   @default("Good") // Excellent, Good, Fair, Poor
   insuranceValue        Float    @default(0)

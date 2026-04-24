@@ -282,3 +282,68 @@ Stage Summary:
 - FAMS-GL integration fully functional with atomic transactions, account validation, assetRef traceability
 - COA now has 112 sub-types (28 ASSET, 15 LIABILITY, 13 EQUITY, 20 INCOME, 36 EXPENSE)
 - All 4 user-requested tasks completed
+
+---
+Task ID: 7
+Agent: Main Agent
+Task: Build single-page Fixed Asset Registration Form
+
+Work Log:
+- Added 8 new columns to FixedAsset Prisma model: make, model, modelYear, priorApprovalNo, purchaseOrderNo, receiptVoucherNo, checkRegisterNo, stockRegisterPageNo
+- Ran `bun run db:push` to sync database schema
+- Updated WizardForm interface with new fields and assetTag
+- Changed CONDITIONS from ['Excellent', 'Good', 'Fair', 'Poor'] to ['New', 'Old'] per user spec
+- Replaced 7-step wizard with single-page registration form containing 9 visual sections:
+  1. Basic Asset Information (Asset Name, Asset Tag, Category from COA, Purchase Date, Cost)
+  2. Asset Specifications (Make, Model, Model Year, Condition, Serial Number, Sub-Category)
+  3. Procurement & Reference Details (Prior Approval No, PO No, Receipt Voucher No, Check Register No, Stock Register Page No, Invoice, Supplier)
+  4. Depreciation Setup (with auto-detection for Land/Donor-funded)
+  5. Location & Custodian
+  6. Donor Funding (toggle + conditional fields)
+  7. Insurance & Warranty
+  8. GL Account Mapping
+  9. Additional Notes
+- Added COA category dropdown (fetches from /api/accounts, filters to fixed asset sub-types)
+- Added GL_CATEGORY_MAP constant for voucher creation
+- Added fetchCoaCategories function and coaCategories state
+- Replaced wizard Dialog with wide (max-w-3xl) dialog with sticky bottom action bar
+- Action bar has: Cancel, Save as Draft, Save & Create Draft Voucher
+- "Save & Create Draft Voucher" also creates a BP (Bank Payment) voucher in the accounting module
+- Updated toast messages: "Asset saved and Draft Voucher created successfully."
+- Added form validation: Asset Name, Category, and Cost are required (isFormValid)
+- Updated FAMS assets POST API to save new fields
+- Updated FAMS assets PUT API to allow updating new fields
+- Lint passes with 0 errors
+
+Stage Summary:
+- Single-page registration form replaces 7-step wizard
+- Category dropdown pulls from Chart of Accounts (with fallback to hardcoded)
+- "Save & Create Draft Voucher" creates asset + BP voucher in accounting module
+- 8 new fields added to database schema and API
+- Condition options changed to "New" and "Old" per spec
+- Sticky bottom action bar with Cancel / Save as Draft / Save & Create Draft Voucher
+
+---
+Task ID: 1-a
+Agent: Schema Update Agent
+Task: Add new columns to FixedAsset model in Prisma schema (make, model, modelYear, priorApprovalNo, purchaseOrderNo, receiptVoucherNo, checkRegisterNo, stockRegisterPageNo)
+
+Work Log:
+- Read prisma/schema.prisma and located the `serialNumber` field at line 476 in the FixedAsset model
+- Added 8 new optional fields after `serialNumber` (before `status`):
+  - make (String?) — e.g., Toyota, Dell, HP
+  - model (String?) — e.g., Corolla, Latitude 5520
+  - modelYear (Int?) — e.g., 2023
+  - priorApprovalNo (String?) — Prior approval reference number
+  - purchaseOrderNo (String?) — Purchase order number
+  - receiptVoucherNo (String?) — Receipt voucher reference
+  - checkRegisterNo (String?) — Check register reference
+  - stockRegisterPageNo (String?) — Stock register page number
+- Ran `bun run db:push` — database synced successfully in 43ms
+- Prisma Client regenerated (v6.19.2) successfully
+
+Stage Summary:
+- 8 new optional columns added to FixedAsset model after serialNumber field
+- All fields are optional (nullable) to maintain backward compatibility with existing data
+- Database migration applied successfully — no data loss
+- Prisma Client regenerated with new fields available

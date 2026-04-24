@@ -148,6 +148,10 @@ export async function PUT(
       'insurancePolicyNumber', 'costCenter', 'project',
       'fundCode', 'donorCode', 'notes',
       'decliningRate', 'approvedBy',
+      // New registration form fields
+      'make', 'model', 'modelYear',
+      'priorApprovalNo', 'purchaseOrderNo', 'receiptVoucherNo',
+      'checkRegisterNo', 'stockRegisterPageNo',
     ]
 
     for (const field of updatableFields) {

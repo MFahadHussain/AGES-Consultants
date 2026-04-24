@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
         donorRestrictions: body.donorRestrictions || null, grantReference: body.grantReference || null,
         invoiceNumber: body.invoiceNumber || null, supplierName: body.supplierName || null,
         supplierNTN: body.supplierNTN || null, serialNumber: body.serialNumber || null,
-        status: 'Active', condition: body.condition || 'Good',
+        status: 'Active', condition: body.condition || 'New',
         insuranceValue: body.insuranceValue || 0, insurancePolicyNumber: body.insurancePolicyNumber || null,
         costCenter: body.costCenter || null, project: body.project || null, fundCode: body.fundCode || null,
         donorCode: body.donorCode || null,
@@ -108,6 +108,15 @@ export async function POST(request: NextRequest) {
         accumulatedDepreciation: body.accumulatedDepreciation || 0, netBookValue: Math.round(nbv),
         warrantyExpiryDate: body.warrantyExpiryDate ? new Date(body.warrantyExpiryDate) : null,
         insuranceExpiryDate: body.insuranceExpiryDate ? new Date(body.insuranceExpiryDate) : null,
+        // New registration form fields
+        make: body.make || null,
+        model: body.model || null,
+        modelYear: body.modelYear || null,
+        priorApprovalNo: body.priorApprovalNo || null,
+        purchaseOrderNo: body.purchaseOrderNo || null,
+        receiptVoucherNo: body.receiptVoucherNo || null,
+        checkRegisterNo: body.checkRegisterNo || null,
+        stockRegisterPageNo: body.stockRegisterPageNo || null,
       },
     })
 
