@@ -347,3 +347,25 @@ Stage Summary:
 - All fields are optional (nullable) to maintain backward compatibility with existing data
 - Database migration applied successfully — no data loss
 - Prisma Client regenerated with new fields available
+---
+Task ID: 1
+Agent: main
+Task: Fix Fixed Asset Registration Form layout (proper rectangle cards) and connect Category to Chart of Accounts
+
+Work Log:
+- Read the full fixed-assets.tsx file to understand current form structure
+- Identified that registration form sections used plain `<div>` with `border-b` dividers instead of proper Card components
+- Identified that fetchCoaCategories had potential issues with API response parsing and subType filtering
+- Converted all 9 form sections to use Card > CardHeader > CardTitle + CardContent components for proper rectangular card borders
+- Fixed fetchCoaCategories to properly handle array/different API response shapes
+- Added allowPosting filter and explicit ACCUMULATED_DEPRECIATION exclusion in COA fetch
+- Added fetchCoaCategories() call in openAddWizard so categories are refreshed when dialog opens
+- Added auto-fill of GL Account Mapping when category is selected (using GL_CATEGORY_MAP)
+- Improved Category dropdown placeholder to show "Select from Chart of Accounts" when COA data available
+- Verified all changes with ESLint - 0 errors
+
+Stage Summary:
+- Registration form now uses proper Card components for each section (9 sections total)
+- Category dropdown is connected to COA and refreshes when dialog opens
+- GL mapping auto-fills when a category is selected
+- Code passes lint with 0 errors

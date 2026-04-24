@@ -649,15 +649,21 @@ export function FixedAssetsModule() {
       const res = await fetch('/api/accounts?accountType=ASSET&isActive=true')
       if (res.ok) {
         const data = await res.json()
-        // Filter to fixed asset category accounts (subType contains FIXED or specific asset types)
-        const fixedAssetAccounts = (data.accounts || data || []).filter(
-          (a: { subType?: string | null; code?: string }) =>
-            a.subType && ['FIXED_ASSET', 'LAND', 'BUILDING', 'VEHICLE', 'FURNITURE', 'OFFICE_EQUIPMENT', 'IT_ASSET', 'MACHINERY', 'OTHER_FIXED_ASSET', 'ACCUMULATED_DEPRECIATION'].includes(a.subType)
+        const accounts = Array.isArray(data) ? data : (data.accounts || [])
+        // Filter to fixed asset category accounts - include FIXED_ASSET subType and specific asset sub-types
+        // Exclude accumulated depreciation accounts
+        const fixedAssetAccounts = accounts.filter(
+          (a: { subType?: string | null; code?: string; name?: string; allowPosting?: boolean }) => {
+            if (!a.subType) return false
+            if (a.subType === 'ACCUMULATED_DEPRECIATION') return false
+            if (!a.allowPosting) return false
+            return ['FIXED_ASSET', 'LAND', 'BUILDING', 'VEHICLE', 'FURNITURE',
+                    'OFFICE_EQUIPMENT', 'IT_ASSET', 'MACHINERY', 'OTHER_FIXED_ASSET'].includes(a.subType)
+          }
         )
         setCoaCategories(fixedAssetAccounts.map((a: { id: string; code: string; name: string }) => ({ id: a.id, code: a.code, name: a.name })))
       }
     } catch {
-      // Fallback to hardcoded categories
       setCoaCategories(ASSET_CATEGORIES.map((c, i) => ({ id: String(i), code: String(1510 + i * 5), name: c })))
     }
   }, [])
@@ -769,6 +775,7 @@ export function FixedAssetsModule() {
     setEditMode(false)
     setEditingAssetId(null)
     setWizardOpen(true)
+    fetchCoaCategories()
   }
 
   const openEditWizard = (asset: AssetRecord) => {
@@ -1627,11 +1634,14 @@ export function FixedAssetsModule() {
     return (
       <div className="space-y-6">
         {/* ─── Section 1: Basic Asset Information ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b pb-2">
-            <Package className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">Basic Asset Information</h3>
-          </div>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3 pt-4 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Package className="h-4 w-4 text-primary" />
+              Basic Asset Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <Label className="text-xs font-medium">Asset Name <span className="text-red-500">*</span></Label>
@@ -1643,12 +1653,23 @@ export function FixedAssetsModule() {
             </div>
             <div>
               <Label className="text-xs font-medium">Category <span className="text-red-500">*</span></Label>
-              <Select value={wizardForm.category} onValueChange={v => setWizardForm(f => ({ ...f, category: v }))}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Select category from Chart of Accounts" /></SelectTrigger>
+              <Select value={wizardForm.category} onValueChange={v => {
+                const glMap = GL_CATEGORY_MAP[v] || { asset: '1545', accDep: '1670', depExp: '5670' }
+                setWizardForm(f => ({ 
+                  ...f, 
+                  category: v,
+                  glAssetAccount: f.glAssetAccount || glMap.asset,
+                  glAccDepAccount: f.glAccDepAccount || (glMap.accDep || ''),
+                  glDepExpAccount: f.glDepExpAccount || (glMap.depExp || ''),
+                }))
+              }}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder={coaCategories.length > 0 ? "Select from Chart of Accounts" : "Select category"} /></SelectTrigger>
                 <SelectContent className="max-h-64">
                   {coaCategories.length > 0
                     ? coaCategories.filter(c => !c.name.toLowerCase().includes('accumulated')).map(c => (
-                      <SelectItem key={c.id} value={c.name}>{c.code} — {c.name}</SelectItem>
+                      <SelectItem key={c.id} value={c.name}>
+                        <span className="font-mono text-muted-foreground mr-1">{c.code}</span> {c.name}
+                      </SelectItem>
                     ))
                     : ASSET_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)
                   }
@@ -1670,14 +1691,18 @@ export function FixedAssetsModule() {
               <span>Auto-generated Asset ID: AST-{new Date().getFullYear()}-XXXX | FBR Rate: {fbrRate}%</span>
             </div>
           )}
-        </div>
+          </CardContent>
+        </Card>
 
         {/* ─── Section 2: Asset Specifications ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b pb-2">
-            <Cog className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">Asset Specifications</h3>
-          </div>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3 pt-4 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Cog className="h-4 w-4 text-primary" />
+              Asset Specifications
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label className="text-xs font-medium">Make</Label>
@@ -1709,14 +1734,18 @@ export function FixedAssetsModule() {
               <Input className="mt-1" value={wizardForm.subCategory} onChange={e => setWizardForm(f => ({ ...f, subCategory: e.target.value }))} placeholder="Optional sub-classification" />
             </div>
           </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* ─── Section 3: Procurement & Reference Details ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b pb-2">
-            <FileText className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">Procurement & Reference Details</h3>
-          </div>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3 pt-4 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <FileText className="h-4 w-4 text-primary" />
+              Procurement &amp; Reference Details
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label className="text-xs font-medium">Prior Approval No.</Label>
@@ -1751,14 +1780,18 @@ export function FixedAssetsModule() {
               <Input className="mt-1" value={wizardForm.supplierNTN} onChange={e => setWizardForm(f => ({ ...f, supplierNTN: e.target.value }))} placeholder="National Tax Number" />
             </div>
           </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* ─── Section 4: Depreciation Setup ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b pb-2">
-            <TrendingDown className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">Depreciation Setup</h3>
-          </div>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3 pt-4 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <TrendingDown className="h-4 w-4 text-primary" />
+              Depreciation Setup
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
           {isNoDep ? (
             <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50">
               <Info className="h-4 w-4 text-sky-600" />
@@ -1800,14 +1833,18 @@ export function FixedAssetsModule() {
               </div>
             </div>
           )}
-        </div>
+          </CardContent>
+        </Card>
 
         {/* ─── Section 5: Location & Custodian ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b pb-2">
-            <MapPin className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">Location & Custodian</h3>
-          </div>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3 pt-4 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-primary" />
+              Location &amp; Custodian
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div><Label className="text-xs font-medium">Location</Label><Input className="mt-1" value={wizardForm.location} onChange={e => setWizardForm(f => ({ ...f, location: e.target.value }))} placeholder="e.g., Head Office" /></div>
             <div>
@@ -1820,14 +1857,18 @@ export function FixedAssetsModule() {
             <div><Label className="text-xs font-medium">Custodian</Label><Input className="mt-1" value={wizardForm.custodian} onChange={e => setWizardForm(f => ({ ...f, custodian: e.target.value }))} placeholder="Person responsible" /></div>
             <div><Label className="text-xs font-medium">Cost Center</Label><Input className="mt-1" value={wizardForm.costCenter} onChange={e => setWizardForm(f => ({ ...f, costCenter: e.target.value }))} placeholder="CC-XXXX" /></div>
           </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* ─── Section 6: Donor Funding ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b pb-2">
-            <DollarSign className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">Donor Funding</h3>
-          </div>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3 pt-4 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-primary" />
+              Donor Funding
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
           <div className="flex items-center gap-3">
             <Switch checked={wizardForm.isDonorFunded} onCheckedChange={v => setWizardForm(f => ({ ...f, isDonorFunded: v }))} />
             <Label className="text-xs">This is a donor-funded asset</Label>
@@ -1840,43 +1881,56 @@ export function FixedAssetsModule() {
               <div className="md:col-span-2"><Label className="text-xs font-medium">Restrictions</Label><Textarea className="mt-1" value={wizardForm.donorRestrictions} onChange={e => setWizardForm(f => ({ ...f, donorRestrictions: e.target.value }))} placeholder="Any donor restrictions on disposal/transfer" rows={2} /></div>
             </div>
           )}
-        </div>
+          </CardContent>
+        </Card>
 
         {/* ─── Section 7: Insurance & Warranty ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b pb-2">
-            <Shield className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">Insurance & Warranty</h3>
-          </div>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3 pt-4 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Shield className="h-4 w-4 text-primary" />
+              Insurance &amp; Warranty
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div><Label className="text-xs font-medium">Insurance Value (PKR)</Label><Input className="mt-1" type="number" value={wizardForm.insuranceValue || ''} onChange={e => setWizardForm(f => ({ ...f, insuranceValue: parseFloat(e.target.value) || 0 }))} /></div>
             <div><Label className="text-xs font-medium">Policy Number</Label><Input className="mt-1" value={wizardForm.insurancePolicyNumber} onChange={e => setWizardForm(f => ({ ...f, insurancePolicyNumber: e.target.value }))} /></div>
             <div><Label className="text-xs font-medium">Insurance Expiry</Label><Input className="mt-1" type="date" value={wizardForm.insuranceExpiryDate} onChange={e => setWizardForm(f => ({ ...f, insuranceExpiryDate: e.target.value }))} /></div>
             <div><Label className="text-xs font-medium">Warranty Expiry</Label><Input className="mt-1" type="date" value={wizardForm.warrantyExpiryDate} onChange={e => setWizardForm(f => ({ ...f, warrantyExpiryDate: e.target.value }))} /></div>
           </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* ─── Section 8: GL Mapping ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b pb-2">
-            <Landmark className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">GL Account Mapping</h3>
-          </div>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3 pt-4 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Landmark className="h-4 w-4 text-primary" />
+              GL Account Mapping
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div><Label className="text-[10px] text-muted-foreground">Asset Account</Label><Input className="mt-1 text-xs" value={wizardForm.glAssetAccount} onChange={e => setWizardForm(f => ({ ...f, glAssetAccount: e.target.value }))} placeholder="Auto-assigned" /></div>
             <div><Label className="text-[10px] text-muted-foreground">Acc. Dep. Account</Label><Input className="mt-1 text-xs" value={wizardForm.glAccDepAccount} onChange={e => setWizardForm(f => ({ ...f, glAccDepAccount: e.target.value }))} placeholder="Auto-assigned" /></div>
             <div><Label className="text-[10px] text-muted-foreground">Dep. Expense Account</Label><Input className="mt-1 text-xs" value={wizardForm.glDepExpAccount} onChange={e => setWizardForm(f => ({ ...f, glDepExpAccount: e.target.value }))} placeholder="Auto-assigned" /></div>
           </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* ─── Section 9: Notes ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b pb-2">
-            <FileText className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">Additional Notes</h3>
-          </div>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3 pt-4 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <FileText className="h-4 w-4 text-primary" />
+              Additional Notes
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
           <Textarea value={wizardForm.notes} onChange={e => setWizardForm(f => ({ ...f, notes: e.target.value }))} placeholder="Any additional notes about this asset" rows={3} />
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Bottom spacer for sticky bar */}
         <div className="h-20" />
