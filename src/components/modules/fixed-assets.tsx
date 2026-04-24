@@ -909,7 +909,7 @@ export function FixedAssetsModule() {
     try {
       const isNoDep = wizardForm.isDonorFunded || wizardForm.category === 'Land' || wizardForm.depreciationMethod === 'None'
 
-      // Build a clean payload with proper types (no NaN or empty strings for required fields)
+      // Build a clean payload with proper types
       const payload = {
         name: wizardForm.name.trim(),
         description: wizardForm.description?.trim() || '',
@@ -963,20 +963,37 @@ export function FixedAssetsModule() {
       const url = editMode && editingAssetId ? `/api/fams/assets/${editingAssetId}` : '/api/fams/assets'
       const method = editMode ? 'PUT' : 'POST'
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}: ${res.statusText}` }))
-        console.error('[FAMS] Asset creation failed:', errData)
-        toast({ title: 'Error Creating Asset', description: errData.error || `Failed with status ${res.status}`, variant: 'destructive' })
+      let res: Response
+      try {
+        res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+      } catch (fetchError) {
+        console.error('[FAMS] Network error during asset creation:', fetchError)
+        toast({ title: 'Network Error', description: 'Could not connect to the server. Please check your connection and try again.', variant: 'destructive' })
         return
       }
 
-      const assetData = await res.json()
+      // Safely parse the response body
+      let responseBody: Record<string, unknown>
+      try {
+        responseBody = await res.json()
+      } catch {
+        console.error('[FAMS] Failed to parse API response. Status:', res.status, res.statusText)
+        toast({ title: 'Server Error', description: `Server returned an invalid response (HTTP ${res.status}). Please try again.`, variant: 'destructive' })
+        return
+      }
+
+      if (!res.ok) {
+        const errorMessage = (responseBody.error as string) || (responseBody.message as string) || `Failed with status ${res.status}`
+        console.error('[FAMS] Asset creation failed:', responseBody)
+        toast({ title: 'Error Creating Asset', description: errorMessage, variant: 'destructive' })
+        return
+      }
+
+      const assetData = responseBody as Record<string, unknown>
       console.log('[FAMS] Asset created successfully:', assetData.assetId)
 
       // If submitting (not draft), also create a draft voucher in the accounting module
@@ -984,7 +1001,7 @@ export function FixedAssetsModule() {
         try {
           // Use the COA account ID we already have from the dropdown, or look it up
           let assetAccountId = wizardForm.categoryAccountId || ''
-          
+
           // If no COA ID stored, look up by search
           if (!assetAccountId) {
             const glMap = GL_CATEGORY_MAP[wizardForm.category] || { asset: '1545', accDep: '1670', depExp: '5670' }
@@ -1035,8 +1052,8 @@ export function FixedAssetsModule() {
               isAssetPosted: true,
               financialYearId,
               entries: [
-                { accountId: assetAccountId, debit: Number(wizardForm.purchasePrice), credit: 0, description: `Dr. ${wizardForm.category} Asset — ${wizardForm.name}`, assetRef: assetData.assetId || '' },
-                { accountId: bankAccountId, debit: 0, credit: Number(wizardForm.purchasePrice), description: `Cr. Bank — ${wizardForm.supplierName || 'Payment for asset'}`, assetRef: assetData.assetId || '' },
+                { accountId: assetAccountId, debit: Number(wizardForm.purchasePrice), credit: 0, description: `Dr. ${wizardForm.category} Asset — ${wizardForm.name}`, assetRef: assetData.assetId as string || '' },
+                { accountId: bankAccountId, debit: 0, credit: Number(wizardForm.purchasePrice), description: `Cr. Bank — ${wizardForm.supplierName || 'Payment for asset'}`, assetRef: assetData.assetId as string || '' },
               ],
             }
             console.log('[FAMS] Submitting Voucher Payload:', JSON.stringify(voucherPayload, null, 2))
@@ -1054,7 +1071,7 @@ export function FixedAssetsModule() {
               const voucherErr = await voucherRes.json().catch(() => ({ error: `HTTP ${voucherRes.status}` }))
               console.error('[FAMS] Draft voucher creation failed:', voucherErr)
               // Show a warning toast but don't fail the whole save — asset is already saved
-              toast({ title: 'Warning', description: `Asset saved but draft voucher failed: ${voucherErr.error || 'Unknown error'}`, variant: 'destructive' })
+              toast({ title: 'Warning', description: `Asset saved but draft voucher failed: ${(voucherErr as Record<string, unknown>).error || 'Unknown error'}`, variant: 'destructive' })
             }
           } else {
             console.warn('[FAMS] Cannot create voucher - missing required IDs:', { assetAccountId, bankAccountId, financialYearId })
@@ -1762,315 +1779,462 @@ export function FixedAssetsModule() {
 
   // ─── Render: Registration Form (Single-Page) ───────────────────────────────
 
-  const isFormValid = !!(wizardForm.name && wizardForm.category && wizardForm.purchasePrice > 0)
+  const isFormValid = !!(wizardForm.name && wizardForm.category && wizardForm.purchasePrice > 0 && wizardForm.dateOfPurchase)
 
   const renderRegistrationForm = () => {
     const isNoDep = wizardForm.isDonorFunded || wizardForm.category === 'Land' || wizardForm.depreciationMethod === 'None'
     const fbrRate = FBR_RATES[wizardForm.category] ?? 10
 
-    return (
-      <div className="space-y-6">
-        {/* ─── Section 1: Basic Asset Information ─── */}
-        <Card className="shadow-sm">
-          <CardHeader className="pb-3 pt-4 px-4">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Package className="h-4 w-4 text-primary" />
-              Basic Asset Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <Label className="text-xs font-medium">Asset Name <span className="text-red-500">*</span></Label>
-              <Input className="mt-1" value={wizardForm.name} onChange={e => setWizardForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g., Dell Latitude 5520 Laptop" />
-            </div>
-            <div>
-              <Label className="text-xs font-medium">Asset Tag - Manual</Label>
-              <Input className="mt-1" value={wizardForm.assetTag} onChange={e => setWizardForm(f => ({ ...f, assetTag: e.target.value }))} placeholder="e.g., FA-IT-2024-001" />
-            </div>
-            <div>
-              <Label className="text-xs font-medium">Category <span className="text-red-500">*</span></Label>
-              <Select value={wizardForm.category} onValueChange={v => {
-                // Find the COA entry for this category to get the account ID
-                const coaEntry = coaCategories.find(c => c.category === v)
-                const glMap = GL_CATEGORY_MAP[v] || { asset: '1545', accDep: '1670', depExp: '5670' }
-                setWizardForm(f => ({ 
-                  ...f, 
-                  category: v,
-                  categoryAccountId: coaEntry?.id || '',
-                  glAssetAccount: glMap.asset,
-                  glAccDepAccount: glMap.accDep || '',
-                  glDepExpAccount: glMap.depExp || '',
-                }))
-              }}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder={coaCategories.length > 0 ? "Select from Chart of Accounts" : "Select category"} /></SelectTrigger>
-                <SelectContent className="max-h-64">
-                  {coaCategories.length > 0
-                    ? coaCategories.map(c => (
-                      <SelectItem key={c.id || c.code} value={c.category}>
-                        <span className="font-mono text-muted-foreground mr-1">{c.code}</span> {c.name}
-                      </SelectItem>
-                    ))
-                    : ASSET_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)
-                  }
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs font-medium">Purchase Date <span className="text-red-500">*</span></Label>
-              <Input className="mt-1" type="date" value={wizardForm.dateOfPurchase} onChange={e => setWizardForm(f => ({ ...f, dateOfPurchase: e.target.value, dateOfCapitalization: f.dateOfCapitalization || e.target.value }))} />
-            </div>
-            <div>
-              <Label className="text-xs font-medium">Cost / Purchase Price (PKR) <span className="text-red-500">*</span></Label>
-              <Input className="mt-1" type="number" value={wizardForm.purchasePrice || ''} onChange={e => setWizardForm(f => ({ ...f, purchasePrice: parseFloat(e.target.value) || 0 }))} placeholder="0" />
-            </div>
+    // Section header component for consistent styling
+    const SectionHeader = ({ icon, title, description, step }: { icon: React.ReactNode; title: string; description: string; step: number }) => (
+      <div className="flex items-start gap-3 mb-4">
+        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary font-bold text-sm shrink-0">
+          {step}
+        </div>
+        <div className="pt-0.5">
+          <div className="flex items-center gap-2">
+            {icon}
+            <h3 className="text-sm font-semibold">{title}</h3>
           </div>
-          {wizardForm.category && (
-            <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50 text-xs text-muted-foreground">
-              {getCategoryIcon(wizardForm.category)}
-              <span>Auto-generated Asset ID: AST-{new Date().getFullYear()}-XXXX | FBR Rate: {fbrRate}%</span>
+          <p className="text-[11px] text-muted-foreground mt-0.5">{description}</p>
+        </div>
+      </div>
+    )
+
+    // Form field wrapper for consistent spacing
+    const Field = ({ label, required, children, colSpan }: { label: string; required?: boolean; children: React.ReactNode; colSpan?: boolean }) => (
+      <div className={colSpan ? 'md:col-span-2' : ''}>
+        <Label className="text-xs font-medium text-foreground/80 mb-1.5 block">
+          {label} {required && <span className="text-red-500">*</span>}
+        </Label>
+        {children}
+      </div>
+    )
+
+    return (
+      <div className="space-y-5">
+        {/* ─── Section 1: Basic Asset Information ─── */}
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="px-5 pt-4 pb-1">
+            <SectionHeader
+              step={1}
+              icon={<Package className="h-4 w-4 text-primary" />}
+              title="Basic Asset Information"
+              description="Core identification and acquisition details"
+            />
+          </div>
+          <div className="px-5 pb-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
+              <Field label="Asset Name" required colSpan>
+                <Input
+                  className="h-9"
+                  value={wizardForm.name}
+                  onChange={e => setWizardForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="e.g., Dell Latitude 5520 Laptop"
+                />
+              </Field>
+              <Field label="Asset Tag (Manual)">
+                <Input
+                  className="h-9"
+                  value={wizardForm.assetTag}
+                  onChange={e => setWizardForm(f => ({ ...f, assetTag: e.target.value }))}
+                  placeholder="e.g., FA-IT-2024-001"
+                />
+              </Field>
+              <Field label="Category" required>
+                <Select value={wizardForm.category} onValueChange={v => {
+                  const coaEntry = coaCategories.find(c => c.category === v)
+                  const glMap = GL_CATEGORY_MAP[v] || { asset: '1545', accDep: '1670', depExp: '5670' }
+                  setWizardForm(f => ({
+                    ...f,
+                    category: v,
+                    categoryAccountId: coaEntry?.id || '',
+                    glAssetAccount: glMap.asset,
+                    glAccDepAccount: glMap.accDep || '',
+                    glDepExpAccount: glMap.depExp || '',
+                  }))
+                }}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder={coaCategories.length > 0 ? "Select from COA" : "Select category"} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    {coaCategories.length > 0
+                      ? coaCategories.map(c => (
+                        <SelectItem key={c.id || c.code} value={c.category}>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-muted-foreground text-[11px]">{c.code}</span>
+                            <span>{c.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                      : ASSET_CATEGORIES.map(c => (
+                        <SelectItem key={c} value={c}>
+                          <div className="flex items-center gap-2">{getCategoryIcon(c)}{c}</div>
+                        </SelectItem>
+                      ))
+                    }
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Purchase Date" required>
+                <Input
+                  className="h-9"
+                  type="date"
+                  value={wizardForm.dateOfPurchase}
+                  onChange={e => setWizardForm(f => ({ ...f, dateOfPurchase: e.target.value, dateOfCapitalization: f.dateOfCapitalization || e.target.value }))}
+                />
+              </Field>
+              <Field label="Date of Capitalization">
+                <Input
+                  className="h-9"
+                  type="date"
+                  value={wizardForm.dateOfCapitalization}
+                  onChange={e => setWizardForm(f => ({ ...f, dateOfCapitalization: e.target.value }))}
+                />
+              </Field>
+              <Field label="Cost / Purchase Price (PKR)" required>
+                <Input
+                  className="h-9"
+                  type="number"
+                  value={wizardForm.purchasePrice || ''}
+                  onChange={e => setWizardForm(f => ({ ...f, purchasePrice: parseFloat(e.target.value) || 0 }))}
+                  placeholder="0"
+                />
+              </Field>
             </div>
-          )}
-          </CardContent>
-        </Card>
+            {wizardForm.category && (
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-primary/5 border border-primary/10 text-xs mt-3">
+                {getCategoryIcon(wizardForm.category)}
+                <span className="text-primary font-medium">Auto Asset ID:</span>
+                <span className="text-muted-foreground">AST-{new Date().getFullYear()}-XXXX</span>
+                <Separator orientation="vertical" className="h-3 mx-1" />
+                <span className="text-primary font-medium">FBR Rate:</span>
+                <span className="text-muted-foreground">{fbrRate}%</span>
+                <Separator orientation="vertical" className="h-3 mx-1" />
+                <span className="text-primary font-medium">GL Asset:</span>
+                <span className="text-muted-foreground font-mono">{wizardForm.glAssetAccount || '—'}</span>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* ─── Section 2: Asset Specifications ─── */}
-        <Card className="shadow-sm">
-          <CardHeader className="pb-3 pt-4 px-4">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Cog className="h-4 w-4 text-primary" />
-              Asset Specifications
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label className="text-xs font-medium">Make</Label>
-              <Input className="mt-1" value={wizardForm.make} onChange={e => setWizardForm(f => ({ ...f, make: e.target.value }))} placeholder="e.g., Toyota, Dell, HP" />
-            </div>
-            <div>
-              <Label className="text-xs font-medium">Model</Label>
-              <Input className="mt-1" value={wizardForm.model} onChange={e => setWizardForm(f => ({ ...f, model: e.target.value }))} placeholder="e.g., Corolla, Latitude 5520" />
-            </div>
-            <div>
-              <Label className="text-xs font-medium">Model Year</Label>
-              <Input className="mt-1" type="number" value={wizardForm.modelYear || ''} onChange={e => setWizardForm(f => ({ ...f, modelYear: parseInt(e.target.value) || new Date().getFullYear() }))} placeholder="e.g., 2024" />
-            </div>
-            <div>
-              <Label className="text-xs font-medium">Asset Condition <span className="text-red-500">*</span></Label>
-              <Select value={wizardForm.condition} onValueChange={v => setWizardForm(f => ({ ...f, condition: v }))}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {CONDITIONS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs font-medium">Serial Number</Label>
-              <Input className="mt-1" value={wizardForm.serialNumber} onChange={e => setWizardForm(f => ({ ...f, serialNumber: e.target.value }))} placeholder="SN-XXXX" />
-            </div>
-            <div>
-              <Label className="text-xs font-medium">Sub-Category</Label>
-              <Input className="mt-1" value={wizardForm.subCategory} onChange={e => setWizardForm(f => ({ ...f, subCategory: e.target.value }))} placeholder="Optional sub-classification" />
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="px-5 pt-4 pb-1">
+            <SectionHeader
+              step={2}
+              icon={<Cog className="h-4 w-4 text-primary" />}
+              title="Asset Specifications"
+              description="Physical attributes and identification details"
+            />
+          </div>
+          <div className="px-5 pb-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
+              <Field label="Make / Manufacturer">
+                <Input className="h-9" value={wizardForm.make} onChange={e => setWizardForm(f => ({ ...f, make: e.target.value }))} placeholder="e.g., Toyota, Dell, HP" />
+              </Field>
+              <Field label="Model">
+                <Input className="h-9" value={wizardForm.model} onChange={e => setWizardForm(f => ({ ...f, model: e.target.value }))} placeholder="e.g., Corolla, Latitude 5520" />
+              </Field>
+              <Field label="Model Year">
+                <Input className="h-9" type="number" value={wizardForm.modelYear || ''} onChange={e => setWizardForm(f => ({ ...f, modelYear: parseInt(e.target.value) || new Date().getFullYear() }))} placeholder="e.g., 2024" />
+              </Field>
+              <Field label="Asset Condition" required>
+                <Select value={wizardForm.condition} onValueChange={v => setWizardForm(f => ({ ...f, condition: v }))}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CONDITIONS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Serial Number">
+                <Input className="h-9" value={wizardForm.serialNumber} onChange={e => setWizardForm(f => ({ ...f, serialNumber: e.target.value }))} placeholder="SN-XXXX" />
+              </Field>
+              <Field label="Sub-Category">
+                <Input className="h-9" value={wizardForm.subCategory} onChange={e => setWizardForm(f => ({ ...f, subCategory: e.target.value }))} placeholder="Optional sub-classification" />
+              </Field>
+              <Field label="Description" colSpan>
+                <Textarea
+                  className="min-h-[60px] resize-none"
+                  value={wizardForm.description}
+                  onChange={e => setWizardForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="Brief description of the asset"
+                  rows={2}
+                />
+              </Field>
             </div>
           </div>
-          </CardContent>
-        </Card>
+        </div>
 
         {/* ─── Section 3: Procurement & Reference Details ─── */}
-        <Card className="shadow-sm">
-          <CardHeader className="pb-3 pt-4 px-4">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <FileText className="h-4 w-4 text-primary" />
-              Procurement &amp; Reference Details
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label className="text-xs font-medium">Prior Approval No.</Label>
-              <Input className="mt-1" value={wizardForm.priorApprovalNo} onChange={e => setWizardForm(f => ({ ...f, priorApprovalNo: e.target.value }))} placeholder="e.g., PA-2024-001" />
-            </div>
-            <div>
-              <Label className="text-xs font-medium">Purchase Order No.</Label>
-              <Input className="mt-1" value={wizardForm.purchaseOrderNo} onChange={e => setWizardForm(f => ({ ...f, purchaseOrderNo: e.target.value }))} placeholder="e.g., PO-2024-001" />
-            </div>
-            <div>
-              <Label className="text-xs font-medium">Receipt Voucher No.</Label>
-              <Input className="mt-1" value={wizardForm.receiptVoucherNo} onChange={e => setWizardForm(f => ({ ...f, receiptVoucherNo: e.target.value }))} placeholder="e.g., RV-2024-001" />
-            </div>
-            <div>
-              <Label className="text-xs font-medium">Check Register No.</Label>
-              <Input className="mt-1" value={wizardForm.checkRegisterNo} onChange={e => setWizardForm(f => ({ ...f, checkRegisterNo: e.target.value }))} placeholder="e.g., CR-2024-001" />
-            </div>
-            <div>
-              <Label className="text-xs font-medium">Stock Register Page No.</Label>
-              <Input className="mt-1" value={wizardForm.stockRegisterPageNo} onChange={e => setWizardForm(f => ({ ...f, stockRegisterPageNo: e.target.value }))} placeholder="e.g., SR-P42" />
-            </div>
-            <div>
-              <Label className="text-xs font-medium">Invoice Number</Label>
-              <Input className="mt-1" value={wizardForm.invoiceNumber} onChange={e => setWizardForm(f => ({ ...f, invoiceNumber: e.target.value }))} placeholder="INV-XXXX" />
-            </div>
-            <div>
-              <Label className="text-xs font-medium">Supplier Name</Label>
-              <Input className="mt-1" value={wizardForm.supplierName} onChange={e => setWizardForm(f => ({ ...f, supplierName: e.target.value }))} placeholder="Supplier or vendor name" />
-            </div>
-            <div>
-              <Label className="text-xs font-medium">Supplier NTN</Label>
-              <Input className="mt-1" value={wizardForm.supplierNTN} onChange={e => setWizardForm(f => ({ ...f, supplierNTN: e.target.value }))} placeholder="National Tax Number" />
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="px-5 pt-4 pb-1">
+            <SectionHeader
+              step={3}
+              icon={<FileText className="h-4 w-4 text-primary" />}
+              title="Procurement & Reference Details"
+              description="Purchase documentation and supplier information"
+            />
+          </div>
+          <div className="px-5 pb-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
+              <Field label="Prior Approval No.">
+                <Input className="h-9" value={wizardForm.priorApprovalNo} onChange={e => setWizardForm(f => ({ ...f, priorApprovalNo: e.target.value }))} placeholder="PA-2024-001" />
+              </Field>
+              <Field label="Purchase Order No.">
+                <Input className="h-9" value={wizardForm.purchaseOrderNo} onChange={e => setWizardForm(f => ({ ...f, purchaseOrderNo: e.target.value }))} placeholder="PO-2024-001" />
+              </Field>
+              <Field label="Invoice Number">
+                <Input className="h-9" value={wizardForm.invoiceNumber} onChange={e => setWizardForm(f => ({ ...f, invoiceNumber: e.target.value }))} placeholder="INV-XXXX" />
+              </Field>
+              <Field label="Receipt Voucher No.">
+                <Input className="h-9" value={wizardForm.receiptVoucherNo} onChange={e => setWizardForm(f => ({ ...f, receiptVoucherNo: e.target.value }))} placeholder="RV-2024-001" />
+              </Field>
+              <Field label="Check Register No.">
+                <Input className="h-9" value={wizardForm.checkRegisterNo} onChange={e => setWizardForm(f => ({ ...f, checkRegisterNo: e.target.value }))} placeholder="CR-2024-001" />
+              </Field>
+              <Field label="Stock Register Page No.">
+                <Input className="h-9" value={wizardForm.stockRegisterPageNo} onChange={e => setWizardForm(f => ({ ...f, stockRegisterPageNo: e.target.value }))} placeholder="SR-P42" />
+              </Field>
+              <Field label="Supplier Name">
+                <Input className="h-9" value={wizardForm.supplierName} onChange={e => setWizardForm(f => ({ ...f, supplierName: e.target.value }))} placeholder="Supplier or vendor name" />
+              </Field>
+              <Field label="Supplier NTN">
+                <Input className="h-9" value={wizardForm.supplierNTN} onChange={e => setWizardForm(f => ({ ...f, supplierNTN: e.target.value }))} placeholder="National Tax Number" />
+              </Field>
             </div>
           </div>
-          </CardContent>
-        </Card>
+        </div>
 
         {/* ─── Section 4: Depreciation Setup ─── */}
-        <Card className="shadow-sm">
-          <CardHeader className="pb-3 pt-4 px-4">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-primary" />
-              Depreciation Setup
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-          {isNoDep ? (
-            <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50">
-              <Info className="h-4 w-4 text-sky-600" />
-              <div>
-                <p className="text-xs font-medium">No Depreciation</p>
-                <p className="text-[10px] text-muted-foreground">{wizardForm.category === 'Land' ? 'Land is not depreciated per accounting standards.' : wizardForm.isDonorFunded ? 'Donor-funded assets are not depreciated.' : 'Depreciation is disabled for this asset.'}</p>
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="px-5 pt-4 pb-1">
+            <SectionHeader
+              step={4}
+              icon={<TrendingDown className="h-4 w-4 text-primary" />}
+              title="Depreciation Setup"
+              description="Method, useful life, and residual value configuration"
+            />
+          </div>
+          <div className="px-5 pb-5">
+            {isNoDep ? (
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-sky-50 border border-sky-200">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-sky-100">
+                  <Info className="h-4 w-4 text-sky-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-sky-900">No Depreciation</p>
+                  <p className="text-[11px] text-sky-700 mt-0.5">
+                    {wizardForm.category === 'Land'
+                      ? 'Land is not depreciated per accounting standards.'
+                      : wizardForm.isDonorFunded
+                        ? 'Donor-funded assets are not depreciated.'
+                        : 'Depreciation is disabled for this asset.'}
+                  </p>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs font-medium">Depreciation Method</Label>
-                <Select value={wizardForm.depreciationMethod} onValueChange={v => setWizardForm(f => ({ ...f, depreciationMethod: v }))}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>{DEP_METHODS.filter(m => m !== 'None').map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              {wizardForm.depreciationMethod === 'Straight-Line' && (
-                <>
-                  <div><Label className="text-xs font-medium">Useful Life (Years)</Label><Input className="mt-1" type="number" value={wizardForm.usefulLifeYears || ''} onChange={e => setWizardForm(f => ({ ...f, usefulLifeYears: parseInt(e.target.value) || 0 }))} /></div>
-                  <div><Label className="text-xs font-medium">Residual Value (PKR)</Label><Input className="mt-1" type="number" value={wizardForm.residualValue || ''} onChange={e => setWizardForm(f => ({ ...f, residualValue: parseFloat(e.target.value) || 0 }))} /></div>
-                </>
-              )}
-              {wizardForm.depreciationMethod === 'Declining-Balance' && (
-                <>
-                  <div><Label className="text-xs font-medium">Declining Rate (%)</Label><Input className="mt-1" type="number" value={wizardForm.decliningRate || ''} onChange={e => setWizardForm(f => ({ ...f, decliningRate: parseFloat(e.target.value) || 0 }))} /></div>
-                  <div><Label className="text-xs font-medium">Residual Value (PKR)</Label><Input className="mt-1" type="number" value={wizardForm.residualValue || ''} onChange={e => setWizardForm(f => ({ ...f, residualValue: parseFloat(e.target.value) || 0 }))} /></div>
-                </>
-              )}
-            </div>
-          )}
-          {wizardForm.purchasePrice > 0 && depCalculation.annual > 0 && !isNoDep && (
-            <div className="p-3 rounded-md bg-muted/50 space-y-1">
-              <p className="text-xs font-medium">Depreciation Preview</p>
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <div><span className="text-muted-foreground">Annual:</span> {pkr(depCalculation.annual)}</div>
-                <div><span className="text-muted-foreground">Monthly:</span> {pkr(depCalculation.monthly)}</div>
-                <div><span className="text-muted-foreground">Total:</span> {pkr(depCalculation.totalDep)}</div>
-              </div>
-            </div>
-          )}
-          </CardContent>
-        </Card>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
+                  <Field label="Depreciation Method">
+                    <Select value={wizardForm.depreciationMethod} onValueChange={v => setWizardForm(f => ({ ...f, depreciationMethod: v }))}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>{DEP_METHODS.filter(m => m !== 'None').map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </Field>
+                  {wizardForm.depreciationMethod === 'Straight-Line' && (
+                    <>
+                      <Field label="Useful Life (Years)">
+                        <Input className="h-9" type="number" value={wizardForm.usefulLifeYears || ''} onChange={e => setWizardForm(f => ({ ...f, usefulLifeYears: parseInt(e.target.value) || 0 }))} placeholder="5" />
+                      </Field>
+                      <Field label="Residual Value (PKR)">
+                        <Input className="h-9" type="number" value={wizardForm.residualValue || ''} onChange={e => setWizardForm(f => ({ ...f, residualValue: parseFloat(e.target.value) || 0 }))} placeholder="0" />
+                      </Field>
+                    </>
+                  )}
+                  {wizardForm.depreciationMethod === 'Declining-Balance' && (
+                    <>
+                      <Field label="Declining Rate (%)">
+                        <Input className="h-9" type="number" value={wizardForm.decliningRate || ''} onChange={e => setWizardForm(f => ({ ...f, decliningRate: parseFloat(e.target.value) || 0 }))} placeholder="20" />
+                      </Field>
+                      <Field label="Residual Value (PKR)">
+                        <Input className="h-9" type="number" value={wizardForm.residualValue || ''} onChange={e => setWizardForm(f => ({ ...f, residualValue: parseFloat(e.target.value) || 0 }))} placeholder="0" />
+                      </Field>
+                    </>
+                  )}
+                </div>
+                {wizardForm.purchasePrice > 0 && depCalculation.annual > 0 && (
+                  <div className="grid grid-cols-3 gap-3 mt-4">
+                    <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-center">
+                      <p className="text-[10px] text-emerald-600 font-medium uppercase tracking-wider">Annual</p>
+                      <p className="text-sm font-bold text-emerald-900 mt-0.5">{pkr(depCalculation.annual)}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-sky-50 border border-sky-200 text-center">
+                      <p className="text-[10px] text-sky-600 font-medium uppercase tracking-wider">Monthly</p>
+                      <p className="text-sm font-bold text-sky-900 mt-0.5">{pkr(depCalculation.monthly)}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-center">
+                      <p className="text-[10px] text-amber-600 font-medium uppercase tracking-wider">Total Dep.</p>
+                      <p className="text-sm font-bold text-amber-900 mt-0.5">{pkr(depCalculation.totalDep)}</p>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
 
         {/* ─── Section 5: Location & Custodian ─── */}
-        <Card className="shadow-sm">
-          <CardHeader className="pb-3 pt-4 px-4">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-primary" />
-              Location &amp; Custodian
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div><Label className="text-xs font-medium">Location</Label><Input className="mt-1" value={wizardForm.location} onChange={e => setWizardForm(f => ({ ...f, location: e.target.value }))} placeholder="e.g., Head Office" /></div>
-            <div>
-              <Label className="text-xs font-medium">Province</Label>
-              <Select value={wizardForm.province} onValueChange={v => setWizardForm(f => ({ ...f, province: v }))}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>{PROVINCES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div><Label className="text-xs font-medium">Custodian</Label><Input className="mt-1" value={wizardForm.custodian} onChange={e => setWizardForm(f => ({ ...f, custodian: e.target.value }))} placeholder="Person responsible" /></div>
-            <div><Label className="text-xs font-medium">Cost Center</Label><Input className="mt-1" value={wizardForm.costCenter} onChange={e => setWizardForm(f => ({ ...f, costCenter: e.target.value }))} placeholder="CC-XXXX" /></div>
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="px-5 pt-4 pb-1">
+            <SectionHeader
+              step={5}
+              icon={<MapPin className="h-4 w-4 text-primary" />}
+              title="Location & Custodian"
+              description="Where the asset is located and who is responsible"
+            />
           </div>
-          </CardContent>
-        </Card>
+          <div className="px-5 pb-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
+              <Field label="Location">
+                <Input className="h-9" value={wizardForm.location} onChange={e => setWizardForm(f => ({ ...f, location: e.target.value }))} placeholder="e.g., Head Office, Peshawar" />
+              </Field>
+              <Field label="Province">
+                <Select value={wizardForm.province} onValueChange={v => setWizardForm(f => ({ ...f, province: v }))}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>{PROVINCES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                </Select>
+              </Field>
+              <Field label="Custodian">
+                <Input className="h-9" value={wizardForm.custodian} onChange={e => setWizardForm(f => ({ ...f, custodian: e.target.value }))} placeholder="Person responsible" />
+              </Field>
+              <Field label="Cost Center">
+                <Input className="h-9" value={wizardForm.costCenter} onChange={e => setWizardForm(f => ({ ...f, costCenter: e.target.value }))} placeholder="CC-XXXX" />
+              </Field>
+              <Field label="Project">
+                <Input className="h-9" value={wizardForm.project} onChange={e => setWizardForm(f => ({ ...f, project: e.target.value }))} placeholder="Project code" />
+              </Field>
+              <Field label="Fund Code">
+                <Input className="h-9" value={wizardForm.fundCode} onChange={e => setWizardForm(f => ({ ...f, fundCode: e.target.value }))} placeholder="Fund code" />
+              </Field>
+            </div>
+          </div>
+        </div>
 
         {/* ─── Section 6: Donor Funding ─── */}
-        <Card className="shadow-sm">
-          <CardHeader className="pb-3 pt-4 px-4">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-primary" />
-              Donor Funding
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-          <div className="flex items-center gap-3">
-            <Switch checked={wizardForm.isDonorFunded} onCheckedChange={v => setWizardForm(f => ({ ...f, isDonorFunded: v }))} />
-            <Label className="text-xs">This is a donor-funded asset</Label>
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="px-5 pt-4 pb-1">
+            <SectionHeader
+              step={6}
+              icon={<DollarSign className="h-4 w-4 text-primary" />}
+              title="Donor Funding"
+              description="Mark if donor-funded and provide donor details"
+            />
           </div>
-          {wizardForm.isDonorFunded && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div><Label className="text-xs font-medium">Donor Name</Label><Input className="mt-1" value={wizardForm.donor} onChange={e => setWizardForm(f => ({ ...f, donor: e.target.value }))} placeholder="e.g., USAID, DFID" /></div>
-              <div><Label className="text-xs font-medium">Grant Reference</Label><Input className="mt-1" value={wizardForm.grantReference} onChange={e => setWizardForm(f => ({ ...f, grantReference: e.target.value }))} placeholder="GRANT-XXXX" /></div>
-              <div><Label className="text-xs font-medium">Donor Code</Label><Input className="mt-1" value={wizardForm.donorCode} onChange={e => setWizardForm(f => ({ ...f, donorCode: e.target.value }))} placeholder="DC-XXXX" /></div>
-              <div className="md:col-span-2"><Label className="text-xs font-medium">Restrictions</Label><Textarea className="mt-1" value={wizardForm.donorRestrictions} onChange={e => setWizardForm(f => ({ ...f, donorRestrictions: e.target.value }))} placeholder="Any donor restrictions on disposal/transfer" rows={2} /></div>
+          <div className="px-5 pb-5">
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border mb-4">
+              <Switch checked={wizardForm.isDonorFunded} onCheckedChange={v => setWizardForm(f => ({ ...f, isDonorFunded: v }))} />
+              <div>
+                <Label className="text-xs font-medium">Donor-Funded Asset</Label>
+                <p className="text-[10px] text-muted-foreground">If enabled, depreciation will be set to None</p>
+              </div>
             </div>
-          )}
-          </CardContent>
-        </Card>
+            {wizardForm.isDonorFunded && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
+                <Field label="Donor Name">
+                  <Input className="h-9" value={wizardForm.donor} onChange={e => setWizardForm(f => ({ ...f, donor: e.target.value }))} placeholder="e.g., USAID, DFID" />
+                </Field>
+                <Field label="Grant Reference">
+                  <Input className="h-9" value={wizardForm.grantReference} onChange={e => setWizardForm(f => ({ ...f, grantReference: e.target.value }))} placeholder="GRANT-XXXX" />
+                </Field>
+                <Field label="Donor Code">
+                  <Input className="h-9" value={wizardForm.donorCode} onChange={e => setWizardForm(f => ({ ...f, donorCode: e.target.value }))} placeholder="DC-XXXX" />
+                </Field>
+                <Field label="Restrictions" colSpan>
+                  <Textarea className="min-h-[60px] resize-none" value={wizardForm.donorRestrictions} onChange={e => setWizardForm(f => ({ ...f, donorRestrictions: e.target.value }))} placeholder="Any donor restrictions on disposal/transfer" rows={2} />
+                </Field>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* ─── Section 7: Insurance & Warranty ─── */}
-        <Card className="shadow-sm">
-          <CardHeader className="pb-3 pt-4 px-4">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Shield className="h-4 w-4 text-primary" />
-              Insurance &amp; Warranty
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div><Label className="text-xs font-medium">Insurance Value (PKR)</Label><Input className="mt-1" type="number" value={wizardForm.insuranceValue || ''} onChange={e => setWizardForm(f => ({ ...f, insuranceValue: parseFloat(e.target.value) || 0 }))} /></div>
-            <div><Label className="text-xs font-medium">Policy Number</Label><Input className="mt-1" value={wizardForm.insurancePolicyNumber} onChange={e => setWizardForm(f => ({ ...f, insurancePolicyNumber: e.target.value }))} /></div>
-            <div><Label className="text-xs font-medium">Insurance Expiry</Label><Input className="mt-1" type="date" value={wizardForm.insuranceExpiryDate} onChange={e => setWizardForm(f => ({ ...f, insuranceExpiryDate: e.target.value }))} /></div>
-            <div><Label className="text-xs font-medium">Warranty Expiry</Label><Input className="mt-1" type="date" value={wizardForm.warrantyExpiryDate} onChange={e => setWizardForm(f => ({ ...f, warrantyExpiryDate: e.target.value }))} /></div>
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="px-5 pt-4 pb-1">
+            <SectionHeader
+              step={7}
+              icon={<Shield className="h-4 w-4 text-primary" />}
+              title="Insurance & Warranty"
+              description="Coverage and warranty details for the asset"
+            />
           </div>
-          </CardContent>
-        </Card>
-
-        {/* ─── Section 8: GL Mapping ─── */}
-        <Card className="shadow-sm">
-          <CardHeader className="pb-3 pt-4 px-4">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Landmark className="h-4 w-4 text-primary" />
-              GL Account Mapping
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div><Label className="text-[10px] text-muted-foreground">Asset Account</Label><Input className="mt-1 text-xs" value={wizardForm.glAssetAccount} onChange={e => setWizardForm(f => ({ ...f, glAssetAccount: e.target.value }))} placeholder="Auto-assigned" /></div>
-            <div><Label className="text-[10px] text-muted-foreground">Acc. Dep. Account</Label><Input className="mt-1 text-xs" value={wizardForm.glAccDepAccount} onChange={e => setWizardForm(f => ({ ...f, glAccDepAccount: e.target.value }))} placeholder="Auto-assigned" /></div>
-            <div><Label className="text-[10px] text-muted-foreground">Dep. Expense Account</Label><Input className="mt-1 text-xs" value={wizardForm.glDepExpAccount} onChange={e => setWizardForm(f => ({ ...f, glDepExpAccount: e.target.value }))} placeholder="Auto-assigned" /></div>
+          <div className="px-5 pb-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
+              <Field label="Insurance Value (PKR)">
+                <Input className="h-9" type="number" value={wizardForm.insuranceValue || ''} onChange={e => setWizardForm(f => ({ ...f, insuranceValue: parseFloat(e.target.value) || 0 }))} placeholder="0" />
+              </Field>
+              <Field label="Policy Number">
+                <Input className="h-9" value={wizardForm.insurancePolicyNumber} onChange={e => setWizardForm(f => ({ ...f, insurancePolicyNumber: e.target.value }))} placeholder="POL-XXXX" />
+              </Field>
+              <Field label="Insurance Expiry">
+                <Input className="h-9" type="date" value={wizardForm.insuranceExpiryDate} onChange={e => setWizardForm(f => ({ ...f, insuranceExpiryDate: e.target.value }))} />
+              </Field>
+              <Field label="Warranty Expiry">
+                <Input className="h-9" type="date" value={wizardForm.warrantyExpiryDate} onChange={e => setWizardForm(f => ({ ...f, warrantyExpiryDate: e.target.value }))} />
+              </Field>
+            </div>
           </div>
-          </CardContent>
-        </Card>
+        </div>
 
-        {/* ─── Section 9: Notes ─── */}
-        <Card className="shadow-sm">
-          <CardHeader className="pb-3 pt-4 px-4">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <FileText className="h-4 w-4 text-primary" />
-              Additional Notes
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-          <Textarea value={wizardForm.notes} onChange={e => setWizardForm(f => ({ ...f, notes: e.target.value }))} placeholder="Any additional notes about this asset" rows={3} />
-          </CardContent>
-        </Card>
+        {/* ─── Section 8: GL Account Mapping ─── */}
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="px-5 pt-4 pb-1">
+            <SectionHeader
+              step={8}
+              icon={<Landmark className="h-4 w-4 text-primary" />}
+              title="GL Account Mapping"
+              description="General Ledger accounts auto-assigned based on category"
+            />
+          </div>
+          <div className="px-5 pb-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
+              <Field label="Asset Account">
+                <Input className="h-9 font-mono text-xs" value={wizardForm.glAssetAccount} onChange={e => setWizardForm(f => ({ ...f, glAssetAccount: e.target.value }))} placeholder="Auto-assigned" />
+              </Field>
+              <Field label="Acc. Dep. Account">
+                <Input className="h-9 font-mono text-xs" value={wizardForm.glAccDepAccount} onChange={e => setWizardForm(f => ({ ...f, glAccDepAccount: e.target.value }))} placeholder="Auto-assigned" />
+              </Field>
+              <Field label="Dep. Expense Account">
+                <Input className="h-9 font-mono text-xs" value={wizardForm.glDepExpAccount} onChange={e => setWizardForm(f => ({ ...f, glDepExpAccount: e.target.value }))} placeholder="Auto-assigned" />
+              </Field>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2 flex items-center gap-1">
+              <Info className="h-3 w-3" />
+              These accounts are automatically populated based on the selected category. You can override them if needed.
+            </p>
+          </div>
+        </div>
+
+        {/* ─── Section 9: Additional Notes ─── */}
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="px-5 pt-4 pb-1">
+            <SectionHeader
+              step={9}
+              icon={<FileText className="h-4 w-4 text-primary" />}
+              title="Additional Notes"
+              description="Any supplementary information about this asset"
+            />
+          </div>
+          <div className="px-5 pb-5">
+            <Textarea
+              className="min-h-[70px] resize-none"
+              value={wizardForm.notes}
+              onChange={e => setWizardForm(f => ({ ...f, notes: e.target.value }))}
+              placeholder="Any additional notes about this asset..."
+              rows={3}
+            />
+          </div>
+        </div>
 
         {/* Bottom spacer for sticky bar */}
         <div className="h-20" />
@@ -2913,24 +3077,31 @@ export function FixedAssetsModule() {
 
       {/* Registration Form Dialog */}
       <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
-        <DialogContent className="max-w-3xl max-h-[92vh] p-0 gap-0">
-          <DialogHeader className="px-6 pt-6 pb-3 border-b">
-            <DialogTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-primary" />
+        <DialogContent className="max-w-4xl max-h-[94vh] p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b bg-muted/30">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10">
+                <Package className="h-4 w-4 text-primary" />
+              </div>
               {editMode ? 'Edit Asset' : 'Fixed Asset Registration Form'}
             </DialogTitle>
-            <DialogDescription>
-              {editMode ? 'Update the asset details below' : 'Fill in the asset details to register and create a draft voucher'}
+            <DialogDescription className="text-xs mt-1">
+              {editMode ? 'Update the asset details below' : 'Fill in the asset details to register and create a draft voucher in the accounting system'}
             </DialogDescription>
           </DialogHeader>
-          <div className="px-6 py-4 overflow-y-auto" style={{ maxHeight: 'calc(92vh - 140px)' }}>
+          <div className="px-6 py-4 overflow-y-auto" style={{ maxHeight: 'calc(94vh - 140px)' }}>
             {renderRegistrationForm()}
           </div>
           {/* Sticky Bottom Action Bar */}
           <div className="sticky bottom-0 border-t bg-background px-6 py-3 flex items-center justify-between">
-            <Button variant="outline" onClick={() => setWizardOpen(false)} disabled={saving}>
-              <X className="h-4 w-4 mr-1" />Cancel
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setWizardOpen(false)} disabled={saving}>
+                <X className="h-4 w-4 mr-1" />Cancel
+              </Button>
+              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setWizardForm({ ...initialWizardForm }); fetchCoaCategories() }}>
+                <RotateCcw className="h-3.5 w-3.5 mr-1" />Reset Form
+              </Button>
+            </div>
             <div className="flex gap-2">
               {canCreate && (
                 <Button variant="outline" onClick={() => handleSaveAsset('draft')} disabled={saving || !isFormValid}>
@@ -2939,7 +3110,8 @@ export function FixedAssetsModule() {
               )}
               {canCreate && (
                 <Button onClick={() => handleSaveAsset('submit')} disabled={saving || !isFormValid}>
-                  <Send className="h-4 w-4 mr-1" />{saving ? 'Saving...' : 'Save & Create Draft Voucher'}
+                  {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
+                  {saving ? 'Saving...' : 'Save & Create Voucher'}
                 </Button>
               )}
             </div>

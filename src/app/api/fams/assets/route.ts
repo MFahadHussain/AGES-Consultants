@@ -117,13 +117,26 @@ export async function POST(request: NextRequest) {
         receiptVoucherNo: body.receiptVoucherNo || null,
         checkRegisterNo: body.checkRegisterNo || null,
         stockRegisterPageNo: body.stockRegisterPageNo || null,
+        assetTag: body.assetTag || null,
       },
     })
 
+    console.log('[FAMS] Asset created successfully:', asset.assetId, asset.id)
     return NextResponse.json(asset, { status: 201 })
   } catch (error) {
     console.error('FAMS Assets POST error:', error)
-    const message = error instanceof Error ? error.message : String(error)
+    let message = 'Unknown error'
+    if (error instanceof Error) {
+      message = error.message
+      // Prisma-specific error messages
+      if (message.includes('Unique constraint')) {
+        message = 'An asset with this ID already exists. Please try again.'
+      } else if (message.includes('required')) {
+        message = `Missing required field: ${message}`
+      }
+    } else {
+      message = String(error)
+    }
     return NextResponse.json({ error: `Failed to create asset: ${message}` }, { status: 500 })
   }
 }

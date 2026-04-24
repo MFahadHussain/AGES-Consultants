@@ -482,6 +482,7 @@ model FixedAsset {
   receiptVoucherNo      String?   // Receipt voucher reference
   checkRegisterNo       String?   // Check register reference
   stockRegisterPageNo   String?   // Stock register page number
+  assetTag              String?   // Manual asset tag identifier (e.g., FA-IT-2024-001)
   status                String   @default("Active") // Active, Disposed, Transferred, Under Maintenance, Written Off
   condition             String   @default("Good") // Excellent, Good, Fair, Poor
   insuranceValue        Float    @default(0)

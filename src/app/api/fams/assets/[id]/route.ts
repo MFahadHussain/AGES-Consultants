@@ -151,7 +151,7 @@ export async function PUT(
       // New registration form fields
       'make', 'model', 'modelYear',
       'priorApprovalNo', 'purchaseOrderNo', 'receiptVoucherNo',
-      'checkRegisterNo', 'stockRegisterPageNo',
+      'checkRegisterNo', 'stockRegisterPageNo', 'assetTag',
     ]
 
     for (const field of updatableFields) {
