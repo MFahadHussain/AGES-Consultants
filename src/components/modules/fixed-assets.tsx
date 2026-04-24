@@ -58,6 +58,19 @@ const GL_CATEGORY_MAP: Record<string, { asset: string; accDep: string; depExp: s
   'Other':             { asset: '1545', accDep: '1670', depExp: '5670' },
 }
 
+// Mapping from COA account names (exact match) to system category names used in FAMS
+const COA_NAME_TO_CATEGORY: Record<string, string> = {
+  'Land': 'Land',
+  'Buildings': 'Buildings',
+  'Vehicles': 'Vehicles',
+  'Furniture & Fixtures': 'Furniture',
+  'Office Equipment': 'Office Equipment',
+  'IT Assets': 'IT Assets',
+  'Machinery': 'Machinery',
+  'Other Fixed Assets': 'Other',
+  'Capital Work in Progress': 'Other',
+}
+
 // ─── PKR Utility ──────────────────────────────────────────────────────────────
 
 const pkr = (n: number) => new Intl.NumberFormat('en-PK', {
@@ -272,6 +285,7 @@ interface WizardForm {
   receiptVoucherNo: string
   checkRegisterNo: string
   stockRegisterPageNo: string
+  categoryAccountId: string  // COA account ID for voucher creation
 }
 
 const initialWizardForm: WizardForm = {
@@ -321,6 +335,7 @@ const initialWizardForm: WizardForm = {
   receiptVoucherNo: '',
   checkRegisterNo: '',
   stockRegisterPageNo: '',
+  categoryAccountId: '',
 }
 
 // ─── Category Icon Helper ─────────────────────────────────────────────────────
@@ -432,7 +447,7 @@ export function FixedAssetsModule() {
   const [currentRole, setCurrentRole] = useState<string>('super-admin')
 
   // COA Category accounts for dropdown
-  const [coaCategories, setCoaCategories] = useState<Array<{ id: string; code: string; name: string }>>([])
+  const [coaCategories, setCoaCategories] = useState<Array<{ id: string; code: string; name: string; category: string }>>([])
 
   // CSV Import state
   const [csvImportOpen, setCsvImportOpen] = useState(false)
@@ -650,21 +665,32 @@ export function FixedAssetsModule() {
       if (res.ok) {
         const data = await res.json()
         const accounts = Array.isArray(data) ? data : (data.accounts || [])
-        // Filter to fixed asset category accounts - include FIXED_ASSET subType and specific asset sub-types
+        // Filter to ONLY fixed asset accounts (subType === 'FIXED_ASSET')
+        // Exclude parent/header accounts (allowPosting === false) like "Property, Plant & Equipment"
         // Exclude accumulated depreciation accounts
         const fixedAssetAccounts = accounts.filter(
           (a: { subType?: string | null; code?: string; name?: string; allowPosting?: boolean }) => {
             if (!a.subType) return false
-            if (a.subType === 'ACCUMULATED_DEPRECIATION') return false
-            if (!a.allowPosting) return false
-            return ['FIXED_ASSET', 'LAND', 'BUILDING', 'VEHICLE', 'FURNITURE',
-                    'OFFICE_EQUIPMENT', 'IT_ASSET', 'MACHINERY', 'OTHER_FIXED_ASSET'].includes(a.subType)
+            if (a.subType !== 'FIXED_ASSET') return false  // Only fixed asset sub-type
+            if (!a.allowPosting) return false  // Exclude parent/header accounts
+            return true
           }
         )
-        setCoaCategories(fixedAssetAccounts.map((a: { id: string; code: string; name: string }) => ({ id: a.id, code: a.code, name: a.name })))
+        // Map COA names to system category names and store the COA account ID
+        const mapped = fixedAssetAccounts
+          .map((a: { id: string; code: string; name: string }) => {
+            const category = COA_NAME_TO_CATEGORY[a.name] || a.name
+            return { id: a.id, code: a.code, name: a.name, category }
+          })
+          // Filter out accounts that don't map to a known FAMS category
+          .filter((c: { category: string }) => ASSET_CATEGORIES.includes(c.category))
+        setCoaCategories(mapped)
+        console.log('[FAMS] Loaded COA categories for dropdown:', mapped.map((c: { code: string; name: string; category: string }) => `${c.code} → ${c.category}`))
       }
-    } catch {
-      setCoaCategories(ASSET_CATEGORIES.map((c, i) => ({ id: String(i), code: String(1510 + i * 5), name: c })))
+    } catch (err) {
+      console.error('[FAMS] Failed to fetch COA categories:', err)
+      // Fallback to hardcoded categories (no COA ID available)
+      setCoaCategories(ASSET_CATEGORIES.map((c, i) => ({ id: '', code: String(1510 + i * 5), name: c, category: c })))
     }
   }, [])
 
@@ -825,6 +851,7 @@ export function FixedAssetsModule() {
       receiptVoucherNo: (asset as AssetRecord & { receiptVoucherNo?: string }).receiptVoucherNo || '',
       checkRegisterNo: (asset as AssetRecord & { checkRegisterNo?: string }).checkRegisterNo || '',
       stockRegisterPageNo: (asset as AssetRecord & { stockRegisterPageNo?: string }).stockRegisterPageNo || '',
+      categoryAccountId: '',  // Will be resolved from COA when category is selected
     })
     setEditMode(true)
     setEditingAssetId(asset.id)
@@ -868,17 +895,70 @@ export function FixedAssetsModule() {
   }
 
   const handleSaveAsset = async (submitType: 'draft' | 'submit') => {
+    // Validate required fields before submission
+    if (!wizardForm.name || !wizardForm.category || !wizardForm.purchasePrice || wizardForm.purchasePrice <= 0) {
+      toast({ title: 'Validation Error', description: 'Asset Name, Category, and Cost are required.', variant: 'destructive' })
+      return
+    }
+    if (!wizardForm.dateOfPurchase) {
+      toast({ title: 'Validation Error', description: 'Purchase Date is required.', variant: 'destructive' })
+      return
+    }
+
     setSaving(true)
     try {
       const isNoDep = wizardForm.isDonorFunded || wizardForm.category === 'Land' || wizardForm.depreciationMethod === 'None'
+
+      // Build a clean payload with proper types (no NaN or empty strings for required fields)
       const payload = {
-        ...wizardForm,
+        name: wizardForm.name.trim(),
+        description: wizardForm.description?.trim() || '',
+        category: wizardForm.category,
+        subCategory: wizardForm.subCategory?.trim() || '',
+        serialNumber: wizardForm.serialNumber?.trim() || '',
+        condition: wizardForm.condition || 'New',
+        notes: wizardForm.notes?.trim() || '',
+        dateOfPurchase: wizardForm.dateOfPurchase,
+        dateOfCapitalization: wizardForm.dateOfCapitalization || wizardForm.dateOfPurchase,
+        invoiceNumber: wizardForm.invoiceNumber?.trim() || '',
+        supplierName: wizardForm.supplierName?.trim() || '',
+        supplierNTN: wizardForm.supplierNTN?.trim() || '',
+        purchasePrice: Number(wizardForm.purchasePrice) || 0,
         depreciationMethod: isNoDep ? 'None' : wizardForm.depreciationMethod,
-        usefulLifeYears: isNoDep ? 0 : wizardForm.usefulLifeYears,
-        residualValue: isNoDep ? (wizardForm.category === 'Land' ? wizardForm.purchasePrice : 0) : wizardForm.residualValue,
-        decliningRate: isNoDep ? 0 : wizardForm.decliningRate,
+        usefulLifeYears: isNoDep ? 0 : (Number(wizardForm.usefulLifeYears) || 0),
+        residualValue: isNoDep ? (wizardForm.category === 'Land' ? wizardForm.purchasePrice : 0) : (Number(wizardForm.residualValue) || 0),
+        decliningRate: isNoDep ? 0 : (Number(wizardForm.decliningRate) || 0),
+        location: wizardForm.location?.trim() || '',
+        province: wizardForm.province || 'KPK',
+        custodian: wizardForm.custodian?.trim() || '',
+        costCenter: wizardForm.costCenter?.trim() || '',
+        project: wizardForm.project?.trim() || '',
+        fundCode: wizardForm.fundCode?.trim() || '',
+        isDonorFunded: wizardForm.isDonorFunded || false,
+        donor: wizardForm.donor?.trim() || '',
+        grantReference: wizardForm.grantReference?.trim() || '',
+        donorRestrictions: wizardForm.donorRestrictions?.trim() || '',
+        donorCode: wizardForm.donorCode?.trim() || '',
+        insuranceValue: Number(wizardForm.insuranceValue) || 0,
+        insurancePolicyNumber: wizardForm.insurancePolicyNumber?.trim() || '',
+        insuranceExpiryDate: wizardForm.insuranceExpiryDate || '',
+        warrantyExpiryDate: wizardForm.warrantyExpiryDate || '',
+        glAssetAccount: wizardForm.glAssetAccount?.trim() || '',
+        glAccDepAccount: wizardForm.glAccDepAccount?.trim() || '',
+        glDepExpAccount: wizardForm.glDepExpAccount?.trim() || '',
         approvalStatus: submitType === 'draft' ? 'Draft' : 'Pending Approval',
+        assetTag: wizardForm.assetTag?.trim() || '',
+        make: wizardForm.make?.trim() || '',
+        model: wizardForm.model?.trim() || '',
+        modelYear: wizardForm.modelYear ? Number(wizardForm.modelYear) : null,
+        priorApprovalNo: wizardForm.priorApprovalNo?.trim() || '',
+        purchaseOrderNo: wizardForm.purchaseOrderNo?.trim() || '',
+        receiptVoucherNo: wizardForm.receiptVoucherNo?.trim() || '',
+        checkRegisterNo: wizardForm.checkRegisterNo?.trim() || '',
+        stockRegisterPageNo: wizardForm.stockRegisterPageNo?.trim() || '',
       }
+
+      console.log('[FAMS] Submitting Payload:', JSON.stringify(payload, null, 2))
 
       const url = editMode && editingAssetId ? `/api/fams/assets/${editingAssetId}` : '/api/fams/assets'
       const method = editMode ? 'PUT' : 'POST'
@@ -889,57 +969,114 @@ export function FixedAssetsModule() {
         body: JSON.stringify(payload),
       })
 
-      if (res.ok) {
-        const assetData = await res.json()
-
-        // If submitting (not draft), also create a draft voucher in the accounting module
-        if (submitType === 'submit' && !editMode && assetData.id) {
-          try {
-            const glMap = GL_CATEGORY_MAP[wizardForm.category] || { asset: '1545', accDep: '1670', depExp: '5670' }
-            // Resolve account codes to IDs
-            const assetAccount = await (await fetch(`/api/accounts?search=${glMap.asset}`)).json().then(d => (d.accounts || d || [])[0]).catch(() => null)
-            const bankAccount = await (await fetch(`/api/accounts?search=1121`)).json().then(d => (d.accounts || d || [])[0]).catch(() => null)
-
-            if (assetAccount?.id && bankAccount?.id) {
-              await fetch('/api/vouchers', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  voucherType: 'BP',
-                  voucherTypeName: 'Bank Payment',
-                  date: wizardForm.dateOfPurchase || new Date().toISOString().split('T')[0],
-                  narration: `Fixed Asset Acquisition: ${wizardForm.name} (${wizardForm.category}) — Asset ID: ${assetData.assetId || 'N/A'}${wizardForm.assetTag ? ` | Tag: ${wizardForm.assetTag}` : ''}`,
-                  reference: `AST-${assetData.assetId || 'NEW'}`,
-                  payeeName: wizardForm.supplierName || '',
-                  autoPost: false,
-                  isAssetPosted: true,
-                  entries: [
-                    { accountId: assetAccount.id, debit: wizardForm.purchasePrice, credit: 0, description: `Dr. ${wizardForm.category} Asset — ${wizardForm.name}`, assetRef: assetData.assetId || '' },
-                    { accountId: bankAccount.id, debit: 0, credit: wizardForm.purchasePrice, description: `Cr. Bank — ${wizardForm.supplierName || 'Payment for asset'}`, assetRef: assetData.assetId || '' },
-                  ],
-                }),
-              })
-            }
-          } catch (voucherErr) {
-            console.error('Draft voucher creation failed:', voucherErr)
-            // Don't fail the whole save — asset is already saved
-          }
-        }
-
-        toast({
-          title: 'Success',
-          description: submitType === 'submit'
-            ? 'Asset saved and Draft Voucher created successfully.'
-            : editMode ? 'Asset updated successfully' : 'Asset saved as draft.',
-        })
-        setWizardOpen(false)
-        refreshAll()
-      } else {
-        const err = await res.json()
-        toast({ title: 'Error', description: err.error || 'Failed to save asset', variant: 'destructive' })
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}: ${res.statusText}` }))
+        console.error('[FAMS] Asset creation failed:', errData)
+        toast({ title: 'Error Creating Asset', description: errData.error || `Failed with status ${res.status}`, variant: 'destructive' })
+        return
       }
-    } catch {
-      toast({ title: 'Error', description: 'Failed to save asset', variant: 'destructive' })
+
+      const assetData = await res.json()
+      console.log('[FAMS] Asset created successfully:', assetData.assetId)
+
+      // If submitting (not draft), also create a draft voucher in the accounting module
+      if (submitType === 'submit' && !editMode && assetData.id) {
+        try {
+          // Use the COA account ID we already have from the dropdown, or look it up
+          let assetAccountId = wizardForm.categoryAccountId || ''
+          
+          // If no COA ID stored, look up by search
+          if (!assetAccountId) {
+            const glMap = GL_CATEGORY_MAP[wizardForm.category] || { asset: '1545', accDep: '1670', depExp: '5670' }
+            const assetSearchRes = await fetch(`/api/accounts?search=${glMap.asset}`)
+            if (assetSearchRes.ok) {
+              const assetSearchData = await assetSearchRes.json()
+              const assetAccounts = Array.isArray(assetSearchData) ? assetSearchData : (assetSearchData.accounts || [])
+              assetAccountId = assetAccounts[0]?.id || ''
+            }
+          }
+
+          // Find a bank account for the credit entry
+          const bankSearchRes = await fetch('/api/accounts?search=1121')
+          let bankAccountId = ''
+          if (bankSearchRes.ok) {
+            const bankSearchData = await bankSearchRes.json()
+            const bankAccounts = Array.isArray(bankSearchData) ? bankSearchData : (bankSearchData.accounts || [])
+            bankAccountId = bankAccounts[0]?.id || ''
+          }
+
+          // Find or create a financial year for the voucher
+          const fyRes = await fetch('/api/financial-year')
+          let financialYearId = ''
+          if (fyRes.ok) {
+            const fyData = await fyRes.json()
+            const fyList = Array.isArray(fyData) ? fyData : (fyData.financialYears || fyData.data || [])
+            // Find the FY that contains the purchase date
+            const purchaseDate = new Date(wizardForm.dateOfPurchase)
+            const matchingFy = fyList.find((fy: { startDate: string; endDate: string; status: string }) => {
+              const start = new Date(fy.startDate)
+              const end = new Date(fy.endDate)
+              return purchaseDate >= start && purchaseDate <= end && fy.status !== 'closed'
+            })
+            financialYearId = matchingFy?.id || (fyList[0]?.id || '')
+          }
+
+          console.log('[FAMS] Voucher creation - assetAccountId:', assetAccountId, 'bankAccountId:', bankAccountId, 'financialYearId:', financialYearId)
+
+          if (assetAccountId && bankAccountId && financialYearId) {
+            const voucherPayload = {
+              voucherType: 'BP',
+              voucherTypeName: 'Bank Payment',
+              date: wizardForm.dateOfPurchase || new Date().toISOString().split('T')[0],
+              narration: `Fixed Asset Acquisition: ${wizardForm.name} (${wizardForm.category}) — Asset ID: ${assetData.assetId || 'N/A'}${wizardForm.assetTag ? ` | Tag: ${wizardForm.assetTag}` : ''}`,
+              reference: `AST-${assetData.assetId || 'NEW'}`,
+              payeeName: wizardForm.supplierName || '',
+              autoPost: false,
+              isAssetPosted: true,
+              financialYearId,
+              entries: [
+                { accountId: assetAccountId, debit: Number(wizardForm.purchasePrice), credit: 0, description: `Dr. ${wizardForm.category} Asset — ${wizardForm.name}`, assetRef: assetData.assetId || '' },
+                { accountId: bankAccountId, debit: 0, credit: Number(wizardForm.purchasePrice), description: `Cr. Bank — ${wizardForm.supplierName || 'Payment for asset'}`, assetRef: assetData.assetId || '' },
+              ],
+            }
+            console.log('[FAMS] Submitting Voucher Payload:', JSON.stringify(voucherPayload, null, 2))
+
+            const voucherRes = await fetch('/api/vouchers', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(voucherPayload),
+            })
+
+            if (voucherRes.ok) {
+              const voucherData = await voucherRes.json()
+              console.log('[FAMS] Draft voucher created:', voucherData.voucherNumber)
+            } else {
+              const voucherErr = await voucherRes.json().catch(() => ({ error: `HTTP ${voucherRes.status}` }))
+              console.error('[FAMS] Draft voucher creation failed:', voucherErr)
+              // Show a warning toast but don't fail the whole save — asset is already saved
+              toast({ title: 'Warning', description: `Asset saved but draft voucher failed: ${voucherErr.error || 'Unknown error'}`, variant: 'destructive' })
+            }
+          } else {
+            console.warn('[FAMS] Cannot create voucher - missing required IDs:', { assetAccountId, bankAccountId, financialYearId })
+            toast({ title: 'Warning', description: 'Asset saved but draft voucher could not be created (missing account or financial year configuration).', variant: 'destructive' })
+          }
+        } catch (voucherErr) {
+          console.error('[FAMS] Draft voucher creation exception:', voucherErr)
+          toast({ title: 'Warning', description: `Asset saved but draft voucher failed: ${voucherErr instanceof Error ? voucherErr.message : 'Unknown error'}`, variant: 'destructive' })
+        }
+      }
+
+      toast({
+        title: 'Success',
+        description: submitType === 'submit'
+          ? 'Asset saved and Draft Voucher created successfully.'
+          : editMode ? 'Asset updated successfully' : 'Asset saved as draft.',
+      })
+      setWizardOpen(false)
+      refreshAll()
+    } catch (error) {
+      console.error('[FAMS] Submission Error:', error)
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to save asset', variant: 'destructive' })
     } finally {
       setSaving(false)
     }
@@ -1654,20 +1791,23 @@ export function FixedAssetsModule() {
             <div>
               <Label className="text-xs font-medium">Category <span className="text-red-500">*</span></Label>
               <Select value={wizardForm.category} onValueChange={v => {
+                // Find the COA entry for this category to get the account ID
+                const coaEntry = coaCategories.find(c => c.category === v)
                 const glMap = GL_CATEGORY_MAP[v] || { asset: '1545', accDep: '1670', depExp: '5670' }
                 setWizardForm(f => ({ 
                   ...f, 
                   category: v,
-                  glAssetAccount: f.glAssetAccount || glMap.asset,
-                  glAccDepAccount: f.glAccDepAccount || (glMap.accDep || ''),
-                  glDepExpAccount: f.glDepExpAccount || (glMap.depExp || ''),
+                  categoryAccountId: coaEntry?.id || '',
+                  glAssetAccount: glMap.asset,
+                  glAccDepAccount: glMap.accDep || '',
+                  glDepExpAccount: glMap.depExp || '',
                 }))
               }}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder={coaCategories.length > 0 ? "Select from Chart of Accounts" : "Select category"} /></SelectTrigger>
                 <SelectContent className="max-h-64">
                   {coaCategories.length > 0
-                    ? coaCategories.filter(c => !c.name.toLowerCase().includes('accumulated')).map(c => (
-                      <SelectItem key={c.id} value={c.name}>
+                    ? coaCategories.map(c => (
+                      <SelectItem key={c.id || c.code} value={c.category}>
                         <span className="font-mono text-muted-foreground mr-1">{c.code}</span> {c.name}
                       </SelectItem>
                     ))

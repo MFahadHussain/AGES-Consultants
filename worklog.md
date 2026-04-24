@@ -369,3 +369,28 @@ Stage Summary:
 - Category dropdown is connected to COA and refreshes when dialog opens
 - GL mapping auto-fills when a category is selected
 - Code passes lint with 0 errors
+---
+Task ID: 2
+Agent: main
+Task: Fix Category dropdown (only show Fixed Asset accounts) and fix submission handler (asset/voucher creation failure)
+
+Work Log:
+- Investigated actual COA data via API - found all asset accounts use subType=FIXED_ASSET, not specific sub-types like LAND/BUILDING
+- Found COA names differ from system category names (e.g., "Furniture & Fixtures" vs "Furniture")
+- Added COA_NAME_TO_CATEGORY mapping to translate COA account names to FAMS category names
+- Fixed fetchCoaCategories to filter ONLY by subType=FIXED_ASSET (not multiple sub-types) and require allowPosting=true
+- Changed category dropdown to use system category name as SelectItem value (for backend compat) while displaying COA name
+- Added categoryAccountId to WizardForm to store the COA account ID for voucher creation
+- Fixed handleSaveAsset with: explicit payload construction (no spread of entire form), proper Number() coercion for numeric fields, early validation with toast, console.log of payload before API call
+- Fixed voucher creation: added financialYearId lookup (was missing, causing 500 error), fixed account lookup response parsing (API returns array not {accounts:[]}), added error-specific toast messages
+- Fixed backend API error reporting (assets/route.ts now returns actual error message)
+- Cleared Turbopack cache (.next directory) to regenerate Prisma client with make/model fields
+- Verified both asset creation and voucher creation work end-to-end via curl tests
+
+Stage Summary:
+- Category dropdown now shows ONLY fixed asset COA accounts (8 accounts instead of all 42)
+- Submission handler properly creates asset AND draft voucher with correct financialYearId
+- All error paths show specific error messages via toast
+- console.log/console.error added for debugging
+- Backend error responses now include actual error details
+- 0 lint errors
