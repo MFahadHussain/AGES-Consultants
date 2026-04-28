@@ -40,3 +40,30 @@ Stage Summary:
 - Fixed: API returns proper error messages instead of empty `{}`
 - Fixed: Registration form UI completely redesigned with professional 3-column layout, step indicators, and better visual hierarchy
 - Fixed: Error handling in handleSaveAsset properly handles network errors, JSON parse errors, and API error messages
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Fix Fixed Asset Registration Form - Input Bug & Single Page Layout
+
+Work Log:
+- Identified CRITICAL BUG: SectionHeader and Field components were defined INSIDE renderRegistrationForm(), causing React to recreate them on every keystroke. React sees new component references, unmounts old inputs, and mounts new ones — causing the one-character input focus loss bug.
+- Moved SectionHeader → FormSectionHeader and Field → FormField as stable top-level function components OUTSIDE the FixedAssetsModule component, before the export line.
+- Removed the local SectionHeader and Field definitions from inside renderRegistrationForm().
+- Replaced all <Field>/<Field> with <FormField>/</FormField> throughout the registration form (42 occurrences).
+- Replaced all <SectionHeader with <FormSectionHeader throughout the registration form (9 occurrences).
+- Added allCoaAccounts state for ALL Chart of Accounts (grouped by account type).
+- Updated fetchCoaCategories to also fetch ALL accounts via /api/accounts?isActive=true and populate allCoaAccounts.
+- Added new "Chart of Account" dropdown field after the Category field, using allCoaAccounts with grouped display by account type (Assets, Liabilities, Equity, Income, Expenses, Other) with sub-type labels.
+- The COA dropdown auto-fills category, GL asset account, accumulated depreciation account, and depreciation expense account when a COA account is selected.
+- Added "Register Asset" tab (TabsTrigger value="new-asset") to make the form accessible as a single page instead of only through a dialog.
+- Added corresponding TabsContent with header, Reset Form button, renderRegistrationForm(), and action bar with Save as Draft / Save & Create Voucher buttons.
+- Updated openAddWizard to navigate to the new-asset tab instead of opening the dialog.
+- isFormValid kept as-is (without requiring categoryAccountId) so the form can be submitted.
+- Lint check passes with 0 errors (only pre-existing warnings in unrelated files).
+
+Stage Summary:
+- Fixed: One-character input focus loss bug by moving form helper components outside the render function
+- Added: Chart of Account dropdown with grouped display of all COA accounts
+- Added: "Register Asset" tab for single-page form access
+- Updated: openAddWizard navigates to the new tab instead of opening a dialog

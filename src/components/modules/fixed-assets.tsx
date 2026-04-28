@@ -384,6 +384,37 @@ const journalBadge = (status: string) => {
   return <Badge variant="secondary" className={`text-[10px] ${map[status] || ''}`}>{status}</Badge>
 }
 
+// ─── Stable form helper components ──────────────────────────────────────────
+// MUST be outside render to avoid remount on keystroke (fixes one-char input bug)
+
+function FormSectionHeader({ icon, title, description, step }: { icon: React.ReactNode; title: string; description: string; step: number }) {
+  return (
+    <div className="flex items-start gap-3 mb-4 pb-3 border-b">
+      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary font-bold text-sm shrink-0">
+        {step}
+      </div>
+      <div className="pt-0.5">
+        <div className="flex items-center gap-2">
+          {icon}
+          <h3 className="text-sm font-semibold">{title}</h3>
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-0.5">{description}</p>
+      </div>
+    </div>
+  )
+}
+
+function FormField({ label, required, children, colSpan }: { label: string; required?: boolean; children: React.ReactNode; colSpan?: boolean }) {
+  return (
+    <div className={colSpan ? 'md:col-span-2' : ''}>
+      <Label className="text-xs font-medium text-foreground/80 mb-1.5 block">
+        {label} {required && <span className="text-red-500">*</span>}
+      </Label>
+      {children}
+    </div>
+  )
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function FixedAssetsModule() {
@@ -448,6 +479,9 @@ export function FixedAssetsModule() {
 
   // COA Category accounts for dropdown
   const [coaCategories, setCoaCategories] = useState<Array<{ id: string; code: string; name: string; category: string }>>([])
+
+  // ALL COA accounts for the Chart of Account dropdown (grouped by type)
+  const [allCoaAccounts, setAllCoaAccounts] = useState<Array<{ id: string; code: string; name: string; accountType: string; subType?: string | null }>>([])
 
   // CSV Import state
   const [csvImportOpen, setCsvImportOpen] = useState(false)
@@ -661,6 +695,16 @@ export function FixedAssetsModule() {
 
   const fetchCoaCategories = useCallback(async () => {
     try {
+      // Fetch ALL accounts for the Chart of Account dropdown
+      const allRes = await fetch('/api/accounts?isActive=true')
+      if (allRes.ok) {
+        const allData = await allRes.json()
+        const allAccounts = Array.isArray(allData) ? allData : (allData.accounts || [])
+        setAllCoaAccounts(allAccounts.map((a: any) => ({
+          id: a.id, code: a.code, name: a.name, accountType: a.accountType, subType: a.subType
+        })))
+      }
+
       const res = await fetch('/api/accounts?accountType=ASSET&isActive=true')
       if (res.ok) {
         const data = await res.json()
@@ -800,7 +844,7 @@ export function FixedAssetsModule() {
     setWizardStep(1)
     setEditMode(false)
     setEditingAssetId(null)
-    setWizardOpen(true)
+    setActiveTab('new-asset')
     fetchCoaCategories()
   }
 
@@ -1785,38 +1829,12 @@ export function FixedAssetsModule() {
     const isNoDep = wizardForm.isDonorFunded || wizardForm.category === 'Land' || wizardForm.depreciationMethod === 'None'
     const fbrRate = FBR_RATES[wizardForm.category] ?? 10
 
-    // Section header component for consistent styling
-    const SectionHeader = ({ icon, title, description, step }: { icon: React.ReactNode; title: string; description: string; step: number }) => (
-      <div className="flex items-start gap-3 mb-4">
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary font-bold text-sm shrink-0">
-          {step}
-        </div>
-        <div className="pt-0.5">
-          <div className="flex items-center gap-2">
-            {icon}
-            <h3 className="text-sm font-semibold">{title}</h3>
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-0.5">{description}</p>
-        </div>
-      </div>
-    )
-
-    // Form field wrapper for consistent spacing
-    const Field = ({ label, required, children, colSpan }: { label: string; required?: boolean; children: React.ReactNode; colSpan?: boolean }) => (
-      <div className={colSpan ? 'md:col-span-2' : ''}>
-        <Label className="text-xs font-medium text-foreground/80 mb-1.5 block">
-          {label} {required && <span className="text-red-500">*</span>}
-        </Label>
-        {children}
-      </div>
-    )
-
     return (
       <div className="space-y-5">
         {/* ─── Section 1: Basic Asset Information ─── */}
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <div className="px-5 pt-4 pb-1">
-            <SectionHeader
+            <FormSectionHeader
               step={1}
               icon={<Package className="h-4 w-4 text-primary" />}
               title="Basic Asset Information"
@@ -1825,23 +1843,23 @@ export function FixedAssetsModule() {
           </div>
           <div className="px-5 pb-5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
-              <Field label="Asset Name" required colSpan>
+              <FormField label="Asset Name" required colSpan>
                 <Input
                   className="h-9"
                   value={wizardForm.name}
                   onChange={e => setWizardForm(f => ({ ...f, name: e.target.value }))}
                   placeholder="e.g., Dell Latitude 5520 Laptop"
                 />
-              </Field>
-              <Field label="Asset Tag (Manual)">
+              </FormField>
+              <FormField label="Asset Tag (Manual)">
                 <Input
                   className="h-9"
                   value={wizardForm.assetTag}
                   onChange={e => setWizardForm(f => ({ ...f, assetTag: e.target.value }))}
                   placeholder="e.g., FA-IT-2024-001"
                 />
-              </Field>
-              <Field label="Category" required>
+              </FormField>
+              <FormField label="Category" required>
                 <Select value={wizardForm.category} onValueChange={v => {
                   const coaEntry = coaCategories.find(c => c.category === v)
                   const glMap = GL_CATEGORY_MAP[v] || { asset: '1545', accDep: '1670', depExp: '5670' }
@@ -1875,24 +1893,78 @@ export function FixedAssetsModule() {
                     }
                   </SelectContent>
                 </Select>
-              </Field>
-              <Field label="Purchase Date" required>
+              </FormField>
+              <FormField label="Chart of Account" required>
+                <Select value={wizardForm.categoryAccountId} onValueChange={v => {
+                  const selectedCoa = allCoaAccounts.find(c => c.id === v)
+                  if (selectedCoa) {
+                    const mappedCategory = COA_NAME_TO_CATEGORY[selectedCoa.name] || wizardForm.category
+                    const glMap = GL_CATEGORY_MAP[mappedCategory] || { asset: selectedCoa.code, accDep: '', depExp: '' }
+                    setWizardForm(f => ({
+                      ...f,
+                      categoryAccountId: v,
+                      category: ASSET_CATEGORIES.includes(mappedCategory) ? mappedCategory : f.category,
+                      glAssetAccount: selectedCoa.code,
+                      glAccDepAccount: glMap.accDep || '',
+                      glDepExpAccount: glMap.depExp || '',
+                    }))
+                  }
+                }}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder={allCoaAccounts.length > 0 ? "Select COA account" : "No COA accounts found"} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {(() => {
+                      const grouped = allCoaAccounts.reduce((acc, a) => {
+                        const type = a.accountType || 'OTHER'
+                        if (!acc[type]) acc[type] = []
+                        acc[type].push(a)
+                        return acc
+                      }, {} as Record<string, typeof allCoaAccounts>)
+
+                      const typeLabels: Record<string, string> = {
+                        ASSET: 'Assets', LIABILITY: 'Liabilities', EQUITY: 'Equity',
+                        INCOME: 'Income', EXPENSE: 'Expenses', OTHER: 'Other',
+                      }
+
+                      return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([type, accounts]) => (
+                        <div key={type}>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50">{typeLabels[type] || type}</div>
+                          {accounts.map(c => (
+                            <SelectItem key={c.id} value={c.id}>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-muted-foreground text-[11px]">{c.code}</span>
+                                <span>{c.name}</span>
+                                {c.subType && <span className="text-[10px] text-muted-foreground">({c.subType.replace(/_/g, ' ')})</span>}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </div>
+                      ))
+                    })()}
+                    {allCoaAccounts.length === 0 && (
+                      <SelectItem value="__none" disabled>No accounts found in Chart of Accounts</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Purchase Date" required>
                 <Input
                   className="h-9"
                   type="date"
                   value={wizardForm.dateOfPurchase}
                   onChange={e => setWizardForm(f => ({ ...f, dateOfPurchase: e.target.value, dateOfCapitalization: f.dateOfCapitalization || e.target.value }))}
                 />
-              </Field>
-              <Field label="Date of Capitalization">
+              </FormField>
+              <FormField label="Date of Capitalization">
                 <Input
                   className="h-9"
                   type="date"
                   value={wizardForm.dateOfCapitalization}
                   onChange={e => setWizardForm(f => ({ ...f, dateOfCapitalization: e.target.value }))}
                 />
-              </Field>
-              <Field label="Cost / Purchase Price (PKR)" required>
+              </FormField>
+              <FormField label="Cost / Purchase Price (PKR)" required>
                 <Input
                   className="h-9"
                   type="number"
@@ -1900,7 +1972,7 @@ export function FixedAssetsModule() {
                   onChange={e => setWizardForm(f => ({ ...f, purchasePrice: parseFloat(e.target.value) || 0 }))}
                   placeholder="0"
                 />
-              </Field>
+              </FormField>
             </div>
             {wizardForm.category && (
               <div className="flex items-center gap-2 p-2.5 rounded-lg bg-primary/5 border border-primary/10 text-xs mt-3">
@@ -1921,7 +1993,7 @@ export function FixedAssetsModule() {
         {/* ─── Section 2: Asset Specifications ─── */}
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <div className="px-5 pt-4 pb-1">
-            <SectionHeader
+            <FormSectionHeader
               step={2}
               icon={<Cog className="h-4 w-4 text-primary" />}
               title="Asset Specifications"
@@ -1930,30 +2002,30 @@ export function FixedAssetsModule() {
           </div>
           <div className="px-5 pb-5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
-              <Field label="Make / Manufacturer">
+              <FormField label="Make / Manufacturer">
                 <Input className="h-9" value={wizardForm.make} onChange={e => setWizardForm(f => ({ ...f, make: e.target.value }))} placeholder="e.g., Toyota, Dell, HP" />
-              </Field>
-              <Field label="Model">
+              </FormField>
+              <FormField label="Model">
                 <Input className="h-9" value={wizardForm.model} onChange={e => setWizardForm(f => ({ ...f, model: e.target.value }))} placeholder="e.g., Corolla, Latitude 5520" />
-              </Field>
-              <Field label="Model Year">
+              </FormField>
+              <FormField label="Model Year">
                 <Input className="h-9" type="number" value={wizardForm.modelYear || ''} onChange={e => setWizardForm(f => ({ ...f, modelYear: parseInt(e.target.value) || new Date().getFullYear() }))} placeholder="e.g., 2024" />
-              </Field>
-              <Field label="Asset Condition" required>
+              </FormField>
+              <FormField label="Asset Condition" required>
                 <Select value={wizardForm.condition} onValueChange={v => setWizardForm(f => ({ ...f, condition: v }))}>
                   <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {CONDITIONS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
-              </Field>
-              <Field label="Serial Number">
+              </FormField>
+              <FormField label="Serial Number">
                 <Input className="h-9" value={wizardForm.serialNumber} onChange={e => setWizardForm(f => ({ ...f, serialNumber: e.target.value }))} placeholder="SN-XXXX" />
-              </Field>
-              <Field label="Sub-Category">
+              </FormField>
+              <FormField label="Sub-Category">
                 <Input className="h-9" value={wizardForm.subCategory} onChange={e => setWizardForm(f => ({ ...f, subCategory: e.target.value }))} placeholder="Optional sub-classification" />
-              </Field>
-              <Field label="Description" colSpan>
+              </FormField>
+              <FormField label="Description" colSpan>
                 <Textarea
                   className="min-h-[60px] resize-none"
                   value={wizardForm.description}
@@ -1961,7 +2033,7 @@ export function FixedAssetsModule() {
                   placeholder="Brief description of the asset"
                   rows={2}
                 />
-              </Field>
+              </FormField>
             </div>
           </div>
         </div>
@@ -1969,7 +2041,7 @@ export function FixedAssetsModule() {
         {/* ─── Section 3: Procurement & Reference Details ─── */}
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <div className="px-5 pt-4 pb-1">
-            <SectionHeader
+            <FormSectionHeader
               step={3}
               icon={<FileText className="h-4 w-4 text-primary" />}
               title="Procurement & Reference Details"
@@ -1978,30 +2050,30 @@ export function FixedAssetsModule() {
           </div>
           <div className="px-5 pb-5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
-              <Field label="Prior Approval No.">
+              <FormField label="Prior Approval No.">
                 <Input className="h-9" value={wizardForm.priorApprovalNo} onChange={e => setWizardForm(f => ({ ...f, priorApprovalNo: e.target.value }))} placeholder="PA-2024-001" />
-              </Field>
-              <Field label="Purchase Order No.">
+              </FormField>
+              <FormField label="Purchase Order No.">
                 <Input className="h-9" value={wizardForm.purchaseOrderNo} onChange={e => setWizardForm(f => ({ ...f, purchaseOrderNo: e.target.value }))} placeholder="PO-2024-001" />
-              </Field>
-              <Field label="Invoice Number">
+              </FormField>
+              <FormField label="Invoice Number">
                 <Input className="h-9" value={wizardForm.invoiceNumber} onChange={e => setWizardForm(f => ({ ...f, invoiceNumber: e.target.value }))} placeholder="INV-XXXX" />
-              </Field>
-              <Field label="Receipt Voucher No.">
+              </FormField>
+              <FormField label="Receipt Voucher No.">
                 <Input className="h-9" value={wizardForm.receiptVoucherNo} onChange={e => setWizardForm(f => ({ ...f, receiptVoucherNo: e.target.value }))} placeholder="RV-2024-001" />
-              </Field>
-              <Field label="Check Register No.">
+              </FormField>
+              <FormField label="Check Register No.">
                 <Input className="h-9" value={wizardForm.checkRegisterNo} onChange={e => setWizardForm(f => ({ ...f, checkRegisterNo: e.target.value }))} placeholder="CR-2024-001" />
-              </Field>
-              <Field label="Stock Register Page No.">
+              </FormField>
+              <FormField label="Stock Register Page No.">
                 <Input className="h-9" value={wizardForm.stockRegisterPageNo} onChange={e => setWizardForm(f => ({ ...f, stockRegisterPageNo: e.target.value }))} placeholder="SR-P42" />
-              </Field>
-              <Field label="Supplier Name">
+              </FormField>
+              <FormField label="Supplier Name">
                 <Input className="h-9" value={wizardForm.supplierName} onChange={e => setWizardForm(f => ({ ...f, supplierName: e.target.value }))} placeholder="Supplier or vendor name" />
-              </Field>
-              <Field label="Supplier NTN">
+              </FormField>
+              <FormField label="Supplier NTN">
                 <Input className="h-9" value={wizardForm.supplierNTN} onChange={e => setWizardForm(f => ({ ...f, supplierNTN: e.target.value }))} placeholder="National Tax Number" />
-              </Field>
+              </FormField>
             </div>
           </div>
         </div>
@@ -2009,7 +2081,7 @@ export function FixedAssetsModule() {
         {/* ─── Section 4: Depreciation Setup ─── */}
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <div className="px-5 pt-4 pb-1">
-            <SectionHeader
+            <FormSectionHeader
               step={4}
               icon={<TrendingDown className="h-4 w-4 text-primary" />}
               title="Depreciation Setup"
@@ -2036,30 +2108,30 @@ export function FixedAssetsModule() {
             ) : (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
-                  <Field label="Depreciation Method">
+                  <FormField label="Depreciation Method">
                     <Select value={wizardForm.depreciationMethod} onValueChange={v => setWizardForm(f => ({ ...f, depreciationMethod: v }))}>
                       <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                       <SelectContent>{DEP_METHODS.filter(m => m !== 'None').map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
                     </Select>
-                  </Field>
+                  </FormField>
                   {wizardForm.depreciationMethod === 'Straight-Line' && (
                     <>
-                      <Field label="Useful Life (Years)">
+                      <FormField label="Useful Life (Years)">
                         <Input className="h-9" type="number" value={wizardForm.usefulLifeYears || ''} onChange={e => setWizardForm(f => ({ ...f, usefulLifeYears: parseInt(e.target.value) || 0 }))} placeholder="5" />
-                      </Field>
-                      <Field label="Residual Value (PKR)">
+                      </FormField>
+                      <FormField label="Residual Value (PKR)">
                         <Input className="h-9" type="number" value={wizardForm.residualValue || ''} onChange={e => setWizardForm(f => ({ ...f, residualValue: parseFloat(e.target.value) || 0 }))} placeholder="0" />
-                      </Field>
+                      </FormField>
                     </>
                   )}
                   {wizardForm.depreciationMethod === 'Declining-Balance' && (
                     <>
-                      <Field label="Declining Rate (%)">
+                      <FormField label="Declining Rate (%)">
                         <Input className="h-9" type="number" value={wizardForm.decliningRate || ''} onChange={e => setWizardForm(f => ({ ...f, decliningRate: parseFloat(e.target.value) || 0 }))} placeholder="20" />
-                      </Field>
-                      <Field label="Residual Value (PKR)">
+                      </FormField>
+                      <FormField label="Residual Value (PKR)">
                         <Input className="h-9" type="number" value={wizardForm.residualValue || ''} onChange={e => setWizardForm(f => ({ ...f, residualValue: parseFloat(e.target.value) || 0 }))} placeholder="0" />
-                      </Field>
+                      </FormField>
                     </>
                   )}
                 </div>
@@ -2087,7 +2159,7 @@ export function FixedAssetsModule() {
         {/* ─── Section 5: Location & Custodian ─── */}
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <div className="px-5 pt-4 pb-1">
-            <SectionHeader
+            <FormSectionHeader
               step={5}
               icon={<MapPin className="h-4 w-4 text-primary" />}
               title="Location & Custodian"
@@ -2096,27 +2168,27 @@ export function FixedAssetsModule() {
           </div>
           <div className="px-5 pb-5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
-              <Field label="Location">
+              <FormField label="Location">
                 <Input className="h-9" value={wizardForm.location} onChange={e => setWizardForm(f => ({ ...f, location: e.target.value }))} placeholder="e.g., Head Office, Peshawar" />
-              </Field>
-              <Field label="Province">
+              </FormField>
+              <FormField label="Province">
                 <Select value={wizardForm.province} onValueChange={v => setWizardForm(f => ({ ...f, province: v }))}>
                   <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                   <SelectContent>{PROVINCES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                 </Select>
-              </Field>
-              <Field label="Custodian">
+              </FormField>
+              <FormField label="Custodian">
                 <Input className="h-9" value={wizardForm.custodian} onChange={e => setWizardForm(f => ({ ...f, custodian: e.target.value }))} placeholder="Person responsible" />
-              </Field>
-              <Field label="Cost Center">
+              </FormField>
+              <FormField label="Cost Center">
                 <Input className="h-9" value={wizardForm.costCenter} onChange={e => setWizardForm(f => ({ ...f, costCenter: e.target.value }))} placeholder="CC-XXXX" />
-              </Field>
-              <Field label="Project">
+              </FormField>
+              <FormField label="Project">
                 <Input className="h-9" value={wizardForm.project} onChange={e => setWizardForm(f => ({ ...f, project: e.target.value }))} placeholder="Project code" />
-              </Field>
-              <Field label="Fund Code">
+              </FormField>
+              <FormField label="Fund Code">
                 <Input className="h-9" value={wizardForm.fundCode} onChange={e => setWizardForm(f => ({ ...f, fundCode: e.target.value }))} placeholder="Fund code" />
-              </Field>
+              </FormField>
             </div>
           </div>
         </div>
@@ -2124,7 +2196,7 @@ export function FixedAssetsModule() {
         {/* ─── Section 6: Donor Funding ─── */}
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <div className="px-5 pt-4 pb-1">
-            <SectionHeader
+            <FormSectionHeader
               step={6}
               icon={<DollarSign className="h-4 w-4 text-primary" />}
               title="Donor Funding"
@@ -2141,18 +2213,18 @@ export function FixedAssetsModule() {
             </div>
             {wizardForm.isDonorFunded && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
-                <Field label="Donor Name">
+                <FormField label="Donor Name">
                   <Input className="h-9" value={wizardForm.donor} onChange={e => setWizardForm(f => ({ ...f, donor: e.target.value }))} placeholder="e.g., USAID, DFID" />
-                </Field>
-                <Field label="Grant Reference">
+                </FormField>
+                <FormField label="Grant Reference">
                   <Input className="h-9" value={wizardForm.grantReference} onChange={e => setWizardForm(f => ({ ...f, grantReference: e.target.value }))} placeholder="GRANT-XXXX" />
-                </Field>
-                <Field label="Donor Code">
+                </FormField>
+                <FormField label="Donor Code">
                   <Input className="h-9" value={wizardForm.donorCode} onChange={e => setWizardForm(f => ({ ...f, donorCode: e.target.value }))} placeholder="DC-XXXX" />
-                </Field>
-                <Field label="Restrictions" colSpan>
+                </FormField>
+                <FormField label="Restrictions" colSpan>
                   <Textarea className="min-h-[60px] resize-none" value={wizardForm.donorRestrictions} onChange={e => setWizardForm(f => ({ ...f, donorRestrictions: e.target.value }))} placeholder="Any donor restrictions on disposal/transfer" rows={2} />
-                </Field>
+                </FormField>
               </div>
             )}
           </div>
@@ -2161,7 +2233,7 @@ export function FixedAssetsModule() {
         {/* ─── Section 7: Insurance & Warranty ─── */}
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <div className="px-5 pt-4 pb-1">
-            <SectionHeader
+            <FormSectionHeader
               step={7}
               icon={<Shield className="h-4 w-4 text-primary" />}
               title="Insurance & Warranty"
@@ -2170,18 +2242,18 @@ export function FixedAssetsModule() {
           </div>
           <div className="px-5 pb-5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
-              <Field label="Insurance Value (PKR)">
+              <FormField label="Insurance Value (PKR)">
                 <Input className="h-9" type="number" value={wizardForm.insuranceValue || ''} onChange={e => setWizardForm(f => ({ ...f, insuranceValue: parseFloat(e.target.value) || 0 }))} placeholder="0" />
-              </Field>
-              <Field label="Policy Number">
+              </FormField>
+              <FormField label="Policy Number">
                 <Input className="h-9" value={wizardForm.insurancePolicyNumber} onChange={e => setWizardForm(f => ({ ...f, insurancePolicyNumber: e.target.value }))} placeholder="POL-XXXX" />
-              </Field>
-              <Field label="Insurance Expiry">
+              </FormField>
+              <FormField label="Insurance Expiry">
                 <Input className="h-9" type="date" value={wizardForm.insuranceExpiryDate} onChange={e => setWizardForm(f => ({ ...f, insuranceExpiryDate: e.target.value }))} />
-              </Field>
-              <Field label="Warranty Expiry">
+              </FormField>
+              <FormField label="Warranty Expiry">
                 <Input className="h-9" type="date" value={wizardForm.warrantyExpiryDate} onChange={e => setWizardForm(f => ({ ...f, warrantyExpiryDate: e.target.value }))} />
-              </Field>
+              </FormField>
             </div>
           </div>
         </div>
@@ -2189,7 +2261,7 @@ export function FixedAssetsModule() {
         {/* ─── Section 8: GL Account Mapping ─── */}
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <div className="px-5 pt-4 pb-1">
-            <SectionHeader
+            <FormSectionHeader
               step={8}
               icon={<Landmark className="h-4 w-4 text-primary" />}
               title="GL Account Mapping"
@@ -2198,15 +2270,15 @@ export function FixedAssetsModule() {
           </div>
           <div className="px-5 pb-5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
-              <Field label="Asset Account">
+              <FormField label="Asset Account">
                 <Input className="h-9 font-mono text-xs" value={wizardForm.glAssetAccount} onChange={e => setWizardForm(f => ({ ...f, glAssetAccount: e.target.value }))} placeholder="Auto-assigned" />
-              </Field>
-              <Field label="Acc. Dep. Account">
+              </FormField>
+              <FormField label="Acc. Dep. Account">
                 <Input className="h-9 font-mono text-xs" value={wizardForm.glAccDepAccount} onChange={e => setWizardForm(f => ({ ...f, glAccDepAccount: e.target.value }))} placeholder="Auto-assigned" />
-              </Field>
-              <Field label="Dep. Expense Account">
+              </FormField>
+              <FormField label="Dep. Expense Account">
                 <Input className="h-9 font-mono text-xs" value={wizardForm.glDepExpAccount} onChange={e => setWizardForm(f => ({ ...f, glDepExpAccount: e.target.value }))} placeholder="Auto-assigned" />
-              </Field>
+              </FormField>
             </div>
             <p className="text-[10px] text-muted-foreground mt-2 flex items-center gap-1">
               <Info className="h-3 w-3" />
@@ -2218,7 +2290,7 @@ export function FixedAssetsModule() {
         {/* ─── Section 9: Additional Notes ─── */}
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <div className="px-5 pt-4 pb-1">
-            <SectionHeader
+            <FormSectionHeader
               step={9}
               icon={<FileText className="h-4 w-4 text-primary" />}
               title="Additional Notes"
@@ -3063,6 +3135,7 @@ export function FixedAssetsModule() {
           <TabsTrigger value="reports" className="text-xs h-8">Reports</TabsTrigger>
           <TabsTrigger value="fiscal-year" className="text-xs h-8">Financial Year</TabsTrigger>
           <TabsTrigger value="settings" className="text-xs h-8">Settings</TabsTrigger>
+          <TabsTrigger value="new-asset" className="text-xs h-8">Register Asset</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard">{renderDashboard()}</TabsContent>
@@ -3073,6 +3146,45 @@ export function FixedAssetsModule() {
         <TabsContent value="reports">{renderReports()}</TabsContent>
         <TabsContent value="fiscal-year">{renderFinancialYear()}</TabsContent>
         <TabsContent value="settings">{renderSettings()}</TabsContent>
+        <TabsContent value="new-asset">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Package className="h-5 w-5 text-primary" />
+                  Fixed Asset Registration
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Fill in the asset details to register and create a draft voucher in the accounting system
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setWizardForm({ ...initialWizardForm }); fetchCoaCategories() }}>
+                  <RotateCcw className="h-3.5 w-3.5 mr-1" />Reset Form
+                </Button>
+              </div>
+            </div>
+            {renderRegistrationForm()}
+            <div className="flex items-center justify-between pt-4 border-t">
+              <Button variant="outline" onClick={() => setActiveTab('register')}>
+                <X className="h-4 w-4 mr-1" />Cancel
+              </Button>
+              <div className="flex gap-2">
+                {canCreate && (
+                  <Button variant="outline" onClick={() => handleSaveAsset('draft')} disabled={saving || !isFormValid}>
+                    <Save className="h-4 w-4 mr-1" />{saving ? 'Saving...' : 'Save as Draft'}
+                  </Button>
+                )}
+                {canCreate && (
+                  <Button onClick={() => handleSaveAsset('submit')} disabled={saving || !isFormValid}>
+                    {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
+                    {saving ? 'Saving...' : 'Save & Create Voucher'}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* Registration Form Dialog */}
