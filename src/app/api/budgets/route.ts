@@ -67,6 +67,7 @@ export async function POST(request: Request) {
         donorId: donorId || null,
         period: period || 'ANNUAL',
         totalAmount,
+        status: 'draft',
         lines: {
           create: lines.map((l: any) => ({
             accountId: l.accountId,
@@ -79,6 +80,104 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json(budget, { status: 201 })
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    if (!id) return NextResponse.json({ error: 'Budget ID required' }, { status: 400 })
+
+    const data = await request.json()
+
+    // Handle status update (approve/reject workflow)
+    if (data.status) {
+      const budget = await db.budget.findUnique({ where: { id } })
+      if (!budget) return NextResponse.json({ error: 'Budget not found' }, { status: 404 })
+
+      const validTransitions: Record<string, string[]> = {
+        draft: ['approved', 'rejected'],
+        approved: ['active', 'rejected'],
+        active: [],
+        rejected: ['draft'],
+      }
+
+      if (!validTransitions[budget.status]?.includes(data.status)) {
+        return NextResponse.json({ error: `Cannot transition from ${budget.status} to ${data.status}` }, { status: 400 })
+      }
+
+      const updated = await db.budget.update({
+        where: { id },
+        data: { status: data.status },
+        include: { lines: { include: { account: true } }, financialYear: true, project: true, donor: true },
+      })
+
+      return NextResponse.json(updated)
+    }
+
+    // Handle full budget update
+    const { name, financialYearId, projectId, donorId, period, lines } = data
+
+    if (!name) return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+
+    const totalAmount = lines ? lines.reduce((sum: number, l: any) => sum + (l.budgetAmount || 0), 0) : undefined
+
+    // Delete existing lines and recreate
+    if (lines) {
+      await db.budgetLine.deleteMany({ where: { budgetId: id } })
+    }
+
+    const updateData: any = {
+      name,
+      ...(financialYearId && { financialYearId }),
+      ...(projectId !== undefined && { projectId: projectId || null }),
+      ...(donorId !== undefined && { donorId: donorId || null }),
+      ...(period && { period }),
+      ...(totalAmount !== undefined && { totalAmount }),
+    }
+
+    if (lines) {
+      updateData.lines = {
+        create: lines.map((l: any) => ({
+          accountId: l.accountId,
+          period: l.period || '2024',
+          budgetAmount: l.budgetAmount || 0,
+        })),
+      }
+    }
+
+    const updated = await db.budget.update({
+      where: { id },
+      data: updateData,
+      include: { lines: { include: { account: true } }, financialYear: true, project: true, donor: true },
+    })
+
+    return NextResponse.json(updated)
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    if (!id) return NextResponse.json({ error: 'Budget ID required' }, { status: 400 })
+
+    const budget = await db.budget.findUnique({ where: { id } })
+    if (!budget) return NextResponse.json({ error: 'Budget not found' }, { status: 404 })
+
+    if (budget.status === 'active') {
+      return NextResponse.json({ error: 'Cannot delete an active budget' }, { status: 400 })
+    }
+
+    await db.budgetLine.deleteMany({ where: { budgetId: id } })
+    await db.budget.delete({ where: { id } })
+
+    return NextResponse.json({ message: 'Budget deleted successfully' })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }

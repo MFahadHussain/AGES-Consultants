@@ -24,6 +24,7 @@ export async function POST(request: Request) {
       // Get all accounts with their balances
       const accounts = await db.account.findMany({ where: { isActive: true } })
       const balanceData = []
+      let netProfitLoss = 0
 
       for (const account of accounts) {
         const result = await db.voucherEntry.aggregate({
@@ -36,6 +37,13 @@ export async function POST(request: Request) {
         const totalDebit = result._sum.debit || 0
         const totalCredit = result._sum.credit || 0
         const balance = totalDebit - totalCredit
+
+        // Track net profit/loss from Income and Expense accounts
+        if (account.accountType === 'INCOME') {
+          netProfitLoss += (totalCredit - totalDebit) // Income: credit balance is positive
+        } else if (account.accountType === 'EXPENSE') {
+          netProfitLoss -= (totalDebit - totalCredit) // Expense: debit balance is positive
+        }
 
         // Create balance record
         await db.accountBalance.create({
@@ -52,7 +60,10 @@ export async function POST(request: Request) {
           },
         }).catch(() => {}) // Ignore if already exists
 
-        balanceData.push({ account: account.code, balance })
+        // Only carry forward Asset, Liability, Equity, Capital balances (not Income/Expense)
+        if (!['INCOME', 'EXPENSE'].includes(account.accountType)) {
+          balanceData.push({ account: account.code, accountId: account.id, balance, accountType: account.accountType })
+        }
       }
 
       // Mark year as closed
@@ -78,21 +89,41 @@ export async function POST(request: Request) {
           },
         })
 
-        // Carry forward balances
+        // Carry forward balances (only Balance Sheet accounts)
         for (const bd of balanceData) {
-          const acct = accounts.find(a => a.code === bd.account)
-          if (acct && bd.balance !== 0) {
+          if (bd.balance !== 0) {
             await db.account.update({
-              where: { id: acct.id },
+              where: { id: bd.accountId },
               data: { openingBalance: bd.balance },
             })
           }
         }
 
-        return NextResponse.json({ message: 'Year closed and next year created', nextFy, balances: balanceData.length })
+        // Carry forward net profit/loss to Retained Earnings
+        if (netProfitLoss !== 0) {
+          const retainedEarningsAcct = accounts.find(a =>
+            a.subType === 'RETAINED_EARNINGS' ||
+            a.name.toLowerCase().includes('retained earnings') ||
+            a.name.toLowerCase().includes('p&l account')
+          )
+          if (retainedEarningsAcct) {
+            const currentBalance = retainedEarningsAcct.openingBalance || 0
+            await db.account.update({
+              where: { id: retainedEarningsAcct.id },
+              data: { openingBalance: currentBalance + netProfitLoss },
+            })
+          }
+        }
+
+        return NextResponse.json({
+          message: 'Year closed and next year created',
+          nextFy,
+          balances: balanceData.length,
+          netProfitLoss,
+        })
       }
 
-      return NextResponse.json({ message: 'Financial year closed', balances: balanceData.length })
+      return NextResponse.json({ message: 'Financial year closed', balances: balanceData.length, netProfitLoss })
     }
 
     // Create new financial year

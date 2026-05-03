@@ -23,6 +23,41 @@ function formatCurrency(amount: number) {
   return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
 }
 
+/** Export statutory report data as CSV download */
+function exportStatutoryCSV(reportData: any, reportType: string) {
+  if (!reportData?.data?.rows || !reportData?.data?.columns) {
+    return
+  }
+  const columns = reportData.data.columns
+  const rows = reportData.data.rows
+  const title = reportData.meta?.report_type || reportType
+
+  // Build header row
+  const headers = ['Particulars', 'Note', ...columns.map((c: any) => c.label)]
+
+  // Build data rows
+  const csvRows = [headers.join(',')]
+  for (const row of rows) {
+    const label = `"${row.label.replace(/"/g, '""')}"`
+    const note = row.note_ref || ''
+    const values = columns.map((col: any) => {
+      const val = row.values?.[col.key] ?? 0
+      return val === 0 ? '' : String(val)
+    })
+    csvRows.push([label, note, ...values].join(','))
+  }
+
+  // Create and download file
+  const content = csvRows.join('\n')
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 interface FilterOption {
   id: string
   name: string
@@ -214,7 +249,7 @@ function StatutoryReports() {
             isConsolidated={viewMode === 'consolidated'}
             validationFailed={validationStatus === 'errors'}
             onPrint={() => window.print()}
-            onExportCSV={() => {/* TODO */}}
+            onExportCSV={() => exportStatutoryCSV(reportData, reportType)}
           >
             <MultiColumnBalanceSheet data={reportData.data} detailLevel={detailLevel as 'summary' | 'detailed'} />
           </ReportLayout>
@@ -229,7 +264,7 @@ function StatutoryReports() {
             isConsolidated={viewMode === 'consolidated'}
             validationFailed={validationStatus === 'errors'}
             onPrint={() => window.print()}
-            onExportCSV={() => {/* TODO */}}
+            onExportCSV={() => exportStatutoryCSV(reportData, reportType)}
           >
             <MultiColumnPL data={reportData.data} detailLevel={detailLevel as 'summary' | 'detailed'} />
           </ReportLayout>
@@ -244,7 +279,7 @@ function StatutoryReports() {
             isConsolidated={viewMode === 'consolidated'}
             validationFailed={validationStatus === 'errors'}
             onPrint={() => window.print()}
-            onExportCSV={() => {/* TODO */}}
+            onExportCSV={() => exportStatutoryCSV(reportData, reportType)}
           >
             <CashFlowStatement data={reportData.data} />
           </ReportLayout>
@@ -272,7 +307,7 @@ function StatutoryReports() {
             isConsolidated={viewMode === 'consolidated'}
             validationFailed={validationStatus === 'errors'}
             onPrint={() => window.print()}
-            onExportCSV={() => {/* TODO */}}
+            onExportCSV={() => exportStatutoryCSV(reportData, reportType)}
           >
             <FixedAssetSchedule
               data={reportData.data}

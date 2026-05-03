@@ -653,11 +653,13 @@ model FAMSSetting {
 model PayrollBatch {
   id              String   @id @default(cuid())
   batchNumber     String   @unique
+  name            String   @default("Payroll Batch")
   period          String   // "2024-01"
-  totalGross      Float
-  totalDeductions Float
-  totalNetPay     Float
-  totalEmployerCharges Float
+  projectId       String?  // Project for cross-charging
+  totalGross      Float    @default(0)
+  totalDeductions Float    @default(0)
+  totalNetPay     Float    @default(0)
+  totalEmployerCharges Float @default(0)
   status          String   @default("draft") // draft, approved, posted
   postedToGL      Boolean  @default(false)
   postedVoucherId String?  // Reference to GL voucher
@@ -673,13 +675,15 @@ model PayrollBatchLine {
   batch          PayrollBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
   employeeName   String
   employeeId     String
-  grossSalary    Float
+  basicSalary    Float       @default(0)
+  allowances     Float       @default(0)
+  grossSalary    Float       @default(0)
   incomeTax      Float       @default(0)
   eobiDeduction  Float       @default(0)
   providentFund  Float       @default(0)
   loanDeduction  Float       @default(0)
   otherDeductions Float      @default(0)
-  netPay         Float
+  netPay         Float       @default(0)
   employerEOBI   Float       @default(0)
   employerPF     Float       @default(0)
   projectId      String?     // For cross-charging
