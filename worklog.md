@@ -267,3 +267,41 @@ Stage Summary:
 - FAMS vouchers are now created as "draft" instead of "posted"
 - Both acquisition vouchers (BP) and depreciation/disposal vouchers (JV) follow the draft workflow
 - Users must review and post vouchers manually through the voucher management approval workflow
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Add project field to Fixed Asset Schedule and Intangible Asset Schedule, make reports professional
+
+Work Log:
+- Analyzed current FixedAssetSchedule.tsx (236 lines, simple flat table, no project columns)
+- Analyzed statutory API generateFixedAssetSchedule (lines 1523-1686, no project filtering, flat row format)
+- Rewrote generateFixedAssetSchedule in statutory/route.ts to use ReportRow format with multi-project columns
+  - Added per-project value computation using FixedAsset.project field matching
+  - Added prior year computation using priorDate()
+  - Structured rows with proper row_types (section_header, line_item, subtotal, grand_total)
+  - Two blocks: COST (Opening/Additions/Deletions/Closing) and DEPRECIATION (Opening Acc/For Period/Closing Acc/NBV)
+  - PPE categories: Land, Buildings, Vehicles, Furniture, Fixtures, Computer Equipment, Electrical Equipment, Geo tech Equipment, Survey Equipments, Office Equipment, Other
+  - Intangible categories: Turbon Pro, CivilStrips, Hydrohelp 2.6
+- Added intangible_asset_schedule to validReportTypes in statutory API
+- Added switch case for intangible_asset_schedule (calls same generateFixedAssetSchedule)
+- Rewrote FixedAssetSchedule.tsx component with:
+  - Dual-format support (new ReportRow format + legacy flat format)
+  - Multi-project columns from API columns data
+  - 3 KPI Summary Cards per section (Gross Cost, Accumulated Dep, NBV)
+  - Professional row styling matching MultiColumnBalanceSheet
+  - PPE and Intangibles tabs with note reference badges
+  - Cash flow link callout at bottom
+  - Print styling (hide tabs, show both sections)
+  - Responsive horizontal scroll with sticky first column
+- Updated reports.tsx to handle intangible_asset_schedule report type and pass proper project labels
+- Added statutoryReportTitle for intangible_asset_schedule
+- Verified: API returns 21 columns (18 projects + consolidated + prior + variance), 34 rows
+- Lint passes with 0 errors, dev server compiles successfully
+
+Stage Summary:
+- Fixed Asset Schedule now has full multi-project column support
+- Intangible Asset Schedule is now a valid report type
+- Both schedules show per-project values + consolidated + prior year + variance
+- Professional styling with KPI cards, section headers, proper formatting
+- Backward compatible with legacy flat format

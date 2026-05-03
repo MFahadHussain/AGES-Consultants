@@ -176,6 +176,7 @@ function StatutoryReports() {
     cash_flow: 'Statement of Cash Flows',
     fixed_assets: 'Fixed Asset Schedule',
     intangible_assets: 'Intangible Asset Schedule',
+    intangible_asset_schedule: 'Intangible Asset Schedule',
   }
 
   const renderStatutoryReport = () => {
@@ -249,19 +250,24 @@ function StatutoryReports() {
         )
       case 'fixed_assets':
       case 'intangible_assets':
+      case 'intangible_asset_schedule': {
+        const isIntangible = reportType === 'intangible_assets' || reportType === 'intangible_asset_schedule'
+        const scheduleTitle = isIntangible ? statutoryReportTitle.intangible_assets : statutoryReportTitle.fixed_assets
+        const projectLabel = viewMode === 'consolidated' ? 'Consolidated' : viewMode === 'single' ? 'Single Project' : 'Multi-Project'
         return (
           <ReportLayout
-            reportTitle={reportType === 'fixed_assets' ? statutoryReportTitle.fixed_assets : statutoryReportTitle.intangible_assets}
+            reportTitle={scheduleTitle}
             fromDate={periodFrom}
             toDate={periodTo}
-            projectName="All Projects"
+            projectName={projectLabel}
             validationFailed={validationStatus === 'errors'}
             onPrint={() => window.print()}
             onExportCSV={() => {/* TODO */}}
           >
-            <FixedAssetSchedule data={reportData.data} scheduleType={reportType === 'intangible_assets' ? 'intangible' : 'ppe'} />
+            <FixedAssetSchedule data={reportData.data} scheduleType={isIntangible ? 'intangible' : 'ppe'} />
           </ReportLayout>
         )
+      }
       default:
         return null
     }

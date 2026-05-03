@@ -1529,158 +1529,533 @@ async function generateFixedAssetSchedule(
 ) {
   const from = new Date(fromDate)
   const to = new Date(toDate)
+  const priorFrom = priorDate(fromDate)
+  const priorTo = priorDate(toDate)
+  const priorFromObj = new Date(priorFrom)
+  const priorToObj = new Date(priorTo)
 
-  // Fetch all active and disposed assets
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  /** Derive FAMS financial-year label from a date (assumes FY starts July) */
+  function getFYLabel(dateStr: string): string {
+    const d = new Date(dateStr)
+    const y = d.getFullYear()
+    const m = d.getMonth() // 0-indexed; July = 6
+    return m >= 6
+      ? `${y}-${String(y + 1).slice(-2)}`
+      : `${y - 1}-${String(y).slice(-2)}`
+  }
+
+  const currentFYLabel = getFYLabel(fromDate)
+  const priorFYLabel = getFYLabel(priorFrom)
+
+  /** Match an asset's `project` text field to one of our project IDs */
+  function resolveProjectId(assetProject: string | null): string | null {
+    if (!assetProject) return null
+    const ap = assetProject.toLowerCase().trim()
+    // Exact match on code, name, or id
+    for (const p of projects) {
+      if (ap === p.code.toLowerCase() || ap === p.name.toLowerCase() || ap === p.id) return p.id
+    }
+    // Partial / contains match
+    for (const p of projects) {
+      if (ap.includes(p.code.toLowerCase()) || p.code.toLowerCase().includes(ap)) return p.id
+    }
+    return null
+  }
+
+  /** Add an amount to a per-project metric Record, distributing unassigned equally */
+  function addMetric(metric: Record<string, number>, pid: string | null, amount: number) {
+    if (amount === 0) return
+    if (pid && projects.some(p => p.id === pid)) {
+      metric[pid] = r2((metric[pid] || 0) + amount)
+    } else if (projects.length > 0) {
+      // Distribute equally across all projects
+      const share = r2(amount / projects.length)
+      for (const p of projects) {
+        metric[p.id] = r2((metric[p.id] || 0) + share)
+      }
+    }
+    metric['consolidated'] = r2((metric['consolidated'] || 0) + amount)
+  }
+
+  function emptyMetric(): Record<string, number> {
+    const v: Record<string, number> = {}
+    for (const p of projects) v[p.id] = 0
+    v['consolidated'] = 0
+    return v
+  }
+
+  // ── Category mapping ─────────────────────────────────────────────────────
+
+  const ppeCategoryMap = [
+    { label: 'Land', keywords: ['land'] },
+    { label: 'Buildings', keywords: ['buildings', 'building', 'construction'] },
+    { label: 'Vehicles', keywords: ['vehicles', 'vehicle', 'motor', 'car'] },
+    { label: 'Furniture', keywords: ['furniture'] },
+    { label: 'Fixtures', keywords: ['fixtures', 'fixture'] },
+    { label: 'Computer Equipment', keywords: ['it hardware', 'computer', 'it asset'] },
+    { label: 'Electrical Equipment', keywords: ['electrical'] },
+    { label: 'Geo tech Equipment', keywords: ['geo tech', 'geotech'] },
+    { label: 'Survey Equipments', keywords: ['survey'] },
+    { label: 'Office Equipment', keywords: ['office equipment'] },
+  ]
+
+  const intangibleCategoryMap = [
+    { label: 'Turbon Pro', keywords: ['turbon', 'software'] },
+    { label: 'CivilStrips', keywords: ['civilstrips', 'civil strips'] },
+    { label: 'Hydrohelp 2.6', keywords: ['hydrohelp'] },
+  ]
+
+  function classifyAsset(category: string): { type: 'ppe' | 'intangible'; label: string } {
+    const cat = (category || '').toLowerCase().trim()
+    // Check intangible first (e.g. "Software" must map to intangible, not PPE)
+    for (const m of intangibleCategoryMap) {
+      if (m.keywords.some(kw => cat.includes(kw))) return { type: 'intangible', label: m.label }
+    }
+    for (const m of ppeCategoryMap) {
+      if (m.keywords.some(kw => cat.includes(kw))) return { type: 'ppe', label: m.label }
+    }
+    return { type: 'ppe', label: 'Other' }
+  }
+
+  // ── Per-category metric accumulation ─────────────────────────────────────
+
+  interface CatMetrics {
+    openingCost: Record<string, number>
+    additions: Record<string, number>
+    deletions: Record<string, number>
+    closingCost: Record<string, number>
+    openingAccDep: Record<string, number>
+    forPeriod: Record<string, number>
+    closingAccDep: Record<string, number>
+    nbv: Record<string, number>
+    // Prior period (closing values only – last-year closing = this-year opening)
+    priorClosingCost: Record<string, number>
+    priorAdditions: Record<string, number>
+    priorDeletions: Record<string, number>
+    priorOpeningAccDep: Record<string, number>
+    priorForPeriod: Record<string, number>
+    priorClosingAccDep: Record<string, number>
+    priorNbv: Record<string, number>
+  }
+
+  function emptyCatMetrics(): CatMetrics {
+    return {
+      openingCost: emptyMetric(), additions: emptyMetric(), deletions: emptyMetric(),
+      closingCost: emptyMetric(), openingAccDep: emptyMetric(), forPeriod: emptyMetric(),
+      closingAccDep: emptyMetric(), nbv: emptyMetric(),
+      priorClosingCost: emptyMetric(), priorAdditions: emptyMetric(),
+      priorDeletions: emptyMetric(), priorOpeningAccDep: emptyMetric(),
+      priorForPeriod: emptyMetric(), priorClosingAccDep: emptyMetric(), priorNbv: emptyMetric(),
+    }
+  }
+
+  const categoryData = new Map<string, { type: 'ppe' | 'intangible'; label: string; metrics: CatMetrics }>()
+
+  function getCatMetrics(type: 'ppe' | 'intangible', label: string): CatMetrics {
+    const key = `${type}:${label}`
+    if (!categoryData.has(key)) categoryData.set(key, { type, label, metrics: emptyCatMetrics() })
+    return categoryData.get(key)!.metrics
+  }
+
+  // ── Fetch assets ─────────────────────────────────────────────────────────
+
   const assets = await db.fixedAsset.findMany({
     where: {
       OR: [
         { status: 'Active' },
-        { status: 'Disposed', updatedAt: { gte: from, lte: to } },
+        { status: 'Disposed' },
       ],
     },
     include: {
       depreciationRecords: {
-        where: {
-          // Filter depreciation records for the current period
-          isPosted: true,
-        },
+        where: { isPosted: true },
         orderBy: { monthNumber: 'asc' },
       },
     },
     orderBy: { category: 'asc' },
   })
 
-  // PPE Categories
-  const ppeCategories = ['Land', 'Buildings', 'Machinery', 'Vehicles', 'Furniture', 'IT Hardware', 'Computer Software', 'Office Equipment', 'Other']
-  const intangibleCategories = ['Computer Software', 'Licenses', 'Other Intangible']
-
-  // Group assets by category
-  const ppeByCategory = new Map<string, typeof assets>()
-  const intangibleByCategory = new Map<string, typeof assets>()
+  // ── Process each asset ───────────────────────────────────────────────────
 
   for (const asset of assets) {
-    const cat = asset.category || 'Other'
-    const isIntangible = ['Computer Software', 'Software', 'Licenses', 'Intangible'].includes(cat)
+    const { type, label } = classifyAsset(asset.category)
+    const m = getCatMetrics(type, label)
+    const pid = resolveProjectId(asset.project)
+    const purchaseDate = new Date(asset.dateOfPurchase)
+    const isDisposed = asset.status === 'Disposed'
+    const disposalDate = isDisposed ? new Date(asset.updatedAt) : null
 
-    if (isIntangible) {
-      if (!intangibleByCategory.has(cat)) intangibleByCategory.set(cat, [])
-      intangibleByCategory.get(cat)!.push(asset)
-    } else {
-      if (!ppeByCategory.has(cat)) ppeByCategory.set(cat, [])
-      ppeByCategory.get(cat)!.push(asset)
+    // ─ Current period cost ─
+    const isOpening = purchaseDate < from && !isDisposed
+    const isAddition = purchaseDate >= from && purchaseDate <= to
+    const isDeletion = isDisposed && disposalDate != null && disposalDate >= from && disposalDate <= to
+
+    if (isOpening) addMetric(m.openingCost, pid, asset.purchasePrice)
+    if (isAddition) addMetric(m.additions, pid, asset.purchasePrice)
+    if (isDeletion) addMetric(m.deletions, pid, asset.purchasePrice)
+
+    // ─ Current period depreciation ─
+    const currentFYDep = asset.depreciationRecords
+      .filter(dr => dr.financialYear === currentFYLabel)
+      .reduce((s, dr) => s + dr.depreciationCharge, 0)
+    const priorFYDep = asset.depreciationRecords
+      .filter(dr => dr.financialYear === priorFYLabel)
+      .reduce((s, dr) => s + dr.depreciationCharge, 0)
+
+    // openingAccDep = total accumulated depreciation − current-period charge
+    const openingAccDepForAsset = r2(asset.accumulatedDepreciation - currentFYDep)
+
+    if (isOpening || isAddition) {
+      addMetric(m.forPeriod, pid, currentFYDep)
+      addMetric(m.openingAccDep, pid, isAddition ? 0 : openingAccDepForAsset)
+    }
+
+    // ─ Prior period ─
+    const isPriorAddition = purchaseDate >= priorFromObj && purchaseDate <= priorToObj
+    const isPriorDeletion = isDisposed && disposalDate != null && disposalDate >= priorFromObj && disposalDate <= priorToObj
+    // Prior-period opening: purchased before priorFrom and not disposed before priorFrom
+    const isPriorOpening = purchaseDate < priorFromObj && (!isDisposed || (disposalDate != null && disposalDate > priorToObj))
+
+    if (isPriorAddition) addMetric(m.priorAdditions, pid, asset.purchasePrice)
+    if (isPriorDeletion) addMetric(m.priorDeletions, pid, asset.purchasePrice)
+
+    if (isPriorOpening || isPriorAddition) {
+      // priorClosingAccDep = current openingAccDep (last-year closing = this-year opening)
+      addMetric(m.priorClosingAccDep, pid, openingAccDepForAsset)
+      addMetric(m.priorForPeriod, pid, priorFYDep)
+      // priorOpeningAccDep = priorClosingAccDep − priorFY depreciation
+      addMetric(m.priorOpeningAccDep, pid, r2(openingAccDepForAsset - priorFYDep))
+    }
+
+    // Prior closing cost = current opening cost (for assets that existed at start of current period)
+    if (isOpening) {
+      addMetric(m.priorClosingCost, pid, asset.purchasePrice)
     }
   }
 
-  function computeScheduleRows(categoryMap: Map<string, typeof assets>, sectionLabel: string, sectionPrefix: string) {
-    const rows: any[] = []
-    let rc = 0
+  // ── Derive computed metrics per category ─────────────────────────────────
 
-    // Header
-    rows.push({
-      row_id: `${sectionPrefix}_header`,
-      label: sectionLabel,
-      row_type: 'section_header',
-      columns: ['Rate', 'Opening Cost', 'Additions', 'Deletions', 'Closing Cost', 'Opening Acc Dep', 'For Period', 'Closing Acc Dep', 'Net Book Value'],
-    })
+  const allColKeys = [...projects.map(p => p.id), 'consolidated']
 
-    let totalOpeningCost = 0
-    let totalAdditions = 0
-    let totalDeletions = 0
-    let totalClosingCost = 0
-    let totalOpeningAccDep = 0
-    let totalForPeriod = 0
-    let totalClosingAccDep = 0
-    let totalNBV = 0
+  for (const [, cat] of categoryData) {
+    const cm = cat.metrics
+    // Current closing cost = opening + additions − deletions
+    for (const k of allColKeys) {
+      cm.closingCost[k] = r2((cm.openingCost[k] || 0) + (cm.additions[k] || 0) - (cm.deletions[k] || 0))
+      cm.closingAccDep[k] = r2((cm.openingAccDep[k] || 0) + (cm.forPeriod[k] || 0))
+      cm.nbv[k] = r2((cm.closingCost[k] || 0) - (cm.closingAccDep[k] || 0))
 
-    for (const [category, catAssets] of categoryMap) {
-      // Determine rate
-      const rate = catAssets[0]?.decliningRate || (catAssets[0]?.usefulLifeYears ? r2(100 / catAssets[0].usefulLifeYears) : 0)
-
-      // Opening cost = purchase price for assets purchased before fromDate (minus deletions)
-      const openingAssets = catAssets.filter(a => new Date(a.dateOfPurchase) < from && a.status !== 'Disposed')
-      const additionAssets = catAssets.filter(a => {
-        const purchaseDate = new Date(a.dateOfPurchase)
-        return purchaseDate >= from && purchaseDate <= to
-      })
-      const deletionAssets = catAssets.filter(a => a.status === 'Disposed')
-
-      const openingCost = openingAssets.reduce((s, a) => s + a.purchasePrice, 0)
-      const additions = additionAssets.reduce((s, a) => s + a.purchasePrice, 0)
-      const deletions = deletionAssets.reduce((s, a) => s + a.purchasePrice, 0)
-      const closingCost = r2(openingCost + additions - deletions)
-
-      // Accumulated depreciation
-      const openingAccDep = openingAssets.reduce((s, a) => {
-        // Accumulated depreciation before the period
-        const priorDep = a.depreciationRecords.filter(dr => {
-          const recDate = new Date(dr.period)
-          return recDate < from
-        })
-        return s + priorDep.reduce((s2, dr) => s2 + dr.depreciationCharge, 0)
-      }, 0)
-
-      const forPeriod = catAssets.filter(a => a.status === 'Active' || a.status === 'Disposed').reduce((s, a) => {
-        const periodDep = a.depreciationRecords.filter(dr => {
-          // Parse the period string (e.g., "Jul-2024") and check if within range
-          // Use monthNumber and financialYear to approximate
-          return dr.isPosted
-        })
-        return s + periodDep.reduce((s2, dr) => s2 + dr.depreciationCharge, 0)
-      }, 0)
-
-      const closingAccDep = r2(openingAccDep + forPeriod)
-      const nbv = r2(closingCost - closingAccDep)
-
-      rows.push({
-        row_id: `${sectionPrefix}_${++rc}`,
-        label: category,
-        row_type: 'line_item',
-        rate,
-        opening_cost: r2(openingCost),
-        additions: r2(additions),
-        deletions: r2(deletions),
-        closing_cost: closingCost,
-        opening_acc_dep: r2(openingAccDep),
-        for_period: r2(forPeriod),
-        closing_acc_dep: closingAccDep,
-        net_book_value: nbv,
-      })
-
-      totalOpeningCost += openingCost
-      totalAdditions += additions
-      totalDeletions += deletions
-      totalClosingCost += closingCost
-      totalOpeningAccDep += openingAccDep
-      totalForPeriod += forPeriod
-      totalClosingAccDep += closingAccDep
-      totalNBV += nbv
+      // Prior closing cost: if not already set from isOpening path, derive
+      if ((cm.priorClosingCost[k] || 0) === 0 && (cm.openingCost[k] || 0) > 0) {
+        cm.priorClosingCost[k] = cm.openingCost[k]
+      }
+      cm.priorNbv[k] = r2((cm.priorClosingCost[k] || 0) - (cm.priorClosingAccDep[k] || 0))
     }
-
-    // Total row
-    rows.push({
-      row_id: `${sectionPrefix}_total`,
-      label: `Total ${sectionLabel}`,
-      row_type: 'grand_total',
-      rate: null,
-      opening_cost: r2(totalOpeningCost),
-      additions: r2(totalAdditions),
-      deletions: r2(totalDeletions),
-      closing_cost: r2(totalClosingCost),
-      opening_acc_dep: r2(totalOpeningAccDep),
-      for_period: r2(totalForPeriod),
-      closing_acc_dep: r2(totalClosingAccDep),
-      net_book_value: r2(totalNBV),
-    })
-
-    return rows
   }
 
-  const ppeRows = computeScheduleRows(ppeByCategory, 'Property, Plant & Equipment', 'ppe')
-  const intangibleRows = computeScheduleRows(intangibleByCategory, 'Intangible Assets', 'int')
+  // ── Build ReportRows ─────────────────────────────────────────────────────
+
+  const rows: ReportRow[] = []
+  let rc = 0
+  const nextId = () => `fas_${++rc}`
+
+  /** Convert a per-project metric Record into a full values Record with prior_consolidated & variance */
+  function toValues(current: Record<string, number>, prior: Record<string, number>): Record<string, number> {
+    const vals: Record<string, number> = { ...current }
+    vals['prior_consolidated'] = prior['consolidated'] || 0
+    vals['variance'] = 0
+    return computeVariance(vals)
+  }
+
+  /** Sum multiple metric Records together */
+  function sumMetrics(...metrics: Record<string, number>[]): Record<string, number> {
+    const result = emptyMetric()
+    result['prior_consolidated'] = 0
+    for (const m of metrics) {
+      for (const k of allColKeys) {
+        result[k] = r2((result[k] || 0) + (m[k] || 0))
+      }
+      result['consolidated'] = r2((result['consolidated'] || 0) + (m['consolidated'] || 0))
+    }
+    return result
+  }
+
+  // Ordered category lists for display
+  const ppeDisplayOrder = ['Land', 'Buildings', 'Vehicles', 'Furniture', 'Fixtures', 'Computer Equipment', 'Electrical Equipment', 'Geo tech Equipment', 'Survey Equipments', 'Office Equipment', 'Other']
+  const intangibleDisplayOrder = ['Turbon Pro', 'CivilStrips', 'Hydrohelp 2.6']
+
+  function buildBlock(
+    assetType: 'ppe' | 'intangible',
+    sectionLabel: string,
+    sectionPrefix: string,
+    noteRef: string,
+    displayOrder: string[],
+  ): { rows: ReportRow[]; totalDepreciationForPeriod: number } {
+    const blockRows: ReportRow[] = []
+    const brc = { v: 0 }
+    const bnextId = () => `${sectionPrefix}_${++brc.v}`
+
+    // Collect categories of this type in display order
+    const orderedCats: { label: string; metrics: CatMetrics }[] = []
+    const seen = new Set<string>()
+    for (const lbl of displayOrder) {
+      const key = `${assetType}:${lbl}`
+      if (categoryData.has(key) && !seen.has(key)) {
+        orderedCats.push({ label: lbl, metrics: categoryData.get(key)!.metrics })
+        seen.add(key)
+      }
+    }
+    // Include any categories not in the display order
+    for (const [key, cat] of categoryData) {
+      if (cat.type === assetType && !seen.has(key)) {
+        orderedCats.push({ label: cat.label, metrics: cat.metrics })
+        seen.add(key)
+      }
+    }
+
+    // ── Section header ──
+    blockRows.push({
+      row_id: bnextId(), label: sectionLabel, note_ref: noteRef,
+      row_type: 'section_header', indent_level: 0,
+      values: zeroValues(projects), prior_values: zeroValues(projects), drilldown_available: false,
+    })
+
+    // ═══════════════════ COST BLOCK ═══════════════════
+    blockRows.push({
+      row_id: bnextId(), label: 'COST',
+      row_type: 'section_header', indent_level: 1,
+      values: zeroValues(projects), prior_values: zeroValues(projects), drilldown_available: false,
+    })
+
+    // --- Opening Cost ---
+    blockRows.push({
+      row_id: bnextId(), label: 'Opening Cost',
+      row_type: 'section_header', indent_level: 2,
+      values: zeroValues(projects), prior_values: zeroValues(projects), drilldown_available: false,
+    })
+    const totalOpeningCost = emptyMetric()
+    const totalPriorOpeningCost = emptyMetric()
+    for (const cat of orderedCats) {
+      blockRows.push({
+        row_id: bnextId(), label: cat.label, row_type: 'line_item', indent_level: 3,
+        values: toValues(cat.metrics.openingCost, cat.metrics.priorClosingCost),
+        prior_values: { ...cat.metrics.priorClosingCost, prior_consolidated: 0, variance: 0 },
+        drilldown_available: true,
+      })
+      for (const k of allColKeys) {
+        totalOpeningCost[k] = r2((totalOpeningCost[k] || 0) + (cat.metrics.openingCost[k] || 0))
+        totalPriorOpeningCost[k] = r2((totalPriorOpeningCost[k] || 0) + (cat.metrics.priorClosingCost[k] || 0))
+      }
+      totalOpeningCost['consolidated'] = r2((totalOpeningCost['consolidated'] || 0) + (cat.metrics.openingCost['consolidated'] || 0))
+      totalPriorOpeningCost['consolidated'] = r2((totalPriorOpeningCost['consolidated'] || 0) + (cat.metrics.priorClosingCost['consolidated'] || 0))
+    }
+    blockRows.push({
+      row_id: bnextId(), label: 'Total Opening Cost', row_type: 'subtotal', indent_level: 2,
+      values: toValues(totalOpeningCost, totalPriorOpeningCost),
+      prior_values: { ...totalPriorOpeningCost, prior_consolidated: 0, variance: 0 },
+      drilldown_available: false,
+    })
+
+    // --- Additions ---
+    blockRows.push({
+      row_id: bnextId(), label: 'Additions',
+      row_type: 'section_header', indent_level: 2,
+      values: zeroValues(projects), prior_values: zeroValues(projects), drilldown_available: false,
+    })
+    const totalAdditions = emptyMetric()
+    const totalPriorAdditions = emptyMetric()
+    for (const cat of orderedCats) {
+      blockRows.push({
+        row_id: bnextId(), label: cat.label, row_type: 'line_item', indent_level: 3,
+        values: toValues(cat.metrics.additions, cat.metrics.priorAdditions),
+        prior_values: { ...cat.metrics.priorAdditions, prior_consolidated: 0, variance: 0 },
+        drilldown_available: true,
+      })
+      for (const k of allColKeys) {
+        totalAdditions[k] = r2((totalAdditions[k] || 0) + (cat.metrics.additions[k] || 0))
+        totalPriorAdditions[k] = r2((totalPriorAdditions[k] || 0) + (cat.metrics.priorAdditions[k] || 0))
+      }
+      totalAdditions['consolidated'] = r2((totalAdditions['consolidated'] || 0) + (cat.metrics.additions['consolidated'] || 0))
+      totalPriorAdditions['consolidated'] = r2((totalPriorAdditions['consolidated'] || 0) + (cat.metrics.priorAdditions['consolidated'] || 0))
+    }
+    blockRows.push({
+      row_id: bnextId(), label: 'Total Additions', row_type: 'subtotal', indent_level: 2,
+      values: toValues(totalAdditions, totalPriorAdditions),
+      prior_values: { ...totalPriorAdditions, prior_consolidated: 0, variance: 0 },
+      drilldown_available: false,
+    })
+
+    // --- Deletions ---
+    blockRows.push({
+      row_id: bnextId(), label: 'Deletions',
+      row_type: 'section_header', indent_level: 2,
+      values: zeroValues(projects), prior_values: zeroValues(projects), drilldown_available: false,
+    })
+    const totalDeletions = emptyMetric()
+    const totalPriorDeletions = emptyMetric()
+    for (const cat of orderedCats) {
+      blockRows.push({
+        row_id: bnextId(), label: cat.label, row_type: 'line_item', indent_level: 3,
+        values: toValues(cat.metrics.deletions, cat.metrics.priorDeletions),
+        prior_values: { ...cat.metrics.priorDeletions, prior_consolidated: 0, variance: 0 },
+        drilldown_available: true,
+      })
+      for (const k of allColKeys) {
+        totalDeletions[k] = r2((totalDeletions[k] || 0) + (cat.metrics.deletions[k] || 0))
+        totalPriorDeletions[k] = r2((totalPriorDeletions[k] || 0) + (cat.metrics.priorDeletions[k] || 0))
+      }
+      totalDeletions['consolidated'] = r2((totalDeletions['consolidated'] || 0) + (cat.metrics.deletions['consolidated'] || 0))
+      totalPriorDeletions['consolidated'] = r2((totalPriorDeletions['consolidated'] || 0) + (cat.metrics.priorDeletions['consolidated'] || 0))
+    }
+    blockRows.push({
+      row_id: bnextId(), label: 'Total Deletions', row_type: 'subtotal', indent_level: 2,
+      values: toValues(totalDeletions, totalPriorDeletions),
+      prior_values: { ...totalPriorDeletions, prior_consolidated: 0, variance: 0 },
+      drilldown_available: false,
+    })
+
+    // --- Closing Cost ---
+    const totalClosingCost = emptyMetric()
+    const totalPriorClosingCost = emptyMetric()
+    for (const k of allColKeys) {
+      totalClosingCost[k] = r2((totalOpeningCost[k] || 0) + (totalAdditions[k] || 0) - (totalDeletions[k] || 0))
+      totalPriorClosingCost[k] = r2((totalPriorOpeningCost[k] || 0) + (totalPriorAdditions[k] || 0) - (totalPriorDeletions[k] || 0))
+    }
+    blockRows.push({
+      row_id: bnextId(), label: 'Closing Cost', row_type: 'subtotal', indent_level: 1,
+      values: toValues(totalClosingCost, totalPriorClosingCost),
+      prior_values: { ...totalPriorClosingCost, prior_consolidated: 0, variance: 0 },
+      drilldown_available: false,
+    })
+
+    // ═══════════════════ DEPRECIATION BLOCK ═══════════════════
+    blockRows.push({
+      row_id: bnextId(), label: 'DEPRECIATION',
+      row_type: 'section_header', indent_level: 1,
+      values: zeroValues(projects), prior_values: zeroValues(projects), drilldown_available: false,
+    })
+
+    // --- Opening Accumulated Depreciation ---
+    blockRows.push({
+      row_id: bnextId(), label: 'Opening Accumulated Depreciation',
+      row_type: 'section_header', indent_level: 2,
+      values: zeroValues(projects), prior_values: zeroValues(projects), drilldown_available: false,
+    })
+    const totalOpeningAccDep = emptyMetric()
+    const totalPriorOpeningAccDep = emptyMetric()
+    for (const cat of orderedCats) {
+      blockRows.push({
+        row_id: bnextId(), label: cat.label, row_type: 'line_item', indent_level: 3,
+        values: toValues(cat.metrics.openingAccDep, cat.metrics.priorOpeningAccDep),
+        prior_values: { ...cat.metrics.priorOpeningAccDep, prior_consolidated: 0, variance: 0 },
+        drilldown_available: true,
+      })
+      for (const k of allColKeys) {
+        totalOpeningAccDep[k] = r2((totalOpeningAccDep[k] || 0) + (cat.metrics.openingAccDep[k] || 0))
+        totalPriorOpeningAccDep[k] = r2((totalPriorOpeningAccDep[k] || 0) + (cat.metrics.priorOpeningAccDep[k] || 0))
+      }
+      totalOpeningAccDep['consolidated'] = r2((totalOpeningAccDep['consolidated'] || 0) + (cat.metrics.openingAccDep['consolidated'] || 0))
+      totalPriorOpeningAccDep['consolidated'] = r2((totalPriorOpeningAccDep['consolidated'] || 0) + (cat.metrics.priorOpeningAccDep['consolidated'] || 0))
+    }
+    blockRows.push({
+      row_id: bnextId(), label: 'Total Opening Acc. Dep.', row_type: 'subtotal', indent_level: 2,
+      values: toValues(totalOpeningAccDep, totalPriorOpeningAccDep),
+      prior_values: { ...totalPriorOpeningAccDep, prior_consolidated: 0, variance: 0 },
+      drilldown_available: false,
+    })
+
+    // --- Depreciation for the Period ---
+    blockRows.push({
+      row_id: bnextId(), label: 'Depreciation for the Period',
+      row_type: 'section_header', indent_level: 2,
+      values: zeroValues(projects), prior_values: zeroValues(projects), drilldown_available: false,
+    })
+    const totalForPeriod = emptyMetric()
+    const totalPriorForPeriod = emptyMetric()
+    for (const cat of orderedCats) {
+      blockRows.push({
+        row_id: bnextId(), label: cat.label, row_type: 'line_item', indent_level: 3,
+        values: toValues(cat.metrics.forPeriod, cat.metrics.priorForPeriod),
+        prior_values: { ...cat.metrics.priorForPeriod, prior_consolidated: 0, variance: 0 },
+        drilldown_available: true,
+      })
+      for (const k of allColKeys) {
+        totalForPeriod[k] = r2((totalForPeriod[k] || 0) + (cat.metrics.forPeriod[k] || 0))
+        totalPriorForPeriod[k] = r2((totalPriorForPeriod[k] || 0) + (cat.metrics.priorForPeriod[k] || 0))
+      }
+      totalForPeriod['consolidated'] = r2((totalForPeriod['consolidated'] || 0) + (cat.metrics.forPeriod['consolidated'] || 0))
+      totalPriorForPeriod['consolidated'] = r2((totalPriorForPeriod['consolidated'] || 0) + (cat.metrics.priorForPeriod['consolidated'] || 0))
+    }
+    blockRows.push({
+      row_id: bnextId(), label: 'Total Depreciation for Period', row_type: 'subtotal', indent_level: 2,
+      values: toValues(totalForPeriod, totalPriorForPeriod),
+      prior_values: { ...totalPriorForPeriod, prior_consolidated: 0, variance: 0 },
+      drilldown_available: false,
+    })
+
+    // --- Closing Accumulated Depreciation ---
+    const totalClosingAccDep = emptyMetric()
+    const totalPriorClosingAccDep = emptyMetric()
+    for (const k of allColKeys) {
+      totalClosingAccDep[k] = r2((totalOpeningAccDep[k] || 0) + (totalForPeriod[k] || 0))
+      totalPriorClosingAccDep[k] = r2((totalPriorOpeningAccDep[k] || 0) + (totalPriorForPeriod[k] || 0))
+    }
+    blockRows.push({
+      row_id: bnextId(), label: 'Closing Accumulated Depreciation', row_type: 'subtotal', indent_level: 1,
+      values: toValues(totalClosingAccDep, totalPriorClosingAccDep),
+      prior_values: { ...totalPriorClosingAccDep, prior_consolidated: 0, variance: 0 },
+      drilldown_available: false,
+    })
+
+    // --- Net Book Value ---
+    blockRows.push({
+      row_id: bnextId(), label: 'NET BOOK VALUE',
+      row_type: 'section_header', indent_level: 1,
+      values: zeroValues(projects), prior_values: zeroValues(projects), drilldown_available: false,
+    })
+    const totalNbv = emptyMetric()
+    const totalPriorNbv = emptyMetric()
+    for (const cat of orderedCats) {
+      blockRows.push({
+        row_id: bnextId(), label: cat.label, row_type: 'line_item', indent_level: 2,
+        values: toValues(cat.metrics.nbv, cat.metrics.priorNbv),
+        prior_values: { ...cat.metrics.priorNbv, prior_consolidated: 0, variance: 0 },
+        drilldown_available: true,
+      })
+      for (const k of allColKeys) {
+        totalNbv[k] = r2((totalNbv[k] || 0) + (cat.metrics.nbv[k] || 0))
+        totalPriorNbv[k] = r2((totalPriorNbv[k] || 0) + (cat.metrics.priorNbv[k] || 0))
+      }
+      totalNbv['consolidated'] = r2((totalNbv['consolidated'] || 0) + (cat.metrics.nbv['consolidated'] || 0))
+      totalPriorNbv['consolidated'] = r2((totalPriorNbv['consolidated'] || 0) + (cat.metrics.priorNbv['consolidated'] || 0))
+    }
+    blockRows.push({
+      row_id: bnextId(), label: 'Total Net Book Value', row_type: 'grand_total', indent_level: 1,
+      values: toValues(totalNbv, totalPriorNbv),
+      prior_values: { ...totalPriorNbv, prior_consolidated: 0, variance: 0 },
+      drilldown_available: false,
+    })
+
+    return {
+      rows: blockRows,
+      totalDepreciationForPeriod: r2(totalForPeriod['consolidated'] || 0),
+    }
+  }
+
+  // ── Build PPE and Intangible blocks ──────────────────────────────────────
+
+  const ppeBlock = buildBlock('ppe', 'PROPERTY, PLANT & EQUIPMENT', 'ppe', 'Note 4', ppeDisplayOrder)
+  const intBlock = buildBlock('intangible', 'INTANGIBLE ASSETS', 'int', 'Note 5', intangibleDisplayOrder)
+
+  rows.push(...ppeBlock.rows, ...intBlock.rows)
 
   return {
-    ppe: ppeRows,
-    intangibles: intangibleRows,
+    columns: buildColumns(projects),
+    rows,
+    ppe: { noteRef: 'Note 4', totalDepreciationForPeriod: ppeBlock.totalDepreciationForPeriod },
+    intangibles: { noteRef: 'Note 5', totalDepreciationForPeriod: intBlock.totalDepreciationForPeriod },
     currency: 'PKR',
   }
 }
@@ -1864,7 +2239,7 @@ export async function GET(request: Request) {
     const detailLevel = searchParams.get('detailLevel') || 'summary'
 
     // Validate report type
-    const validReportTypes = ['balance_sheet', 'profit_loss', 'cash_flow', 'fixed_assets', 'validation']
+    const validReportTypes = ['balance_sheet', 'profit_loss', 'cash_flow', 'fixed_assets', 'intangible_asset_schedule', 'validation']
     if (!validReportTypes.includes(reportType)) {
       return NextResponse.json(
         { status: 'error', error: `Invalid reportType. Must be one of: ${validReportTypes.join(', ')}` },
@@ -1915,6 +2290,10 @@ export async function GET(request: Request) {
         break
       }
       case 'fixed_assets': {
+        data = await generateFixedAssetSchedule(fromDate, toDate, effectiveProjectIds, projects, detailLevel)
+        break
+      }
+      case 'intangible_asset_schedule': {
         data = await generateFixedAssetSchedule(fromDate, toDate, effectiveProjectIds, projects, detailLevel)
         break
       }
