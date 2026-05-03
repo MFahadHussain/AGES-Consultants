@@ -22,6 +22,18 @@ export type ModuleKey =
   | 'settings'
   | 'fixed-assets'
   | 'payroll'
+  | 'user-management'
+
+export interface AuthUser {
+  id: string
+  email: string
+  name: string
+  role: string
+  isActive: boolean
+  avatarUrl: string | null
+  lastLoginAt: string | null
+  createdAt: string
+}
 
 interface AppState {
   activeModule: ModuleKey
@@ -30,6 +42,8 @@ interface AppState {
   setSidebarOpen: (open: boolean) => void
   searchQuery: string
   setSearchQuery: (query: string) => void
+  authUser: AuthUser | null
+  setAuthUser: (user: AuthUser | null) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -39,4 +53,6 @@ export const useAppStore = create<AppState>((set) => ({
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   searchQuery: '',
   setSearchQuery: (query) => set({ searchQuery: query }),
+  authUser: null,
+  setAuthUser: (user) => set({ authUser: user }),
 }))

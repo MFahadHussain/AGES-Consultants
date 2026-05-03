@@ -1,7 +1,7 @@
 'use client'
 
 import { useAppStore, type ModuleKey } from '@/lib/store'
-import { Menu, Bell, Moon, Sun, User, Search } from 'lucide-react'
+import { Menu, Bell, Moon, Sun, User, Search, LogOut, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useTheme } from 'next-themes'
@@ -42,6 +42,8 @@ const moduleLabels: Record<ModuleKey, string> = {
   settings: 'Settings',
   'fixed-assets': 'Fixed Assets',
   payroll: 'Payroll Integration',
+  'user-management': 'User Management',
+  clients: 'Clients',
 }
 
 const moduleGroups: Record<ModuleKey, string> = {
@@ -65,13 +67,28 @@ const moduleGroups: Record<ModuleKey, string> = {
   settings: 'System',
   'fixed-assets': 'Integration',
   payroll: 'Integration',
+  'user-management': 'System',
+  clients: 'Segments',
+}
+
+interface AuthUser {
+  id: string
+  email: string
+  name: string
+  role: string
+  isActive: boolean
+  avatarUrl: string | null
+  lastLoginAt: string | null
+  createdAt: string
 }
 
 interface HeaderProps {
   onSearchOpen?: () => void
+  authUser?: AuthUser | null
+  onLogout?: () => void
 }
 
-export function Header({ onSearchOpen }: HeaderProps) {
+export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
   const { activeModule, setSidebarOpen, sidebarOpen, setActiveModule } = useAppStore()
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -236,15 +253,52 @@ export function Header({ onSearchOpen }: HeaderProps) {
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
         )}
-        <div className="flex items-center gap-2 pl-2 border-l">
-          <div className="h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-            <User className="h-3.5 w-3.5" />
-          </div>
-          <div className="hidden md:block">
-            <p className="text-xs font-medium">Admin</p>
-            <p className="text-[10px] text-muted-foreground">admin@acctfin.com</p>
-          </div>
-        </div>
+        {/* User Profile Popover */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className="flex items-center gap-2 pl-2 border-l cursor-pointer hover:bg-accent/50 rounded-md px-2 py-1 transition-colors">
+              <div className="h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                <User className="h-3.5 w-3.5" />
+              </div>
+              <div className="hidden md:block text-left">
+                <p className="text-xs font-medium">{authUser?.name || 'Admin'}</p>
+                <p className="text-[10px] text-muted-foreground">{authUser?.email || 'admin@acctfin.com'}</p>
+              </div>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-0" align="end">
+            <div className="px-4 py-3 border-b">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                  <User className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{authUser?.name || 'Admin'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{authUser?.email || 'admin@acctfin.com'}</p>
+                </div>
+              </div>
+              <div className="mt-2">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-700 capitalize">{authUser?.role || 'admin'}</span>
+              </div>
+            </div>
+            <div className="p-1">
+              <button
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md hover:bg-accent transition-colors"
+                onClick={() => setActiveModule('settings')}
+              >
+                <Settings className="h-3.5 w-3.5" />
+                System Settings
+              </button>
+              <button
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md hover:bg-red-50 hover:text-red-600 transition-colors text-slate-700"
+                onClick={onLogout}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                Sign Out
+              </button>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </header>
   )

@@ -17,13 +17,16 @@ datasource db {
 // ============================================================
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  role      String   @default("viewer") // admin, manager, accountant, auditor, viewer
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String   @default("") // bcrypt hash; empty for system/OAuth users
+  role         String   @default("viewer") // admin, manager, accountant, auditor, viewer
+  isActive     Boolean  @default(true)
+  avatarUrl    String?  // Optional avatar URL
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   auditLogs       AuditLog[]
   voucherActions  VoucherApproval[]

@@ -95,6 +95,7 @@ const navigation: NavGroup[] = [
   {
     label: 'System',
     items: [
+      { key: 'user-management', label: 'User Management', icon: Users },
       { key: 'import-export', label: 'Import / Export', icon: Download },
       { key: 'audit-log', label: 'Audit Trail', icon: Shield },
       { key: 'settings', label: 'Settings', icon: Settings },

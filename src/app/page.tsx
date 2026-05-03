@@ -6,7 +6,8 @@ import { Header } from '@/components/layout/header'
 import { GlobalSearch } from '@/components/layout/global-search'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { lazy, Suspense, useEffect, useState, useMemo } from 'react'
+import LoginPage from '@/components/auth/LoginPage'
+import { lazy, Suspense, useEffect, useState } from 'react'
 
 // Lazy-load all modules to prevent compiling everything on initial page load
 // This dramatically reduces memory usage during development
@@ -31,6 +32,7 @@ const PayrollIntegration = lazy(() => import('@/components/modules/payroll').the
 const ImportExport = lazy(() => import('@/components/modules/import-export').then(m => ({ default: m.ImportExport })))
 const AuditTrail = lazy(() => import('@/components/modules/audit-trail').then(m => ({ default: m.AuditTrail })))
 const SettingsModule = lazy(() => import('@/components/modules/settings').then(m => ({ default: m.SettingsModule })))
+const UserManagement = lazy(() => import('@/components/modules/user-management').then(m => ({ default: m.UserManagement })))
 
 const moduleComponents: Record<ModuleKey, React.LazyExoticComponent<React.ComponentType>> = {
   dashboard: Dashboard,
@@ -52,6 +54,7 @@ const moduleComponents: Record<ModuleKey, React.LazyExoticComponent<React.Compon
   'import-export': ImportExport,
   'audit-log': AuditTrail,
   settings: SettingsModule,
+  'user-management': UserManagement,
   'fixed-assets': FixedAssetsIntegration,
   payroll: PayrollIntegration,
 }
@@ -75,7 +78,7 @@ function ModuleLoader() {
 }
 
 export default function Home() {
-  const { activeModule, setActiveModule, sidebarOpen, setSidebarOpen } = useAppStore()
+  const { activeModule, sidebarOpen, setSidebarOpen, authUser, setAuthUser } = useAppStore()
   const isMobile = useIsMobile()
   const [searchOpen, setSearchOpen] = useState(false)
 
@@ -84,6 +87,18 @@ export default function Home() {
     if (isMobile) setSidebarOpen(false)
   }, [activeModule, isMobile, setSidebarOpen])
 
+  // Show login page if not authenticated
+  if (!authUser) {
+    return (
+      <LoginPage
+        onLoginSuccess={(user) => {
+          setAuthUser(user)
+        }}
+      />
+    )
+  }
+
+  // Main ERP application
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Desktop Sidebar */}
@@ -99,7 +114,7 @@ export default function Home() {
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <Header onSearchOpen={() => setSearchOpen(true)} />
+        <Header onSearchOpen={() => setSearchOpen(true)} authUser={authUser} onLogout={() => setAuthUser(null)} />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <ModuleLoader />
         </main>

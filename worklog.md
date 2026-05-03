@@ -565,3 +565,57 @@ Stage Summary:
 - All three modules use shadcn/ui components (AlertDialog for confirmations, Dialog for forms, Tabs, Badge, Table, etc.)
 - Prisma schema updated with PayrollBatch.name, PayrollBatch.projectId, PayrollBatchLine.basicSalary, PayrollBatchLine.allowances
 - All API endpoints properly handle error cases (posted batches, active budgets, constraint violations)
+---
+Task ID: 1
+Agent: Main Agent
+Task: Build professional enterprise ERP login page and User Management admin panel
+
+Work Log:
+- Updated Prisma schema: Added passwordHash, avatarUrl, lastLoginAt fields to User model
+- Ran db:push and db:generate to sync database and regenerate Prisma client
+- Installed bcryptjs for password hashing (fell back to SHA-256 via crypto.subtle for Turbopack compatibility)
+- Created /api/auth/login/route.ts: POST handler with email/password validation, SHA-256 hash comparison, last login tracking, audit log
+- Created /api/auth/reset-password/route.ts: POST handler for password reset requests (always returns success to prevent email enumeration)
+- Created /api/auth/seed/route.ts: POST handler to seed default users with SHA-256 hashed passwords
+- Seeded 7 default users (admin@acctfin.com, manager@acctfin.com, accountant@acctfin.com, auditor@acctfin.com, viewer@acctfin.com, ahussain@acctfin.com) with default password "AcctFin@2025"
+- Built LoginPage component (src/components/auth/LoginPage.tsx) with exact specifications:
+  - Full-page centered layout on bg-slate-50
+  - White login card with 2×2 grid logo mark (bottom-right blue)
+  - "AcctFinERP" branding with "Fin" in blue
+  - Email/password fields with inline validation and slide-down error animations
+  - Show/hide password toggle
+  - Remember me checkbox + Forgot password overlay with reset flow
+  - Sign In button with loading spinner (1.8s delay + API call)
+  - Invalid credentials alert banner with animation
+  - Google Workspace SSO button
+  - Security badge with ShieldCheck icon
+  - Page footer with version info and "Build by Fahad Hussain"
+- Built UserManagement component (src/components/modules/user-management.tsx) with exact specifications:
+  - Role guard rules comment block at top
+  - Auth context reads from Zustand store (useCurrentUser hook)
+  - Admin-only "+ Add User" button
+  - Users table with initials avatars, color-coded role badges, status dots, action buttons
+  - Search & filter bar (search, role dropdown, status dropdown, result count)
+  - Add/Edit user modal with form validation, role dropdown (admin-only), status toggle, password (add mode)
+  - Delete confirmation dialog with red "Remove User" button
+  - Role Permission Matrix card with check/dash cells
+  - Empty state with "No users found" and "Clear filters" button
+  - SHA-256 client-side password hashing for new users
+- Updated Zustand store (src/lib/store.ts): Added AuthUser type, authUser state, setAuthUser action
+- Updated page.tsx: Login flow using Zustand store, authUser check, onLoginSuccess/onLogout callbacks
+- Updated Header (src/components/layout/header.tsx):
+  - Added authUser and onLogout props
+  - User profile popover with name, email, role badge, System Settings link, Sign Out button
+  - Added user-management and clients to module labels/groups
+- Updated Sidebar: User Management added under System group
+- Updated globals.css: Added slideDownFade keyframe animation for login alert banner
+- All lint checks pass (0 errors, 4 pre-existing warnings)
+
+Stage Summary:
+- Complete enterprise login page with professional design matching all specifications
+- Complete User Management admin panel with role-based access control
+- Auth flow: Login → Dashboard (with user state in Zustand)
+- Logout via header user profile popover
+- Default password for all users: AcctFin@2025
+- 7 seeded users across all 5 roles (admin, manager, accountant, auditor, viewer)
+- API endpoints: POST /api/auth/login, POST /api/auth/reset-password, POST /api/auth/seed
