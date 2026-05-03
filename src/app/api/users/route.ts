@@ -51,10 +51,14 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, email, role, isActive } = body
+    const { name, email, role, isActive, passwordHash } = body
 
     if (!name || !email) {
       return NextResponse.json({ error: 'Name and email are required' }, { status: 400 })
+    }
+
+    if (!passwordHash) {
+      return NextResponse.json({ error: 'Password is required' }, { status: 400 })
     }
 
     // Check if email already exists
@@ -73,8 +77,18 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         email,
+        passwordHash,
         role: userRole,
         isActive: isActive !== undefined ? isActive : true,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
       },
     })
 

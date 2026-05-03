@@ -276,9 +276,15 @@ export function UserManagement() {
     }
 
     if (!editingUser) {
+      // New user: password is required
       if (!form.password) {
         errors.password = 'Password is required'
       } else if (form.password.length < 8) {
+        errors.password = 'Password must be at least 8 characters'
+      }
+    } else {
+      // Edit user: password is optional, but if provided must be at least 8 chars
+      if (form.password && form.password.length < 8) {
         errors.password = 'Password must be at least 8 characters'
       }
     }
@@ -303,6 +309,11 @@ export function UserManagement() {
           email: form.email,
           role: form.role,
           isActive: form.isActive,
+        }
+
+        // Include password hash only if a new password was entered
+        if (form.password) {
+          payload.passwordHash = await hashPassword(form.password)
         }
 
         const res = await fetch(`/api/users/${editingUser.id}`, {
@@ -837,39 +848,42 @@ export function UserManagement() {
                 </div>
               </div>
 
-              {/* Password (add mode only) */}
-              {!editingUser && (
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium text-slate-700">
-                    Password <span className="text-red-500">*</span>
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      type={showPassword ? 'text' : 'password'}
-                      className={`h-9 text-sm pr-10 ${formErrors.password ? 'border-red-300 focus-visible:ring-red-200' : ''}`}
-                      placeholder="Minimum 8 characters"
-                      value={form.password}
-                      onChange={e => {
-                        setForm(prev => ({ ...prev, password: e.target.value }))
-                        if (formErrors.password) setFormErrors(prev => ({ ...prev, password: '' }))
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  {formErrors.password && (
-                    <p className="text-xs text-red-500 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      {formErrors.password}
-                    </p>
-                  )}
+              {/* Password */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">
+                  Password {!editingUser && <span className="text-red-500">*</span>}
+                </Label>
+                {editingUser && (
+                  <p className="text-xs text-muted-foreground -mt-0.5 mb-1">
+                    Leave blank to keep current password
+                  </p>
+                )}
+                <div className="relative">
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    className={`h-9 text-sm pr-10 ${formErrors.password ? 'border-red-300 focus-visible:ring-red-200' : ''}`}
+                    placeholder={editingUser ? 'Enter new password to change' : 'Minimum 8 characters'}
+                    value={form.password}
+                    onChange={e => {
+                      setForm(prev => ({ ...prev, password: e.target.value }))
+                      if (formErrors.password) setFormErrors(prev => ({ ...prev, password: '' }))
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
-              )}
+                {formErrors.password && (
+                  <p className="text-xs text-red-500 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {formErrors.password}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Modal Footer */}

@@ -40,7 +40,7 @@ export async function PUT(
   try {
     const { id } = await params
     const body = await request.json()
-    const { name, email, role, isActive } = body
+    const { name, email, role, isActive, passwordHash } = body
 
     const existing = await db.user.findUnique({ where: { id } })
     if (!existing) {
@@ -68,10 +68,26 @@ export async function PUT(
     if (email !== undefined) updateData.email = email
     if (role !== undefined) updateData.role = role
     if (isActive !== undefined) updateData.isActive = isActive
+    if (passwordHash) updateData.passwordHash = passwordHash
+
+    // Build audit details without passwordHash
+    const auditChanges = { ...updateData }
+    if (auditChanges.passwordHash) {
+      auditChanges.passwordHash = '[REDACTED]'
+    }
 
     const user = await db.user.update({
       where: { id },
       data: updateData,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     })
 
     // Log the update
@@ -83,7 +99,7 @@ export async function PUT(
           action: 'UPDATE',
           entity: 'User',
           entityId: id,
-          details: JSON.stringify({ changes: updateData }),
+          details: JSON.stringify({ changes: auditChanges }),
         },
       })
     } catch {
