@@ -619,3 +619,26 @@ Stage Summary:
 - Default password for all users: AcctFin@2025
 - 7 seeded users across all 5 roles (admin, manager, accountant, auditor, viewer)
 - API endpoints: POST /api/auth/login, POST /api/auth/reset-password, POST /api/auth/seed
+---
+Task ID: 1
+Agent: Main Agent
+Task: Implement role-based dashboard and sidebar filtering
+
+Work Log:
+- Analyzed existing dashboard component (role-agnostic, showed same data to all users)
+- Analyzed sidebar (showed all modules to all users)
+- Designed 5 distinct dashboard layouts for admin, manager, accountant, auditor, viewer
+- Rewrote dashboard.tsx with RoleWelcomeBanner + 5 role-specific dashboard components
+- Added ROLE_MODULES access control map for sidebar filtering
+- Rewrote sidebar.tsx with useAllowedModules() hook that filters nav items by role
+- Added role badge in sidebar footer showing current role + visible module count
+
+Stage Summary:
+- Dashboard now shows completely different content based on user role:
+  - Admin: Full KPIs, admin quick actions (Users, Settings, Audit, Import/Export), charts, budgets, vouchers, system overview, integration status
+  - Manager: Approval-focused with pending alert banner, KPIs, voucher pipeline, budget utilization, recent vouchers
+  - Accountant: Voucher creation focus with quick action cards (New Voucher, My Drafts, COA, Reports), work queue counter, recent vouchers
+  - Auditor: Compliance-focused with status cards (Posted/Approved/Rejected), full financial KPIs, account type chart, audit navigation, read-only system overview
+  - Viewer: Minimal view with read-only notice, basic KPIs, voucher status chart, report links only
+- Sidebar now filters modules by role (viewer only sees Dashboard, COA, Ledgers, Projects, Donors, Reports)
+- Lint passes with 0 errors

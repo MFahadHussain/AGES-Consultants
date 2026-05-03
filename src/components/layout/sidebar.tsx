@@ -26,12 +26,66 @@ import {
   ChevronDown,
   ChevronRight,
   Search,
+  UserCog,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
+
+// ============================================================
+// Role-Based Module Access Control
+// ============================================================
+
+type UserRole = 'admin' | 'manager' | 'accountant' | 'auditor' | 'viewer'
+
+// Defines which modules each role can access
+const ROLE_MODULES: Record<UserRole, ModuleKey[]> = {
+  admin: [
+    'dashboard', 'chart-of-accounts', 'vouchers', 'ledgers', 'bank-reconciliation',
+    'customers', 'suppliers', 'projects', 'donors', 'locations', 'clients',
+    'budgets', 'taxation', 'aging', 'financial-year',
+    'reports', 'fixed-assets', 'payroll',
+    'user-management', 'import-export', 'audit-log', 'settings',
+  ],
+  manager: [
+    'dashboard', 'chart-of-accounts', 'vouchers', 'ledgers', 'bank-reconciliation',
+    'customers', 'suppliers', 'projects', 'donors', 'locations', 'clients',
+    'budgets', 'taxation', 'aging', 'financial-year',
+    'reports', 'fixed-assets', 'payroll',
+    'audit-log',
+  ],
+  accountant: [
+    'dashboard', 'chart-of-accounts', 'vouchers', 'ledgers', 'bank-reconciliation',
+    'customers', 'suppliers', 'projects', 'donors', 'locations', 'clients',
+    'budgets', 'taxation', 'aging', 'financial-year',
+    'reports', 'fixed-assets', 'payroll',
+  ],
+  auditor: [
+    'dashboard', 'chart-of-accounts', 'vouchers', 'ledgers',
+    'customers', 'suppliers', 'projects', 'donors', 'locations', 'clients',
+    'budgets', 'aging', 'financial-year',
+    'reports', 'fixed-assets', 'payroll',
+    'audit-log',
+  ],
+  viewer: [
+    'dashboard', 'chart-of-accounts', 'ledgers',
+    'projects', 'donors',
+    'reports',
+  ],
+}
+
+function useAllowedModules(): Set<ModuleKey> {
+  const { authUser } = useAppStore()
+  const role = (authUser?.role || 'viewer') as UserRole
+  const allowed = ROLE_MODULES[role] || ROLE_MODULES.viewer
+  return new Set(allowed)
+}
+
+// ============================================================
+// Navigation Definition
+// ============================================================
 
 interface NavGroup {
   label: string
@@ -95,7 +149,7 @@ const navigation: NavGroup[] = [
   {
     label: 'System',
     items: [
-      { key: 'user-management', label: 'User Management', icon: Users },
+      { key: 'user-management', label: 'User Management', icon: UserCog },
       { key: 'import-export', label: 'Import / Export', icon: Download },
       { key: 'audit-log', label: 'Audit Trail', icon: Shield },
       { key: 'settings', label: 'Settings', icon: Settings },
@@ -103,20 +157,39 @@ const navigation: NavGroup[] = [
   },
 ]
 
+// ============================================================
+// Sidebar Component
+// ============================================================
+
 export function Sidebar() {
-  const { activeModule, setActiveModule, sidebarOpen, searchQuery, setSearchQuery } = useAppStore()
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ Overview: true, Accounting: true, Masters: true, Reports: true })
+  const { activeModule, setActiveModule, sidebarOpen, searchQuery, setSearchQuery, authUser } = useAppStore()
+  const allowedModules = useAllowedModules()
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    Overview: true, Accounting: true, Masters: true, Reports: true,
+  })
 
   const toggleGroup = (label: string) => {
     setExpandedGroups(prev => ({ ...prev, [label]: !prev[label] }))
   }
 
-  const filteredNav = navigation.map(group => ({
-    ...group,
-    items: group.items.filter(item =>
-      !searchQuery || item.label.toLowerCase().includes(searchQuery.toLowerCase())
-    ),
-  })).filter(group => group.items.length > 0)
+  // Filter navigation by role + search
+  const filteredNav = navigation
+    .map(group => ({
+      ...group,
+      items: group.items
+        .filter(item => allowedModules.has(item.key))
+        .filter(item => !searchQuery || item.label.toLowerCase().includes(searchQuery.toLowerCase())),
+    }))
+    .filter(group => group.items.length > 0)
+
+  const role = (authUser?.role || 'viewer') as UserRole
+  const roleBadgeColor: Record<UserRole, string> = {
+    admin: 'bg-slate-900 text-white',
+    manager: 'bg-blue-100 text-blue-700',
+    accountant: 'bg-emerald-100 text-emerald-700',
+    auditor: 'bg-amber-100 text-amber-700',
+    viewer: 'bg-slate-100 text-slate-500',
+  }
 
   return (
     <aside
@@ -199,10 +272,18 @@ export function Sidebar() {
         ))}
       </ScrollArea>
 
-      {/* Version */}
+      {/* Role Badge + Version */}
       {sidebarOpen && (
-        <div className="px-3 py-2 border-t text-[10px] text-muted-foreground">
-          v1.0.0 • Multi-Project • Multi-Donor
+        <div className="px-3 py-2 border-t">
+          <div className="flex items-center gap-2 mb-1">
+            <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${roleBadgeColor[role] || 'bg-slate-100 text-slate-500'}`}>
+              {role.charAt(0).toUpperCase() + role.slice(1)}
+            </span>
+            <span className="text-[10px] text-muted-foreground">
+              {filteredNav.reduce((sum, g) => sum + g.items.length, 0)} modules
+            </span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">v1.0.0 • Multi-Project • Multi-Donor</p>
         </div>
       )}
     </aside>
