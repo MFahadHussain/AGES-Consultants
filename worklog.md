@@ -104,3 +104,87 @@ Stage Summary:
 - Non-posting accounts excluded from financial reports
 - All new report APIs tested and returning proper data
 - Lint passes with 0 errors
+
+---
+Task ID: 4
+Agent: report-frontend-builder
+Task: Build frontend report components for Multi-Project Statutory Financial Reporting Engine
+
+Work Log:
+- Created src/lib/report-utils.ts with PKR formatting utilities (formatPKR, formatNegativePKR, formatZero, formatVariance, getCurrentFinancialYear, formatPeriodString, formatPKRWithSymbol, RowType)
+- Created src/components/reports/ReportControlPanel.tsx — control panel with report type select, view mode toggle, multi-select project list with select all/none, date pickers for financial year, detail level toggle, generate button, validation status chip
+- Created src/components/reports/MultiColumnBalanceSheet.tsx — horizontally scrollable sticky-column financial grid with row type styling (section_header, line_item, sub_line, sub_subtotal, subtotal, grand_total, highlighted, memo), drilldown expansion, per-column validation badges, consolidated/prior/variance columns
+- Created src/components/reports/MultiColumnPL.tsx — same multi-column grid as BS for P&L rows, KPI summary cards above table showing Revenue/Gross Profit/Net Profit per project, detail level filtering
+- Created src/components/reports/CashFlowStatement.tsx — three collapsible sections (Operating, Investing, Financing), reconciliation callout box with green/red status for cash per CF vs cash per BS
+- Created src/components/reports/FixedAssetSchedule.tsx — two tabs (PPE Note 4, Intangibles Note 5), each with asset table (Opening Cost, Additions, Deletions, Closing Cost, Opening Accum, For Period highlighted in blue, Closing Accum, NBV), depreciation callout linked to Cash Flow
+- Created src/components/reports/ValidationDashboard.tsx — dialog-based validation results with summary bar, pass/fail/warning badges, detailed rule/project/status/expected/actual/variance table, approved for export indicator
+- Created src/components/reports/ReportLayout.tsx — shared wrapper with company header, report title, period string, project name, validation banner, footer notes statement, signature blocks (Managing Partner / Partner), print/export action bar
+- Fixed useMemo conditional hook call in MultiColumnPL.tsx
+- Lint passes with 0 errors
+
+Stage Summary:
+- Complete set of statutory report frontend components (8 files)
+- Professional financial statement rendering with multi-project column support
+- Consolidation with prior year comparison and variance analysis
+- Validation dashboard with pass/fail indicators and export blocking
+- PKR formatting utilities with negative display, zero handling, and variance coloring
+- Responsive design with horizontal scroll, sticky columns, and print stylesheet considerations
+
+---
+Task ID: 3
+Agent: statutory-api-builder
+Task: Build comprehensive statutory reports API route
+
+Work Log:
+- Created /home/z/my-project/src/app/api/reports/statutory/route.ts (GET handler)
+- Implemented 5 report types: balance_sheet, profit_loss, cash_flow, fixed_assets, validation
+- Balance Sheet: Full multi-project column layout with sections (NON_CURRENT_ASSETS, CURRENT_ASSETS, TOTAL_ASSETS, CAPITAL, CURRENT_LIABILITIES, TOTAL_CAPITAL_LIABILITIES), PPE sub-lines by class (Land/Buildings/Machinery/Vehicles/Furniture/IT Hardware/Computer Software), receivables sub-lines (billed/unbilled/retention/overdue>90), advances sub-lines (staff/supplier/deposit/prepayment), cash sub-lines (in hand/current/saving/fixed deposit), capital sub-lines (opening/net profit/drawings/closing), intra company loan (amber highlighted), accrued expense sub-lines (salaries/contractors/utilities/audit/other), contingencies (memo), accounting equation validation per project column
+- Profit & Loss: Revenue, Cost of Work Done, GROSS PROFIT (subtotal), Other Income, Operating Expenses, Depreciation & Amortization, PROFIT BEFORE TAXATION (subtotal), Provision for Taxation, NET PROFIT AFTER TAXATION (grand_total), KPI summary (Revenue/Gross Profit/EBITDA/Net Profit with % change)
+- Cash Flow: Indirect method with Operating Activities (profit before tax, depreciation addback, amortization addback, working capital changes - receivables/advances/accrued expenses, income tax paid, NET FROM OPERATING), Investing Activities (capex, disposal proceeds, NET FROM INVESTING), Financing Activities (loan receipts, repayments/drawings, NET FROM FINANCING), net increase/decrease, opening/closing cash, reconciliation check
+- Fixed Asset Schedule: Two-part schedule (PPE and Intangibles), each with Rate/Opening Cost/Additions/Deletions/Closing Cost/Opening Acc Dep/For Period/Closing Acc Dep/NBV columns, grouped by asset category
+- Validation: 4 cross-report rules — R001 Accounting Equation (total_assets == total_capital_liabilities), R002 Net Profit Flow (P&L net profit == BS capital net profit), R003 Cash Reconciliation (CF closing cash == BS cash), R004 Depreciation Linkage (P&L depreciation == FAMS depreciation for period), per-rule per-project pass/fail with expected/actual/variance
+- Added multi-project column support: one column per project + consolidated total + prior year consolidated + variance
+- Added detailLevel parameter (summary/detailed) for sub-line expansion
+- Added viewMode parameter (single/multi_column/consolidated)
+- Added toDateOnly helper to fix date string format issue (avoid double-T in ISO strings)
+- All monetary arithmetic uses JavaScript numbers with r2() rounding for SQLite compatibility
+- Response format: { status, data, meta: { generated_at, period, projects, view_mode, detail_level, currency, validated } }
+- Lint passes with 0 errors for statutory route file
+- All 5 report types tested successfully via curl
+
+Stage Summary:
+- Complete statutory reporting API with 5 report types at /api/reports/statutory
+- Multi-project support with project-per-column layout + consolidated + prior year + variance
+- Validation engine with 4 accounting cross-checks (accounting equation, net profit flow, cash reconciliation, depreciation linkage)
+- Detailed sub-line expansion for BS (PPE by class, receivables, advances, cash, capital, accrued expenses) and P&L (by account)
+- Fixed asset schedule with PPE and Intangible sections, movement columns (opening/additions/deletions/closing)
+- Indirect method cash flow with operating/investing/financing sections and reconciliation
+- KPI summary in P&L with prior year comparison
+
+---
+Task ID: 5
+Agent: Main Agent
+Task: Integrate statutory reports into main reports module and fix component issues
+
+Work Log:
+- Updated Prisma schema: Added projectType, isHeadOffice, reportingCurrency, sortOrder, parentProjectId, intraCompanyAccountId to Project model; added FinancialReportConfig model
+- Ran db:push to update database schema
+- Created /api/seed-projects endpoint to seed 18 hydropower projects (HO, AJK, BAL, BIL, BK, DPC, GKH, GU, HAN, JAB, KAR, MUJ, NAG, NJP, RIA, RAN, RAN2, SHA)
+- Fixed component export mismatches: Changed from named imports { Component } to default imports for all report components
+- Fixed ReportLayout props: Changed title→reportTitle, period→fromDate+toDate, validated→validationFailed
+- Made component data props flexible (any type) for MultiColumnBalanceSheet, MultiColumnPL, CashFlowStatement, FixedAssetSchedule
+- Added ValidationDashboard data transformation function (getValidationResults) to convert API validation format to component format
+- Removed unused import (getCurrentFinancialYear)
+- Completely rewrote reports.tsx module with two-tab layout: Statutory Reports + Standard Reports
+- Statutory Reports tab: Uses ReportControlPanel + MultiColumnBalanceSheet/PL/CashFlow/FixedAssets + ValidationDashboard + ReportLayout
+- Standard Reports tab: Preserves all 12 existing report types (trial balance, balance sheet, P&L, cash flow, etc.)
+- Tested all API endpoints successfully: balance_sheet (21-33 rows), profit_loss (11 rows), cash_flow, fixed_assets, validation
+- Lint passes with 0 errors
+
+Stage Summary:
+- Complete integration of statutory financial reporting engine into AcctFin ERP
+- Two-tab UI: Statutory Reports (new engine) + Standard Reports (existing)
+- 18 hydropower projects seeded with project types and sort orders
+- API returns multi-project columns with consolidation, prior year, and variance
+- Validation engine checks accounting equation, net profit flow, cash reconciliation, depreciation linkage
+- All components properly connected and rendering

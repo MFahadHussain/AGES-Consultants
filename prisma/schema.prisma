@@ -94,18 +94,41 @@ model FinancialYear {
 // ============================================================
 
 model Project {
-  id          String   @id @default(cuid())
-  code        String   @unique
-  name        String
-  description String?
-  startDate   DateTime?
-  endDate     DateTime?
-  status      String   @default("active") // active, completed, on-hold
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                   String    @id @default(cuid())
+  code                 String    @unique // e.g. "AJK-HPP", "HO"
+  name                 String
+  projectType          String    @default("Other") // Head Office, Hydropower, Dam, Infrastructure, Other
+  description          String?
+  startDate            DateTime?
+  endDate              DateTime?
+  status               String    @default("active") // active, completed, on-hold
+  isHeadOffice         Boolean   @default(false)
+  reportingCurrency    String    @default("PKR")
+  sortOrder            Int       @default(0) // column ordering in multi-column reports
+  parentProjectId      String?   // self-referencing for sub-projects
+  parentProject        Project?  @relation("ProjectHierarchy", fields: [parentProjectId], references: [id])
+  subProjects          Project[] @relation("ProjectHierarchy")
+  intraCompanyAccountId String?  // FK to Account for intra-company eliminations
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   vouchers    Voucher[]
   budgets     Budget[]
+}
+
+model FinancialReportConfig {
+  id              String   @id @default(cuid())
+  reportName      String
+  reportType      String   // Balance Sheet, P&L, Cash Flow, Fixed Asset Schedule, Intangible Asset Schedule, Multi-Column Balance Sheet
+  viewMode        String   @default("single") // single, multi_column, consolidated
+  fromDate        DateTime
+  toDate          DateTime
+  projectIds      String   @default("[]") // JSON array of project IDs
+  detailLevel     String   @default("summary") // summary, detailed
+  isFinalized     Boolean  @default(false)
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model Donor {
