@@ -67,3 +67,40 @@ Stage Summary:
 - Added: Chart of Account dropdown with grouped display of all COA accounts
 - Added: "Register Asset" tab for single-page form access
 - Updated: openAddWizard navigates to the new tab instead of opening a dialog
+
+---
+Task ID: 2
+Agent: main
+Task: Fix issues in reports module and make it complete and professional
+
+Work Log:
+- Analyzed the entire reports module: API route (`/api/reports/route.ts`) and frontend component (`reports.tsx`)
+- Identified critical bug: Balance Sheet checked `subType === 'CONTRA_ASSET'` but actual data uses `ACCUMULATED_DEPRECIATION` — accumulated depreciation was not properly handled
+- Identified missing report types: General Ledger, Receipts & Payments, Aging Report, Budget vs Actual
+- Identified Trial Balance showing non-posting (group header) accounts
+- Rewrote the API route with these fixes:
+  - Fixed `ACCUMULATED_DEPRECIATION` handling in balance sheet (was `CONTRA_ASSET`)
+  - Added `allowPosting: true` filter to Trial Balance, Balance Sheet, and P&L to exclude group headers
+  - Added sub-type grouping data for Balance Sheet and P&L
+  - Added 4 new report types: `general_ledger`, `receipts_payments`, `aging`, `budget_vs_actual`
+  - Added running balance calculation for General Ledger
+  - Added fallback for cash account lookup when role system returns empty
+  - Fixed date range to include end-of-day for `dateTo`
+  - Added better error handling and console logging
+- Rewrote the frontend component with these enhancements:
+  - Added 4 new report type entries to dropdown
+  - Added new state for GL account selector and aging type
+  - Added GL account dropdown for General Ledger report
+  - Added Aging Type selector (Receivables/Payables)
+  - Added renderers for all 4 new report types with professional styling
+  - Added loading spinner with `Loader2` icon
+  - Added individual try/catch for each filter endpoint fetch
+  - Updated filter relevance mapping for new report types
+  - Added `accountId` and `agingType` params to `generateReport` callback
+
+Stage Summary:
+- Reports module now has 12 report types (was 8)
+- Critical ACCUMULATED_DEPRECIATION bug fixed in Balance Sheet
+- Non-posting accounts excluded from financial reports
+- All new report APIs tested and returning proper data
+- Lint passes with 0 errors

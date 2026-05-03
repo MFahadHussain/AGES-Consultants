@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Download, Printer, RefreshCw, FileText, ChevronDown, ChevronRight, Building2, Filter, X } from 'lucide-react'
+import { Download, Printer, RefreshCw, FileText, ChevronDown, ChevronRight, Building2, Filter, X, Loader2 } from 'lucide-react'
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
@@ -46,6 +46,11 @@ export function FinancialReports() {
   const [financialYearId, setFinancialYearId] = useState<string>('all')
   const [showFilters, setShowFilters] = useState(false)
 
+  // New report-specific state
+  const [glAccountId, setGlAccountId] = useState<string>('')
+  const [allAccounts, setAllAccounts] = useState<Array<{id: string; code: string; name: string; accountType: string}>>([])
+  const [agingType, setAgingType] = useState<string>('receivables')
+
   // Filter options data
   const [filterData, setFilterData] = useState<FilterData>({
     projects: [],
@@ -58,31 +63,48 @@ export function FinancialReports() {
   // Fetch filter options on mount
   useEffect(() => {
     const fetchFilters = async () => {
+      // Fetch projects
       try {
-        const [projectsRes, clientsRes, donorsRes, locationsRes, fyRes] = await Promise.all([
-          fetch('/api/projects'),
-          fetch('/api/clients'),
-          fetch('/api/donors'),
-          fetch('/api/locations'),
-          fetch('/api/financial-year'),
-        ])
-        const [projects, clients, donors, locations, financialYears] = await Promise.all([
-          projectsRes.json(),
-          clientsRes.json(),
-          donorsRes.json(),
-          locationsRes.json(),
-          fyRes.json(),
-        ])
-        setFilterData({
-          projects: Array.isArray(projects) ? projects : projects.data || [],
-          clients: Array.isArray(clients) ? clients : clients.data || [],
-          donors: Array.isArray(donors) ? donors : donors.data || [],
-          locations: Array.isArray(locations) ? locations : locations.data || [],
-          financialYears: Array.isArray(financialYears) ? financialYears : financialYears.data || [],
-        })
-      } catch (e) {
-        console.error('Failed to fetch filter options:', e)
-      }
+        const projectsRes = await fetch('/api/projects')
+        const projects = await projectsRes.json()
+        setFilterData(prev => ({ ...prev, projects: Array.isArray(projects) ? projects : projects.data || [] }))
+      } catch (e) { console.error('Failed to fetch projects:', e) }
+
+      // Fetch clients
+      try {
+        const clientsRes = await fetch('/api/clients')
+        const clients = await clientsRes.json()
+        setFilterData(prev => ({ ...prev, clients: Array.isArray(clients) ? clients : clients.data || [] }))
+      } catch (e) { console.error('Failed to fetch clients:', e) }
+
+      // Fetch donors
+      try {
+        const donorsRes = await fetch('/api/donors')
+        const donors = await donorsRes.json()
+        setFilterData(prev => ({ ...prev, donors: Array.isArray(donors) ? donors : donors.data || [] }))
+      } catch (e) { console.error('Failed to fetch donors:', e) }
+
+      // Fetch locations
+      try {
+        const locationsRes = await fetch('/api/locations')
+        const locations = await locationsRes.json()
+        setFilterData(prev => ({ ...prev, locations: Array.isArray(locations) ? locations : locations.data || [] }))
+      } catch (e) { console.error('Failed to fetch locations:', e) }
+
+      // Fetch financial years
+      try {
+        const fyRes = await fetch('/api/financial-year')
+        const financialYears = await fyRes.json()
+        setFilterData(prev => ({ ...prev, financialYears: Array.isArray(financialYears) ? financialYears : financialYears.data || [] }))
+      } catch (e) { console.error('Failed to fetch financial years:', e) }
+
+      // Fetch accounts for GL dropdown
+      try {
+        const accRes = await fetch('/api/accounts?isActive=true&allowPosting=true')
+        const accData = await accRes.json()
+        const accList = Array.isArray(accData) ? accData : accData.accounts || []
+        setAllAccounts(accList.map((a: any) => ({ id: a.id, code: a.code, name: a.name, accountType: a.accountType })))
+      } catch (e) { console.error('Failed to fetch accounts:', e) }
     }
     fetchFilters()
   }, [])
@@ -95,12 +117,14 @@ export function FinancialReports() {
     if (donorId && donorId !== 'all') params.set('donorId', donorId)
     if (locationId && locationId !== 'all') params.set('locationId', locationId)
     if (financialYearId && financialYearId !== 'all') params.set('financialYearId', financialYearId)
+    if (reportType === 'general_ledger' && glAccountId) params.set('accountId', glAccountId)
+    if (reportType === 'aging') params.set('agingType', agingType)
     try {
       const res = await fetch(`/api/reports?${params}`)
       setReportData(await res.json())
     } catch (e) { console.error(e) }
     setLoading(false)
-  }, [reportType, dateFrom, dateTo, projectId, clientId, donorId, locationId, financialYearId])
+  }, [reportType, dateFrom, dateTo, projectId, clientId, donorId, locationId, financialYearId, glAccountId, agingType])
 
   useEffect(() => { queueMicrotask(() => generateReport()) }, [reportType, generateReport])
 
@@ -123,6 +147,7 @@ export function FinancialReports() {
       case 'pnl':
         return common
       case 'cash_flow':
+      case 'receipts_payments':
         return ['project', 'client', 'donor', 'location', 'financialYear']
       case 'donor_wise':
         return ['project', 'client', 'location', 'financialYear'] // donor is the grouping dimension
@@ -132,6 +157,10 @@ export function FinancialReports() {
         return ['project', 'client', 'donor', 'financialYear'] // location is the grouping dimension
       case 'client_wise_project':
         return ['project', 'donor', 'location', 'financialYear'] // client is the grouping dimension
+      case 'general_ledger':
+      case 'aging':
+      case 'budget_vs_actual':
+        return common
       default:
         return common
     }
@@ -271,6 +300,32 @@ export function FinancialReports() {
           }
         })
         rows.push(['', '', '', '', '', 'GRAND TOTAL', reportData.grandTotalDebit, reportData.grandTotalCredit, reportData.grandBalance])
+      } else if (reportType === 'general_ledger' && reportData.entries) {
+        rows.push(['Date', 'Voucher', 'Type', 'Narration', 'Debit', 'Credit', 'Balance'])
+        reportData.entries.forEach((e: any) => {
+          rows.push([new Date(e.date).toLocaleDateString(), e.voucherNumber, e.voucherType, e.narration, e.debit || '', e.credit || '', e.balance])
+        })
+        rows.push(['', '', 'TOTAL', '', reportData.totalDebit, reportData.totalCredit, reportData.closingBalance || ''])
+      } else if (reportType === 'receipts_payments') {
+        rows.push(['Section', 'Date', 'Voucher', 'Narration', 'Amount'])
+        ;(reportData.receipts || []).forEach((v: any) => {
+          rows.push(['Receipt', new Date(v.date).toLocaleDateString(), v.voucherNumber, v.narration, v.entries?.reduce((s: number, e: any) => s + e.debit, 0) || 0])
+        })
+        ;(reportData.payments || []).forEach((v: any) => {
+          rows.push(['Payment', new Date(v.date).toLocaleDateString(), v.voucherNumber, v.narration, v.entries?.reduce((s: number, e: any) => s + e.credit, 0) || 0])
+        })
+      } else if (reportType === 'aging' && reportData.data) {
+        const periods = reportData.periods || []
+        rows.push(['Code', 'Name', 'Balance', ...periods])
+        reportData.data.forEach((d: any) => {
+          rows.push([d.code, d.name, d.balance, ...(d.buckets || [])])
+        })
+        rows.push(['', 'TOTAL', reportData.grandTotal, ...(reportData.periodTotals || [])])
+      } else if (reportType === 'budget_vs_actual' && reportData.data) {
+        rows.push(['Account Code', 'Account Name', 'Budget Name', 'Budget Amt', 'Actual Amt', 'Variance', 'Var %'])
+        reportData.data.forEach((d: any) => {
+          rows.push([d.accountCode, d.accountName, d.budgetName, d.budgetAmount, d.actualAmount, d.variance, `${d.variancePct.toFixed(1)}%`])
+        })
       } else {
         rows.push(['Code', 'Name', 'Total Debit', 'Total Credit', 'Net Balance'])
         reportData.data?.forEach((d: any) => {
@@ -568,11 +623,196 @@ export function FinancialReports() {
     )
   }
 
+  const renderGeneralLedger = () => {
+    if (!glAccountId) return <p className="text-xs text-muted-foreground text-center py-8">Select an account to view its General Ledger</p>
+    if (!reportData?.entries) return <p className="text-xs text-muted-foreground text-center py-8">No transactions found for this account</p>
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 bg-muted/50 rounded-lg px-4 py-2">
+          <FileText className="h-4 w-4 text-muted-foreground" />
+          <div>
+            <p className="text-sm font-bold">{reportData.account?.code} — {reportData.account?.name}</p>
+            <p className="text-[10px] text-muted-foreground">{reportData.account?.accountType} • {reportData.account?.subType || 'N/A'}</p>
+          </div>
+          <div className="ml-auto text-right">
+            <p className="text-[10px] text-muted-foreground">Closing Balance</p>
+            <p className="text-sm font-bold">{formatCurrency(reportData.closingBalance || 0)}</p>
+          </div>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-[10px]">Date</TableHead>
+              <TableHead className="text-[10px]">Voucher</TableHead>
+              <TableHead className="text-[10px]">Type</TableHead>
+              <TableHead className="text-[10px]">Narration</TableHead>
+              <TableHead className="text-[10px] text-right">Debit</TableHead>
+              <TableHead className="text-[10px] text-right">Credit</TableHead>
+              <TableHead className="text-[10px] text-right">Balance</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {reportData.entries.map((e: any, i: number) => (
+              <TableRow key={i}>
+                <TableCell className="text-xs">{new Date(e.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</TableCell>
+                <TableCell className="font-mono text-xs">{e.voucherNumber}</TableCell>
+                <TableCell><Badge className="text-[8px]">{e.voucherType}</Badge></TableCell>
+                <TableCell className="text-xs max-w-[200px] truncate">{e.narration}</TableCell>
+                <TableCell className="text-xs text-right text-emerald-600">{e.debit > 0 ? formatCurrency(e.debit) : ''}</TableCell>
+                <TableCell className="text-xs text-right text-red-600">{e.credit > 0 ? formatCurrency(e.credit) : ''}</TableCell>
+                <TableCell className={`text-xs text-right font-semibold ${e.balance >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatCurrency(e.balance)}</TableCell>
+              </TableRow>
+            ))}
+            <TableRow className="font-bold bg-muted/50">
+              <TableCell colSpan={4} className="text-xs">TOTAL</TableCell>
+              <TableCell className="text-xs text-right">{formatCurrency(reportData.totalDebit)}</TableCell>
+              <TableCell className="text-xs text-right">{formatCurrency(reportData.totalCredit)}</TableCell>
+              <TableCell className="text-xs text-right">{formatCurrency(reportData.closingBalance || 0)}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
+    )
+  }
+
+  const renderReceiptsPayments = () => {
+    if (!reportData?.receipts && !reportData?.payments) return <p className="text-xs text-muted-foreground text-center py-8">No data</p>
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-3 gap-3">
+          <Card className="border-l-4 border-l-emerald-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Receipts</p><p className="text-sm font-bold text-emerald-600">{formatCurrency(reportData.totalReceipts)}</p></CardContent></Card>
+          <Card className="border-l-4 border-l-red-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Payments</p><p className="text-sm font-bold text-red-600">{formatCurrency(reportData.totalPayments)}</p></CardContent></Card>
+          <Card className={`border-l-4 ${reportData.netAmount >= 0 ? 'border-l-emerald-400' : 'border-l-red-400'}`}><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Net Amount</p><p className={`text-sm font-bold ${reportData.netAmount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(reportData.netAmount)}</p></CardContent></Card>
+        </div>
+        <div>
+          <h4 className="text-xs font-bold mb-2 text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded">RECEIPTS</h4>
+          <Table>
+            <TableHeader><TableRow><TableHead className="text-[10px]">Date</TableHead><TableHead className="text-[10px]">Voucher</TableHead><TableHead className="text-[10px]">Narration</TableHead><TableHead className="text-[10px] text-right">Amount</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {(reportData.receipts || []).map((v: any, i: number) => (
+                <TableRow key={i}>
+                  <TableCell className="text-xs">{new Date(v.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</TableCell>
+                  <TableCell className="font-mono text-xs">{v.voucherNumber}</TableCell>
+                  <TableCell className="text-xs">{v.narration}</TableCell>
+                  <TableCell className="text-xs text-right text-emerald-600 font-semibold">{formatCurrency(v.entries?.reduce((s: number, e: any) => s + e.debit, 0) || 0)}</TableCell>
+                </TableRow>
+              ))}
+              {(!reportData.receipts || reportData.receipts.length === 0) && <TableRow><TableCell colSpan={4} className="text-xs text-center text-muted-foreground py-4">No receipts</TableCell></TableRow>}
+            </TableBody>
+          </Table>
+        </div>
+        <div>
+          <h4 className="text-xs font-bold mb-2 text-red-700 bg-red-50 px-3 py-1.5 rounded">PAYMENTS</h4>
+          <Table>
+            <TableHeader><TableRow><TableHead className="text-[10px]">Date</TableHead><TableHead className="text-[10px]">Voucher</TableHead><TableHead className="text-[10px]">Narration</TableHead><TableHead className="text-[10px] text-right">Amount</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {(reportData.payments || []).map((v: any, i: number) => (
+                <TableRow key={i}>
+                  <TableCell className="text-xs">{new Date(v.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</TableCell>
+                  <TableCell className="font-mono text-xs">{v.voucherNumber}</TableCell>
+                  <TableCell className="text-xs">{v.narration}</TableCell>
+                  <TableCell className="text-xs text-right text-red-600 font-semibold">{formatCurrency(v.entries?.reduce((s: number, e: any) => s + e.credit, 0) || 0)}</TableCell>
+                </TableRow>
+              ))}
+              {(!reportData.payments || reportData.payments.length === 0) && <TableRow><TableCell colSpan={4} className="text-xs text-center text-muted-foreground py-4">No payments</TableCell></TableRow>}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    )
+  }
+
+  const renderAgingReport = () => {
+    if (!reportData?.data) return <p className="text-xs text-muted-foreground text-center py-8">No data</p>
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <Badge className={`text-xs ${reportData.agingType === 'receivables' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+            {reportData.agingType === 'receivables' ? 'Receivables' : 'Payables'}
+          </Badge>
+          <span className="text-sm font-bold">Grand Total: {formatCurrency(reportData.grandTotal)}</span>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-[10px]">Code</TableHead>
+              <TableHead className="text-[10px]">Name</TableHead>
+              <TableHead className="text-[10px] text-right">Balance</TableHead>
+              {(reportData.periods || []).map((p: string, i: number) => (
+                <TableHead key={i} className="text-[10px] text-right">{p}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {reportData.data.map((d: any, i: number) => (
+              <TableRow key={i}>
+                <TableCell className="font-mono text-xs">{d.code}</TableCell>
+                <TableCell className="text-xs">{d.name}</TableCell>
+                <TableCell className="text-xs text-right font-semibold">{formatCurrency(d.balance)}</TableCell>
+                {(d.buckets || []).map((b: number, j: number) => (
+                  <TableCell key={j} className="text-xs text-right">{b > 0 ? formatCurrency(b) : ''}</TableCell>
+                ))}
+              </TableRow>
+            ))}
+            <TableRow className="font-bold bg-muted/50">
+              <TableCell colSpan={2} className="text-xs">TOTAL</TableCell>
+              <TableCell className="text-xs text-right">{formatCurrency(reportData.grandTotal)}</TableCell>
+              {(reportData.periodTotals || []).map((t: number, i: number) => (
+                <TableCell key={i} className="text-xs text-right">{t > 0 ? formatCurrency(t) : ''}</TableCell>
+              ))}
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
+    )
+  }
+
+  const renderBudgetVsActual = () => {
+    if (!reportData?.data) return <p className="text-xs text-muted-foreground text-center py-8">No budget data found. Create and approve budgets first.</p>
+    return (
+      <div className="space-y-3">
+        <div className="grid grid-cols-3 gap-3">
+          <Card className="border-l-4 border-l-sky-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Budget</p><p className="text-sm font-bold text-sky-600">{formatCurrency(reportData.totalBudget)}</p></CardContent></Card>
+          <Card className="border-l-4 border-l-amber-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Actual</p><p className="text-sm font-bold text-amber-600">{formatCurrency(reportData.totalActual)}</p></CardContent></Card>
+          <Card className={`border-l-4 ${reportData.totalVariance >= 0 ? 'border-l-emerald-400' : 'border-l-red-400'}`}><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Variance</p><p className={`text-sm font-bold ${reportData.totalVariance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(reportData.totalVariance)}</p></CardContent></Card>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-[10px]">Account</TableHead>
+              <TableHead className="text-[10px]">Budget</TableHead>
+              <TableHead className="text-[10px] text-right">Budget Amt</TableHead>
+              <TableHead className="text-[10px] text-right">Actual Amt</TableHead>
+              <TableHead className="text-[10px] text-right">Variance</TableHead>
+              <TableHead className="text-[10px] text-right">Var %</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {reportData.data.map((d: any, i: number) => (
+              <TableRow key={i}>
+                <TableCell className="text-xs"><span className="font-mono text-[10px] text-muted-foreground mr-1">{d.accountCode}</span>{d.accountName}</TableCell>
+                <TableCell className="text-[10px] text-muted-foreground">{d.budgetName}</TableCell>
+                <TableCell className="text-xs text-right">{formatCurrency(d.budgetAmount)}</TableCell>
+                <TableCell className="text-xs text-right">{formatCurrency(d.actualAmount)}</TableCell>
+                <TableCell className={`text-xs text-right font-semibold ${d.variance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(d.variance)}</TableCell>
+                <TableCell className={`text-xs text-right ${d.variancePct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{d.variancePct.toFixed(1)}%</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    )
+  }
+
   const reportTypes = [
     { value: 'trial_balance', label: 'Trial Balance', desc: 'List of all accounts with debit/credit balances' },
     { value: 'balance_sheet', label: 'Balance Sheet', desc: 'Assets = Liabilities + Equity' },
     { value: 'pnl', label: 'Profit & Loss', desc: 'Income vs Expenses statement' },
     { value: 'cash_flow', label: 'Cash Flow Statement', desc: 'Operating cash inflows and outflows' },
+    { value: 'receipts_payments', label: 'Receipts & Payments', desc: 'Summary of all receipts and payments' },
+    { value: 'general_ledger', label: 'General Ledger', desc: 'Detailed account transaction history' },
+    { value: 'aging', label: 'Aging Report', desc: 'Receivables/payables aging analysis' },
+    { value: 'budget_vs_actual', label: 'Budget vs Actual', desc: 'Budget variance analysis' },
     { value: 'donor_wise', label: 'Donor-wise Report', desc: 'Financial summary by donor' },
     { value: 'project_wise', label: 'Project-wise Report', desc: 'Financial summary by project' },
     { value: 'location_wise', label: 'Location-wise Report', desc: 'Financial summary by location' },
@@ -630,6 +870,36 @@ export function FinancialReports() {
               <Label className="text-[10px]">To Date</Label>
               <Input type="date" className="h-8 text-xs" value={dateTo} onChange={e => setDateTo(e.target.value)} />
             </div>
+            {reportType === 'general_ledger' && (
+              <div className="w-64">
+                <Label className="text-[10px]">Account</Label>
+                <Select value={glAccountId} onValueChange={setGlAccountId}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Select account..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allAccounts.map(a => (
+                      <SelectItem key={a.id} value={a.id}>
+                        <span className="font-mono text-[10px] text-muted-foreground mr-1">{a.code}</span>
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {reportType === 'aging' && (
+              <div className="w-40">
+                <Label className="text-[10px]">Aging Type</Label>
+                <Select value={agingType} onValueChange={setAgingType}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="receivables">Receivables</SelectItem>
+                    <SelectItem value="payables">Payables</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <Button size="sm" className="h-8 text-xs" onClick={generateReport} disabled={loading}>
               <RefreshCw className="h-3.5 w-3.5 mr-1" />Generate
             </Button>
@@ -850,20 +1120,26 @@ export function FinancialReports() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-xs text-muted-foreground">Generating report...</span>
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+              <span className="text-sm text-muted-foreground">Generating report...</span>
             </div>
           ) : !reportData ? (
             <p className="text-xs text-center py-8 text-muted-foreground">Click Generate to create the report</p>
-          ) :
-            reportType === 'trial_balance' ? renderTrialBalance() :
-            reportType === 'balance_sheet' ? renderBalanceSheet() :
-            reportType === 'pnl' ? renderPnL() :
-            reportType === 'cash_flow' ? renderCashFlow() :
-            reportType === 'client_wise_project' ? renderClientWiseProject() :
-            renderSegmentReport()
-          }
+          ) : (
+            <>
+              {reportType === 'trial_balance' && renderTrialBalance()}
+              {reportType === 'balance_sheet' && renderBalanceSheet()}
+              {reportType === 'pnl' && renderPnL()}
+              {reportType === 'cash_flow' && renderCashFlow()}
+              {reportType === 'client_wise_project' && renderClientWiseProject()}
+              {reportType === 'general_ledger' && renderGeneralLedger()}
+              {reportType === 'receipts_payments' && renderReceiptsPayments()}
+              {reportType === 'aging' && renderAgingReport()}
+              {reportType === 'budget_vs_actual' && renderBudgetVsActual()}
+              {!['trial_balance', 'balance_sheet', 'pnl', 'cash_flow', 'client_wise_project', 'general_ledger', 'receipts_payments', 'aging', 'budget_vs_actual'].includes(reportType) && renderSegmentReport()}
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
