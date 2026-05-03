@@ -169,7 +169,7 @@ async function handleJournalPosting(body: { journalIds?: string[] }, userId: str
           date: new Date(),
           narration,
           reference: `FAMS-${type}`,
-          status: 'posted',
+          status: 'draft',
           financialYearId,
           totalDebit: Math.round(totalDr),
           totalCredit: Math.round(totalCr),
@@ -249,8 +249,8 @@ async function handleJournalPosting(body: { journalIds?: string[] }, userId: str
   await db.auditLog.create({
     data: {
       userId,
-      action: 'EXPORT',
-      entity: 'FAMS_GL_Post',
+      action: 'CREATE',
+      entity: 'FAMS_GL_Post_Draft',
       entityId: 'batch',
       details: JSON.stringify({
         vouchers: postedVouchers,
@@ -264,7 +264,7 @@ async function handleJournalPosting(body: { journalIds?: string[] }, userId: str
 
   return NextResponse.json({
     success: true,
-    message: `${validJournals.length} journal(s) posted to General Ledger${skippedJournals.length > 0 ? `, ${skippedJournals.length} skipped (missing accounts)` : ''}`,
+    message: `${validJournals.length} journal(s) exported to General Ledger as draft voucher(s)${skippedJournals.length > 0 ? `, ${skippedJournals.length} skipped (missing accounts)` : ''}`,
     vouchers: postedVouchers,
     journalCount: validJournals.length,
     totalDebit: Math.round(totalDebit),
@@ -343,7 +343,7 @@ async function handleAcquisitionPosting(
           narration,
           reference: `FAMS-ACQ-${asset.assetId}`,
           payeeName: asset.supplierName || undefined,
-          status: 'posted',
+          status: 'draft',
           financialYearId,
           totalDebit: Math.round(asset.purchasePrice),
           totalCredit: Math.round(asset.purchasePrice),
@@ -394,7 +394,7 @@ async function handleAcquisitionPosting(
     data: {
       userId,
       action: 'CREATE',
-      entity: 'FAMS_Acquisition_Post',
+      entity: 'FAMS_Acquisition_Draft',
       entityId: 'batch',
       details: JSON.stringify({
         assetsPosted: postedAssets,
@@ -406,7 +406,7 @@ async function handleAcquisitionPosting(
 
   return NextResponse.json({
     success: true,
-    message: `${postedAssets.length} asset acquisition(s) posted to General Ledger`,
+    message: `${postedAssets.length} asset acquisition(s) exported to General Ledger as draft voucher(s)`,
     assets: postedAssets,
     totalAmount: Math.round(totalAmount),
   })

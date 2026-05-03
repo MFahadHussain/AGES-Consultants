@@ -247,3 +247,23 @@ Stage Summary:
 - Liability section expanded from ~44 → 84 accounts
 - All new accounts use TAX_PAYABLE sub-type for tax-related accounts, PAYROLL_LIABILITY for payroll, ACCRUAL for accrued, PAYABLE for retention
 - Gap in 03-02-XX numbering fully filled (03-02-01 through 03-02-18 now complete)
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Change FAMS voucher creation from posted to draft status when saving assets
+
+Work Log:
+- Identified two places in /src/app/api/fams/gl-post/route.ts where vouchers were created with status: 'posted'
+- Line 172 (handleJournalPosting): Depreciation/Disposal/Transfer journal batch posting
+- Line 346 (handleAcquisitionPosting): Asset acquisition posting
+- Changed both to status: 'draft' so vouchers must be manually approved/posted through the voucher approval workflow
+- Updated response messages to reflect "draft voucher" instead of "posted to General Ledger"
+- Updated audit log entity names: FAMS_GL_Post → FAMS_GL_Post_Draft, FAMS_Acquisition_Post → FAMS_Acquisition_Draft
+- Frontend already creates draft vouchers (autoPost: false) — no changes needed there
+- Verified API endpoint works correctly, lint passes with 0 errors
+
+Stage Summary:
+- FAMS vouchers are now created as "draft" instead of "posted"
+- Both acquisition vouchers (BP) and depreciation/disposal vouchers (JV) follow the draft workflow
+- Users must review and post vouchers manually through the voucher management approval workflow
