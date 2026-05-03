@@ -175,6 +175,7 @@ function StatutoryReports() {
     profit_loss: 'Profit & Loss Account',
     cash_flow: 'Statement of Cash Flows',
     fixed_assets: 'Fixed Asset Schedule',
+    fixed_asset_schedule: 'Fixed Asset Schedule',
     intangible_assets: 'Intangible Asset Schedule',
     intangible_asset_schedule: 'Intangible Asset Schedule',
   }
@@ -249,22 +250,36 @@ function StatutoryReports() {
           </ReportLayout>
         )
       case 'fixed_assets':
+      case 'fixed_asset_schedule':
       case 'intangible_assets':
       case 'intangible_asset_schedule': {
         const isIntangible = reportType === 'intangible_assets' || reportType === 'intangible_asset_schedule'
-        const scheduleTitle = isIntangible ? statutoryReportTitle.intangible_assets : statutoryReportTitle.fixed_assets
-        const projectLabel = viewMode === 'consolidated' ? 'Consolidated' : viewMode === 'single' ? 'Single Project' : 'Multi-Project'
+        const scheduleTitle = isIntangible ? 'Intangible Asset Schedule' : 'Fixed Asset Schedule'
+        // Build proper project label from actual selected project names
+        const reportProjects = reportData?.meta?.projects || []
+        let projectLabel = 'Consolidated'
+        if (viewMode === 'single' && reportProjects.length === 1) {
+          projectLabel = `${reportProjects[0].code} - ${reportProjects[0].name}`
+        } else if (viewMode === 'multi_column' && reportProjects.length > 1) {
+          projectLabel = reportProjects.map((p: any) => p.code).join(', ')
+        }
         return (
           <ReportLayout
             reportTitle={scheduleTitle}
             fromDate={periodFrom}
             toDate={periodTo}
             projectName={projectLabel}
+            isConsolidated={viewMode === 'consolidated'}
             validationFailed={validationStatus === 'errors'}
             onPrint={() => window.print()}
             onExportCSV={() => {/* TODO */}}
           >
-            <FixedAssetSchedule data={reportData.data} scheduleType={isIntangible ? 'intangible' : 'ppe'} />
+            <FixedAssetSchedule
+              data={reportData.data}
+              scheduleType={isIntangible ? 'intangible' : 'ppe'}
+              projectName={projectLabel}
+              detailLevel={detailLevel as 'summary' | 'detailed'}
+            />
           </ReportLayout>
         )
       }

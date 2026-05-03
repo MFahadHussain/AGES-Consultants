@@ -305,3 +305,38 @@ Stage Summary:
 - Both schedules show per-project values + consolidated + prior year + variance
 - Professional styling with KPI cards, section headers, proper formatting
 - Backward compatible with legacy flat format
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Complete the project - Fix Asset Schedule reports with project field and professional formatting
+
+Work Log:
+- Fixed critical report type mismatch: ReportControlPanel used `fixed_asset_schedule` but API/reports.tsx expected `fixed_assets`
+- Updated ReportControlPanel REPORT_TYPES to use `fixed_assets` (aligned with API)
+- Added `fixed_asset_schedule` as an alias in API validReportTypes and switch case
+- Added `fixed_asset_schedule` to reports.tsx statutoryReportTitle and switch cases
+- Rewrote FixedAssetSchedule.tsx component with complete professional formatting:
+  - Added ProjectHeaderBanner showing project name with MapPin icon, note reference, currency badge
+  - Expanded KPI cards from 3 to 6: Closing Cost, Additions, Deletions, Accum. Depreciation, Dep. for Period, Net Book Value
+  - Added detailLevel prop for summary/detailed row filtering
+  - Added projectName prop passed through all sub-components
+  - Added proper empty states with icons and helpful messages
+  - Cash flow callout properly distinguishes depreciation vs amortization
+  - Print-friendly layout with both sections visible
+- Updated ReportControlPanel to show detail level for asset schedules (not just balance sheet)
+- Updated reports.tsx to build proper project labels from actual project names (not generic "Single Project")
+- Added filterScheduleRows() helper in statutory API to separate PPE and Intangible rows
+- Fixed Asset Schedule API now returns only PPE rows (with ppe metadata)
+- Intangible Asset Schedule API now returns only Intangible rows (with intangibles metadata)
+- Both schedules pass project info through ReportLayout and ScheduleSection
+- Lint passes with 0 errors, dev server compiles successfully
+
+Stage Summary:
+- Fixed: Report type mismatch causing Fixed Asset Schedule to not render (was returning null)
+- Fixed: API now properly filters rows for each schedule type (PPE vs Intangible)
+- Added: Project name banner with icon in each schedule section
+- Added: 6 professional KPI cards with color-coded borders
+- Added: Detail level support for asset schedules
+- Added: Proper project name display (shows actual project codes/names)
+- All report types verified working: fixed_assets, fixed_asset_schedule, intangible_asset_schedule

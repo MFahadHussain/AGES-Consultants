@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { Building2, Cpu, Info, TrendingUp, TrendingDown } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { Building2, Cpu, Info, TrendingUp, TrendingDown, MapPin, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatPKR, formatPKRWithSymbol, formatNegativePKR, formatVariance } from '@/lib/report-utils';
 
@@ -47,6 +48,8 @@ interface FixedAssetScheduleProps {
     currency?: string;
   };
   scheduleType?: 'ppe' | 'intangible' | 'both';
+  projectName?: string;
+  detailLevel?: 'summary' | 'detailed';
 }
 
 // Legacy row format (old API response)
@@ -74,7 +77,7 @@ interface LegacyAssetRow {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ROW STYLING HELPERS (matching MultiColumnBalanceSheet pattern)
+// ROW STYLING HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getRowClasses(rowType: RowType): string {
@@ -112,40 +115,40 @@ interface KpiData {
   totalGrossCost: number;
   totalAccumDep: number;
   netBookValue: number;
+  totalAdditions: number;
+  totalDeletions: number;
+  depForPeriod: number;
 }
 
 function computeKpiFromRows(rows: ReportRow[], columnKey: string): KpiData {
   let totalGrossCost = 0;
   let totalAccumDep = 0;
   let netBookValue = 0;
+  let totalAdditions = 0;
+  let totalDeletions = 0;
+  let depForPeriod = 0;
 
   for (const row of rows) {
     const val = row.values?.[columnKey] ?? 0;
-    if (row.row_type === 'line_item' || row.row_type === 'sub_line') {
-      // Heuristic: if label contains "accumulated" or "depreciation" or "amortization", it's accum dep
-      const lower = row.label.toLowerCase();
-      if (lower.includes('accumulated') || lower.includes('depreciation') || lower.includes('amortization')) {
-        totalAccumDep += val;
-      } else if (lower.includes('gross') || lower.includes('cost') || lower.includes('addition') || lower.includes('deletion') || lower.includes('work in progress')) {
-        totalGrossCost += val;
-      }
-    } else if (row.row_type === 'subtotal') {
-      const lower = row.label.toLowerCase();
-      if (lower.includes('net') && (lower.includes('ppe') || lower.includes('property') || lower.includes('intangible'))) {
-        netBookValue = val;
-      }
+    const lower = row.label.toLowerCase();
+
+    if (row.row_type === 'subtotal') {
+      if (lower.includes('closing cost')) totalGrossCost = val;
+      else if (lower.includes('closing accum')) totalAccumDep = val;
+      else if (lower.includes('total additions')) totalAdditions = val;
+      else if (lower.includes('total deletions')) totalDeletions = val;
+      else if (lower.includes('depreciation for period') || lower.includes('total depreciation')) depForPeriod = val;
     } else if (row.row_type === 'grand_total') {
-      // Grand total is typically NBV for the section
-      if (netBookValue === 0) netBookValue = val;
+      if (lower.includes('net book value')) netBookValue = val;
     }
   }
 
-  // Fallback: if we couldn't compute NBV from subtotals, derive it
+  // Fallback: if we couldn't compute NBV from grand total, derive it
   if (netBookValue === 0 && (totalGrossCost !== 0 || totalAccumDep !== 0)) {
     netBookValue = totalGrossCost - Math.abs(totalAccumDep);
   }
 
-  return { totalGrossCost, totalAccumDep, netBookValue };
+  return { totalGrossCost, totalAccumDep, netBookValue, totalAdditions, totalDeletions, depForPeriod };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -160,17 +163,63 @@ const PRIOR_COL_WIDTH = 130;
 const VARIANCE_COL_WIDTH = 110;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PROJECT HEADER BANNER
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ProjectHeaderBanner({
+  projectName,
+  currency,
+  noteRef,
+  assetType,
+}: {
+  projectName?: string;
+  currency: string;
+  noteRef?: string;
+  assetType: 'ppe' | 'intangibles';
+}) {
+  const title = assetType === 'ppe' ? 'Property, Plant & Equipment' : 'Intangible Assets';
+  const icon = assetType === 'ppe' ? Building2 : Cpu;
+
+  return (
+    <div className="flex items-center gap-3 bg-muted/40 rounded-lg px-4 py-3 border">
+      {React.createElement(icon, { className: 'size-5 text-primary shrink-0' })}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-bold tracking-tight">{title}</h3>
+          {noteRef && (
+            <Badge variant="secondary" className="text-[10px] px-2 py-0 h-5">
+              {noteRef}
+            </Badge>
+          )}
+        </div>
+        {projectName && (
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <MapPin className="size-3 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground truncate">{projectName}</span>
+          </div>
+        )}
+      </div>
+      <div className="text-right shrink-0">
+        <Badge variant="outline" className="text-[10px] font-mono">
+          {currency}
+        </Badge>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // KPI CARD COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
 function KpiCards({ kpi, currency }: { kpi: KpiData; currency: string }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 print:grid-cols-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 print:grid-cols-6">
       <Card className="shadow-sm border-l-4 border-l-emerald-400">
         <CardHeader className="pb-1.5 pt-3 px-4">
           <CardTitle className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
             <TrendingUp className="size-3.5" />
-            Total Gross Cost
+            Closing Cost
           </CardTitle>
         </CardHeader>
         <CardContent className="px-4 pb-3">
@@ -180,21 +229,63 @@ function KpiCards({ kpi, currency }: { kpi: KpiData; currency: string }) {
           <p className="text-[10px] text-muted-foreground mt-0.5">Consolidated • {currency}</p>
         </CardContent>
       </Card>
+      <Card className="shadow-sm border-l-4 border-l-blue-400">
+        <CardHeader className="pb-1.5 pt-3 px-4">
+          <CardTitle className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
+            <TrendingUp className="size-3.5" />
+            Additions
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-3">
+          <p className="text-lg font-bold font-mono tabular-nums">
+            {formatPKR(kpi.totalAdditions)}
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">During Period</p>
+        </CardContent>
+      </Card>
+      <Card className="shadow-sm border-l-4 border-l-orange-400">
+        <CardHeader className="pb-1.5 pt-3 px-4">
+          <CardTitle className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
+            <TrendingDown className="size-3.5" />
+            Deletions
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-3">
+          <p className="text-lg font-bold font-mono tabular-nums">
+            {formatPKR(kpi.totalDeletions)}
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">During Period</p>
+        </CardContent>
+      </Card>
       <Card className="shadow-sm border-l-4 border-l-red-400">
         <CardHeader className="pb-1.5 pt-3 px-4">
           <CardTitle className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
             <TrendingDown className="size-3.5" />
-            Total Accum. Depreciation
+            Accum. Depreciation
           </CardTitle>
         </CardHeader>
         <CardContent className="px-4 pb-3">
           <p className="text-lg font-bold font-mono tabular-nums">
             {formatPKR(kpi.totalAccumDep)}
           </p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Consolidated • {currency}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Closing</p>
         </CardContent>
       </Card>
-      <Card className="shadow-sm border-l-4 border-l-blue-400">
+      <Card className="shadow-sm border-l-4 border-l-purple-400">
+        <CardHeader className="pb-1.5 pt-3 px-4">
+          <CardTitle className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
+            <FileText className="size-3.5" />
+            Dep. for Period
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-3">
+          <p className="text-lg font-bold font-mono tabular-nums">
+            {formatPKR(kpi.depForPeriod)}
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Current Year</p>
+        </CardContent>
+      </Card>
+      <Card className="shadow-sm border-l-4 border-l-emerald-600">
         <CardHeader className="pb-1.5 pt-3 px-4">
           <CardTitle className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
             <Building2 className="size-3.5" />
@@ -239,7 +330,7 @@ function CashFlowCallout({
         <div className="flex items-start gap-2.5">
           <Info className="size-4 text-blue-600 mt-0.5 shrink-0" />
           <p className="text-sm text-blue-900">
-            Depreciation for period{' '}
+            {assetType === 'ppe' ? 'Depreciation' : 'Amortization'} for period{' '}
             <span className="font-semibold font-mono tabular-nums">
               {formatPKRWithSymbol(totalDepPeriod)}
             </span>{' '}
@@ -268,14 +359,23 @@ function CashFlowCallout({
 function MultiColumnScheduleTable({
   rows,
   columns,
+  detailLevel,
 }: {
   rows: ReportRow[];
   columns: Array<{ key: string; label: string; type: string }>;
+  detailLevel: 'summary' | 'detailed';
 }) {
   const projectCols = columns.filter((c) => c.type === 'project');
   const consolidatedCol = columns.find((c) => c.type === 'total');
   const priorCol = columns.find((c) => c.type === 'prior');
   const varianceCol = columns.find((c) => c.type === 'variance');
+
+  // Filter rows based on detail level
+  const filteredRows = useMemo(() => {
+    if (detailLevel === 'detailed') return rows;
+    // Summary: hide sub_line rows (indent_level >= 3)
+    return rows.filter(r => r.row_type !== 'sub_line' || r.indent_level < 3);
+  }, [rows, detailLevel]);
 
   return (
     <ScrollArea className="w-full">
@@ -344,7 +444,7 @@ function MultiColumnScheduleTable({
 
           {/* ── Body ── */}
           <tbody>
-            {rows.map((row) => {
+            {filteredRows.map((row) => {
               const indentPx = getIndentPx(row.indent_level, row.row_type);
               const rowClasses = getRowClasses(row.row_type);
               const isSectionLike =
@@ -501,6 +601,8 @@ function ScheduleSection({
   currency,
   totalDepPeriod,
   assetType,
+  projectName,
+  detailLevel,
 }: {
   title: string;
   noteRef?: string;
@@ -510,32 +612,34 @@ function ScheduleSection({
   currency: string;
   totalDepPeriod: number;
   assetType: 'ppe' | 'intangibles';
+  projectName?: string;
+  detailLevel: 'summary' | 'detailed';
 }) {
   if (rows.length === 0) {
     return (
       <div className="py-8 text-center text-muted-foreground">
+        <Cpu className="h-8 w-8 mx-auto mb-2 opacity-30" />
         <p className="text-sm">No {assetType === 'ppe' ? 'PPE' : 'Intangible'} data available for this period.</p>
+        <p className="text-xs mt-1">Register assets in FAMS module or select a different date range.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {/* Section Header */}
-      <div className="flex items-center gap-2">
-        <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
-        {noteRef && (
-          <Badge variant="secondary" className="text-[10px] px-2 py-0 h-5">
-            {noteRef}
-          </Badge>
-        )}
-      </div>
+      {/* Project Header Banner */}
+      <ProjectHeaderBanner
+        projectName={projectName}
+        currency={currency}
+        noteRef={noteRef}
+        assetType={assetType}
+      />
 
       {/* KPI Summary Cards */}
       <KpiCards kpi={kpi} currency={currency} />
 
       {/* Multi-column Schedule Table */}
-      <MultiColumnScheduleTable rows={rows} columns={columns} />
+      <MultiColumnScheduleTable rows={rows} columns={columns} detailLevel={detailLevel} />
 
       {/* Cash Flow Link Callout */}
       <CashFlowCallout
@@ -557,12 +661,14 @@ function LegacyAssetTable({
   totalDepPeriod,
   assetType,
   currency,
+  projectName,
 }: {
   rows: LegacyAssetRow[];
   noteRef?: string;
   totalDepPeriod: number;
   assetType: 'ppe' | 'intangibles';
   currency: string;
+  projectName?: string;
 }) {
   // Normalize rows
   const normalized = rows.map((row, idx) => ({
@@ -600,6 +706,9 @@ function LegacyAssetTable({
     totalGrossCost: totals.closingCost,
     totalAccumDep: totals.closingAccum,
     netBookValue: totals.nbv,
+    totalAdditions: totals.additions,
+    totalDeletions: totals.deletions,
+    depForPeriod: totals.forPeriod,
   };
 
   const sectionTitle =
@@ -609,15 +718,13 @@ function LegacyAssetTable({
 
   return (
     <div className="space-y-4">
-      {/* Section Header */}
-      <div className="flex items-center gap-2">
-        <h3 className="text-sm font-semibold tracking-tight">{sectionTitle}</h3>
-        {noteRef && (
-          <Badge variant="secondary" className="text-[10px] px-2 py-0 h-5">
-            {noteRef}
-          </Badge>
-        )}
-      </div>
+      {/* Project Header Banner */}
+      <ProjectHeaderBanner
+        projectName={projectName}
+        currency={currency}
+        noteRef={noteRef}
+        assetType={assetType}
+      />
 
       {/* KPI Summary Cards */}
       <KpiCards kpi={kpi} currency={currency} />
@@ -778,6 +885,8 @@ function LegacyAssetTable({
 export default function FixedAssetSchedule({
   data,
   scheduleType = 'both',
+  projectName,
+  detailLevel = 'detailed',
 }: FixedAssetScheduleProps) {
   // ── Detect format ──
   const isNewFormat = !!(data?.columns && data?.rows);
@@ -812,13 +921,26 @@ export default function FixedAssetSchedule({
         ) {
           currentSection = 'intangible';
         }
-        // Don't add bare section headers that just say "NON-CURRENT ASSETS" etc
+        // Add section headers that are PPE/Intangible specific
         if (
           labelLower.includes('property') ||
           labelLower.includes('plant') ||
           labelLower.includes('ppe') ||
           labelLower.includes('equipment') ||
           labelLower.includes('intangible')
+        ) {
+          if (currentSection === 'ppe') ppe.push(row);
+          else if (currentSection === 'intangible') intangible.push(row);
+        }
+        // Also add sub-section headers (COST, DEPRECIATION, NET BOOK VALUE) to current section
+        if (
+          labelLower.includes('cost') ||
+          labelLower.includes('depreciation') ||
+          labelLower.includes('net book value') ||
+          labelLower.includes('opening') ||
+          labelLower.includes('addition') ||
+          labelLower.includes('deletion') ||
+          labelLower.includes('closing')
         ) {
           if (currentSection === 'ppe') ppe.push(row);
           else if (currentSection === 'intangible') intangible.push(row);
@@ -886,7 +1008,11 @@ export default function FixedAssetSchedule({
   if (!data) {
     return (
       <div className="flex items-center justify-center py-16 text-muted-foreground">
-        <p>No fixed asset schedule data available. Generate a report to view data.</p>
+        <div className="text-center">
+          <Building2 className="h-12 w-12 mx-auto mb-4 opacity-30" />
+          <p className="text-sm font-medium">No fixed asset schedule data available.</p>
+          <p className="text-xs mt-1">Select parameters above and generate a report to view data.</p>
+        </div>
       </div>
     );
   }
@@ -917,13 +1043,17 @@ export default function FixedAssetSchedule({
           {hasPpe ? (
             <LegacyAssetTable
               rows={ppeData}
-              noteRef={undefined}
+              noteRef="Note 4"
               totalDepPeriod={ppeTotalDep}
               assetType="ppe"
               currency={currency}
+              projectName={projectName}
             />
           ) : (
-            <div className="py-8 text-center text-muted-foreground">No PPE data available</div>
+            <div className="py-8 text-center text-muted-foreground">
+              <Building2 className="h-8 w-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No PPE data available</p>
+            </div>
           )}
         </div>
       );
@@ -935,13 +1065,17 @@ export default function FixedAssetSchedule({
           {hasIntangibles ? (
             <LegacyAssetTable
               rows={intangibleData}
-              noteRef={undefined}
+              noteRef="Note 5"
               totalDepPeriod={intTotalDep}
               assetType="intangibles"
               currency={currency}
+              projectName={projectName}
             />
           ) : (
-            <div className="py-8 text-center text-muted-foreground">No Intangibles data available</div>
+            <div className="py-8 text-center text-muted-foreground">
+              <Cpu className="h-8 w-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No Intangibles data available</p>
+            </div>
           )}
         </div>
       );
@@ -980,6 +1114,7 @@ export default function FixedAssetSchedule({
                 totalDepPeriod={ppeTotalDep}
                 assetType="ppe"
                 currency={currency}
+                projectName={projectName}
               />
             ) : (
               <div className="py-8 text-center text-muted-foreground">No PPE data available</div>
@@ -994,6 +1129,7 @@ export default function FixedAssetSchedule({
                 totalDepPeriod={intTotalDep}
                 assetType="intangibles"
                 currency={currency}
+                projectName={projectName}
               />
             ) : (
               <div className="py-8 text-center text-muted-foreground">No Intangibles data available</div>
@@ -1009,6 +1145,7 @@ export default function FixedAssetSchedule({
                 totalDepPeriod={ppeTotalDep}
                 assetType="ppe"
                 currency={currency}
+                projectName={projectName}
               />
             )}
             {hasIntangibles && (
@@ -1018,6 +1155,7 @@ export default function FixedAssetSchedule({
                 totalDepPeriod={intTotalDep}
                 assetType="intangibles"
                 currency={currency}
+                projectName={projectName}
               />
             )}
           </div>
@@ -1027,131 +1165,139 @@ export default function FixedAssetSchedule({
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // NEW FORMAT RENDERING
+  // NEW FORMAT RENDERING (multi-project columns)
   // ─────────────────────────────────────────────────────────────────────────
-  if (isNewFormat) {
-    const columns = data.columns || [];
-    const hasPpeRows = ppeRows.length > 0;
-    const hasIntangibleRows = intangibleRows.length > 0;
 
-    // If scheduleType is specific, show only that section without tabs
-    if (scheduleType === 'ppe') {
-      return (
-        <div className="w-full">
-          <ScheduleSection
-            title="Property, Plant & Equipment"
-            noteRef={ppeMeta?.noteRef}
-            rows={ppeRows}
-            columns={columns}
-            kpi={ppeKpi || { totalGrossCost: 0, totalAccumDep: 0, netBookValue: 0 }}
-            currency={currency}
-            totalDepPeriod={ppeMeta?.totalDepreciationForPeriod ?? 0}
-            assetType="ppe"
-          />
-        </div>
-      );
-    }
+  const columns = data.columns || [];
+  const hasPpeData = ppeRows.length > 0;
+  const hasIntangibleData = intangibleRows.length > 0;
 
-    if (scheduleType === 'intangible') {
-      return (
-        <div className="w-full">
-          <ScheduleSection
-            title="Intangible Assets"
-            noteRef={intangibleMeta?.noteRef}
-            rows={intangibleRows}
-            columns={columns}
-            kpi={intangibleKpi || { totalGrossCost: 0, totalAccumDep: 0, netBookValue: 0 }}
-            currency={currency}
-            totalDepPeriod={intangibleMeta?.totalDepreciationForPeriod ?? 0}
-            assetType="intangibles"
-          />
-        </div>
-      );
-    }
-
-    // Both tabs
+  // If scheduleType is specific, show only that section
+  if (scheduleType === 'ppe') {
     return (
       <div className="w-full">
-        <Tabs defaultValue={hasPpeRows ? 'ppe' : 'intangibles'} className="w-full">
-          <TabsList className="mb-4 print:hidden">
-            <TabsTrigger value="ppe" className="flex items-center gap-1.5">
-              <Building2 className="size-3.5" />
-              PPE
-              {ppeMeta?.noteRef && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 ml-1">
-                  {ppeMeta.noteRef}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="intangibles" className="flex items-center gap-1.5">
-              <Cpu className="size-3.5" />
-              Intangibles
-              {intangibleMeta?.noteRef && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 ml-1">
-                  {intangibleMeta.noteRef}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="ppe">
-            <ScheduleSection
-              title="Property, Plant & Equipment"
-              noteRef={ppeMeta?.noteRef}
-              rows={ppeRows}
-              columns={columns}
-              kpi={ppeKpi || { totalGrossCost: 0, totalAccumDep: 0, netBookValue: 0 }}
-              currency={currency}
-              totalDepPeriod={ppeMeta?.totalDepreciationForPeriod ?? 0}
-              assetType="ppe"
-            />
-          </TabsContent>
-
-          <TabsContent value="intangibles">
-            <ScheduleSection
-              title="Intangible Assets"
-              noteRef={intangibleMeta?.noteRef}
-              rows={intangibleRows}
-              columns={columns}
-              kpi={intangibleKpi || { totalGrossCost: 0, totalAccumDep: 0, netBookValue: 0 }}
-              currency={currency}
-              totalDepPeriod={intangibleMeta?.totalDepreciationForPeriod ?? 0}
-              assetType="intangibles"
-            />
-          </TabsContent>
-
-          {/* Print: show both sections */}
-          <div className="hidden print:block space-y-6">
-            <ScheduleSection
-              title="Property, Plant & Equipment"
-              noteRef={ppeMeta?.noteRef}
-              rows={ppeRows}
-              columns={columns}
-              kpi={ppeKpi || { totalGrossCost: 0, totalAccumDep: 0, netBookValue: 0 }}
-              currency={currency}
-              totalDepPeriod={ppeMeta?.totalDepreciationForPeriod ?? 0}
-              assetType="ppe"
-            />
-            <ScheduleSection
-              title="Intangible Assets"
-              noteRef={intangibleMeta?.noteRef}
-              rows={intangibleRows}
-              columns={columns}
-              kpi={intangibleKpi || { totalGrossCost: 0, totalAccumDep: 0, netBookValue: 0 }}
-              currency={currency}
-              totalDepPeriod={intangibleMeta?.totalDepreciationForPeriod ?? 0}
-              assetType="intangibles"
-            />
-          </div>
-        </Tabs>
+        <ScheduleSection
+          title="Property, Plant & Equipment"
+          noteRef={ppeMeta?.noteRef || 'Note 4'}
+          rows={ppeRows}
+          columns={columns}
+          kpi={ppeKpi || { totalGrossCost: 0, totalAccumDep: 0, netBookValue: 0, totalAdditions: 0, totalDeletions: 0, depForPeriod: 0 }}
+          currency={currency}
+          totalDepPeriod={ppeMeta?.totalDepreciationForPeriod || 0}
+          assetType="ppe"
+          projectName={projectName}
+          detailLevel={detailLevel}
+        />
       </div>
     );
   }
 
-  // ── Fallback: no recognizable data ──
+  if (scheduleType === 'intangible') {
+    return (
+      <div className="w-full">
+        <ScheduleSection
+          title="Intangible Assets"
+          noteRef={intangibleMeta?.noteRef || 'Note 5'}
+          rows={intangibleRows}
+          columns={columns}
+          kpi={intangibleKpi || { totalGrossCost: 0, totalAccumDep: 0, netBookValue: 0, totalAdditions: 0, totalDeletions: 0, depForPeriod: 0 }}
+          currency={currency}
+          totalDepPeriod={intangibleMeta?.totalDepreciationForPeriod || 0}
+          assetType="intangibles"
+          projectName={projectName}
+          detailLevel={detailLevel}
+        />
+      </div>
+    );
+  }
+
+  // Both: show tabs
   return (
-    <div className="flex items-center justify-center py-16 text-muted-foreground">
-      <p>No fixed asset schedule data available. Generate a report to view data.</p>
+    <div className="w-full">
+      <Tabs defaultValue={hasPpeData ? 'ppe' : 'intangibles'} className="w-full">
+        <TabsList className="mb-4 print:hidden">
+          <TabsTrigger value="ppe" className="flex items-center gap-1.5">
+            <Building2 className="size-3.5" />
+            PPE
+            {hasPpeData && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 ml-1">
+                Note 4
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="intangibles" className="flex items-center gap-1.5">
+            <Cpu className="size-3.5" />
+            Intangibles
+            {hasIntangibleData && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 ml-1">
+                Note 5
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="ppe">
+          <ScheduleSection
+            title="Property, Plant & Equipment"
+            noteRef={ppeMeta?.noteRef || 'Note 4'}
+            rows={ppeRows}
+            columns={columns}
+            kpi={ppeKpi || { totalGrossCost: 0, totalAccumDep: 0, netBookValue: 0, totalAdditions: 0, totalDeletions: 0, depForPeriod: 0 }}
+            currency={currency}
+            totalDepPeriod={ppeMeta?.totalDepreciationForPeriod || 0}
+            assetType="ppe"
+            projectName={projectName}
+            detailLevel={detailLevel}
+          />
+        </TabsContent>
+
+        <TabsContent value="intangibles">
+          <ScheduleSection
+            title="Intangible Assets"
+            noteRef={intangibleMeta?.noteRef || 'Note 5'}
+            rows={intangibleRows}
+            columns={columns}
+            kpi={intangibleKpi || { totalGrossCost: 0, totalAccumDep: 0, netBookValue: 0, totalAdditions: 0, totalDeletions: 0, depForPeriod: 0 }}
+            currency={currency}
+            totalDepPeriod={intangibleMeta?.totalDepreciationForPeriod || 0}
+            assetType="intangibles"
+            projectName={projectName}
+            detailLevel={detailLevel}
+          />
+        </TabsContent>
+
+        {/* Print: show both sections */}
+        <div className="hidden print:block space-y-8">
+          {hasPpeData && (
+            <ScheduleSection
+              title="Property, Plant & Equipment"
+              noteRef={ppeMeta?.noteRef || 'Note 4'}
+              rows={ppeRows}
+              columns={columns}
+              kpi={ppeKpi || { totalGrossCost: 0, totalAccumDep: 0, netBookValue: 0, totalAdditions: 0, totalDeletions: 0, depForPeriod: 0 }}
+              currency={currency}
+              totalDepPeriod={ppeMeta?.totalDepreciationForPeriod || 0}
+              assetType="ppe"
+              projectName={projectName}
+              detailLevel={detailLevel}
+            />
+          )}
+          {hasIntangibleData && (
+            <ScheduleSection
+              title="Intangible Assets"
+              noteRef={intangibleMeta?.noteRef || 'Note 5'}
+              rows={intangibleRows}
+              columns={columns}
+              kpi={intangibleKpi || { totalGrossCost: 0, totalAccumDep: 0, netBookValue: 0, totalAdditions: 0, totalDeletions: 0, depForPeriod: 0 }}
+              currency={currency}
+              totalDepPeriod={intangibleMeta?.totalDepreciationForPeriod || 0}
+              assetType="intangibles"
+              projectName={projectName}
+              detailLevel={detailLevel}
+            />
+          )}
+        </div>
+      </Tabs>
     </div>
   );
 }

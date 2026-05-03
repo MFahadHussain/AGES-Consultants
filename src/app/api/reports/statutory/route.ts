@@ -2227,6 +2227,46 @@ async function generateValidation(
 // MAIN HANDLER
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Filter schedule rows to only include PPE or Intangible section rows.
+ * Uses row_id prefix (ppe_ vs int_) and section detection.
+ */
+function filterScheduleRows(rows: ReportRow[], section: 'ppe' | 'intangible'): ReportRow[] {
+  const filtered: ReportRow[] = []
+  let inTargetSection = false
+  let currentSection: 'ppe' | 'intangible' | null = null
+
+  for (const row of rows) {
+    const idLower = row.row_id.toLowerCase()
+    const labelLower = row.label.toLowerCase()
+
+    // Detect section boundaries
+    if (row.row_type === 'section_header' && (
+      labelLower.includes('property') ||
+      labelLower.includes('plant') ||
+      labelLower.includes('ppe') ||
+      labelLower.includes('equipment')
+    )) {
+      currentSection = 'ppe'
+      inTargetSection = section === 'ppe'
+    } else if (row.row_type === 'section_header' && (
+      labelLower.includes('intangible')
+    )) {
+      currentSection = 'intangible'
+      inTargetSection = section === 'intangible'
+    }
+
+    // Include row if it belongs to the target section
+    if (inTargetSection) {
+      filtered.push(row)
+    } else if (currentSection === null) {
+      // Before any section header - skip
+    }
+  }
+
+  return filtered
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -2239,7 +2279,7 @@ export async function GET(request: Request) {
     const detailLevel = searchParams.get('detailLevel') || 'summary'
 
     // Validate report type
-    const validReportTypes = ['balance_sheet', 'profit_loss', 'cash_flow', 'fixed_assets', 'intangible_asset_schedule', 'validation']
+    const validReportTypes = ['balance_sheet', 'profit_loss', 'cash_flow', 'fixed_assets', 'fixed_asset_schedule', 'intangible_asset_schedule', 'validation']
     if (!validReportTypes.includes(reportType)) {
       return NextResponse.json(
         { status: 'error', error: `Invalid reportType. Must be one of: ${validReportTypes.join(', ')}` },
@@ -2289,12 +2329,23 @@ export async function GET(request: Request) {
         data = await generateCashFlow(fromDate, toDate, effectiveProjectIds, projects, detailLevel)
         break
       }
-      case 'fixed_assets': {
+      case 'fixed_assets':
+      case 'fixed_asset_schedule': {
         data = await generateFixedAssetSchedule(fromDate, toDate, effectiveProjectIds, projects, detailLevel)
+        // Filter to only PPE rows for the fixed asset schedule
+        if (data.rows) {
+          data.rows = filterScheduleRows(data.rows, 'ppe')
+          data.intangibles = undefined
+        }
         break
       }
       case 'intangible_asset_schedule': {
         data = await generateFixedAssetSchedule(fromDate, toDate, effectiveProjectIds, projects, detailLevel)
+        // Filter to only Intangible rows for the intangible schedule
+        if (data.rows) {
+          data.rows = filterScheduleRows(data.rows, 'intangible')
+          data.ppe = undefined
+        }
         break
       }
       case 'validation': {

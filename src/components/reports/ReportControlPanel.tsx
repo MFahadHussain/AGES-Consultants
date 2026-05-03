@@ -56,7 +56,7 @@ const REPORT_TYPES = [
   { value: 'balance_sheet', label: 'Balance Sheet' },
   { value: 'profit_loss', label: 'P&L' },
   { value: 'cash_flow', label: 'Cash Flow' },
-  { value: 'fixed_asset_schedule', label: 'Fixed Asset Schedule' },
+  { value: 'fixed_assets', label: 'Fixed Asset Schedule' },
   { value: 'intangible_asset_schedule', label: 'Intangible Asset Schedule' },
 ];
 
@@ -107,8 +107,8 @@ export default function ReportControlPanel({
   // Show project selector only for single or multi_column view modes
   const showProjectSelector = viewMode === 'single' || viewMode === 'multi_column';
 
-  // Show detail level only for Balance Sheet
-  const showDetailLevel = reportType === 'balance_sheet';
+  // Show detail level for Balance Sheet and Asset Schedules
+  const showDetailLevel = reportType === 'balance_sheet' || reportType === 'fixed_assets' || reportType === 'intangible_asset_schedule';
 
   // Validation: at least one project and both dates selected
   const isValid =
