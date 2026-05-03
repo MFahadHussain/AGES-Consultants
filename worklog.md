@@ -188,3 +188,29 @@ Stage Summary:
 - API returns multi-project columns with consolidation, prior year, and variance
 - Validation engine checks accounting equation, net profit flow, cash reconciliation, depreciation linkage
 - All components properly connected and rendering
+---
+Task ID: 1
+Agent: Main Agent
+Task: Replace the existing Chart of Accounts with the user-specified partnership firm COA
+
+Work Log:
+- Analyzed the user's COA specification (01-XX-XX-XXXX hierarchical code format)
+- Wrote complete new COA with 263 accounts across 5 major sections:
+  - 01 Assets (81 accounts): Non-Current (Intangible, Tangible, Acc Dep, Acc Amort, CWIP) + Current (Advances, Bank, Petty Cash, Security/Deposits, Prepaid Rent, Loan Receivables)
+  - 02 Capital (23 accounts): Partner Capital (7 partners), Retained Earnings (P&L, Other), Drawings (7 partners)
+  - 03 Liability (44 accounts): Long Term (Loans from 7 partners), Current (Payables, Salary Payable 7 categories, Social Charges 7 categories, Accrued Utilities 5, Loan Payable 8)
+  - 04 Revenue (12 accounts): Operating Revenue, JV Share, Gain/Loss on Disposal, Exchange Gain/Loss
+  - 05 Expenses (103 accounts): Personnel Costs, Social Charges, Travel, Office, Professional, Depreciation, Financial, Other
+- Added Expense section (05) since user's COA didn't include it but ERP requires it for voucher entries
+- Updated account-roles.ts with new semantic role mappings for the new COA structure
+- Updated chart-of-accounts.tsx subType dropdowns to match new subTypes
+- Updated statutory report engine to handle ACCUMULATED_AMORTIZATION (net intangible assets calculation) and RETAINED_EARNINGS/DRAWING subTypes
+- Reseeded database successfully: 263 accounts, 18 projects, FY 2025-26
+- Verified all statutory reports (Balance Sheet, P&L, Cash Flow, Fixed Assets) work correctly
+
+Stage Summary:
+- New COA fully operational with 263 accounts in 01-XX-XX-XXXX format
+- Balance Sheet now shows: Net PPE, Net Intangible Assets, Partner Capital, Retained Earnings, Drawings
+- All 18 projects seeded (HO + 17 Hydropower/Dam/Infrastructure)
+- FAMS re-seeded with settings and fiscal years
+- All API endpoints verified working

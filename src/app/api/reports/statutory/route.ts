@@ -376,15 +376,46 @@ async function generateBalanceSheet(
     values: computeVariance(ppeNetVals), prior_values: ppeNetPrior, drilldown_available: false,
   })
 
-  // Intangible Assets
+  // Intangible Assets (Gross)
   const intangibleAccounts = filterBySubType(allAccounts, ['INTANGIBLE_ASSET'])
+  const accAmortAccounts = filterBySubType(allAccounts, ['ACCUMULATED_AMORTIZATION'])
+
   if (intangibleAccounts.length > 0) {
     rows.push({
-      row_id: nextId(), label: 'Intangible Assets', note_ref: 'Note 5',
+      row_id: nextId(), label: 'Intangible Assets (Gross)', note_ref: 'Note 5',
       row_type: 'line_item', indent_level: 1,
       values: computeVariance(fillProjectValues(balances, intangibleAccounts.map(a => a.id), projects)),
       prior_values: fillProjectValues(priorBalances, intangibleAccounts.map(a => a.id), projects),
       drilldown_available: true,
+    })
+
+    // Accumulated Amortization
+    if (accAmortAccounts.length > 0) {
+      rows.push({
+        row_id: nextId(), label: 'Less: Accumulated Amortization', note_ref: 'Note 5.1',
+        row_type: 'line_item', indent_level: 1,
+        values: computeVariance(fillProjectValues(balances, accAmortAccounts.map(a => a.id), projects, true)),
+        prior_values: fillProjectValues(priorBalances, accAmortAccounts.map(a => a.id), projects, true),
+        drilldown_available: true,
+      })
+    }
+
+    // Net Intangible Assets
+    const intGross = fillProjectValues(balances, intangibleAccounts.map(a => a.id), projects)
+    const amortVals = fillProjectValues(balances, accAmortAccounts.map(a => a.id), projects, true)
+    const intNetVals: Record<string, number> = {}
+    const intNetPrior: Record<string, number> = {}
+    const intGrossPrior = fillProjectValues(priorBalances, intangibleAccounts.map(a => a.id), projects)
+    const amortPrior = fillProjectValues(priorBalances, accAmortAccounts.map(a => a.id), projects, true)
+    for (const k of allColKeys) {
+      intNetVals[k] = r2((intGross[k] || 0) - (amortVals[k] || 0))
+      intNetPrior[k] = r2((intGrossPrior[k] || 0) - (amortPrior[k] || 0))
+    }
+
+    rows.push({
+      row_id: nextId(), label: 'Net Intangible Assets', note_ref: 'Note 5',
+      row_type: 'subtotal', indent_level: 1,
+      values: computeVariance(intNetVals), prior_values: intNetPrior, drilldown_available: false,
     })
   }
 
@@ -414,7 +445,8 @@ async function generateBalanceSheet(
 
   // Non-current subtotal
   const ncAssetIds = [
-    ...ppeAccounts, ...accDepAccounts, ...intangibleAccounts, ...wipAccounts, ...ltLoanAccounts,
+    ...ppeAccounts, ...accDepAccounts, ...intangibleAccounts, ...accAmortAccounts,
+    ...wipAccounts, ...ltLoanAccounts,
   ].map(a => a.id)
   const ncVals: Record<string, number> = {}
   const ncPriorVals: Record<string, number> = {}
@@ -422,8 +454,20 @@ async function generateBalanceSheet(
     ncVals[k] = r2((ppeNetVals[k] || 0))
     ncPriorVals[k] = r2((ppeNetPrior[k] || 0))
   }
-  // Add intangibles, wip, ltloans to subtotal
-  for (const accts of [intangibleAccounts, wipAccounts, ltLoanAccounts]) {
+  // Add net intangibles (gross - amort), wip, ltloans to subtotal
+  if (intangibleAccounts.length > 0) {
+    // Use net intangible values (already computed above if intangibleAccounts exist)
+    for (const k of allColKeys) {
+      const intGross = netBalanceForProject(balances, intangibleAccounts.map(a => a.id), k, false)
+      const amortNet = netBalanceForProject(balances, accAmortAccounts.map(a => a.id), k, true)
+      const intPriorGross = netBalanceForProject(priorBalances, intangibleAccounts.map(a => a.id), k, false)
+      const amortPriorNet = netBalanceForProject(priorBalances, accAmortAccounts.map(a => a.id), k, true)
+      ncVals[k] = r2((ncVals[k] || 0) + intGross - amortNet)
+      ncPriorVals[k] = r2((ncPriorVals[k] || 0) + intPriorGross - amortPriorNet)
+    }
+  }
+  // Add wip, ltloans to subtotal
+  for (const accts of [wipAccounts, ltLoanAccounts]) {
     if (accts.length === 0) continue
     const subVals = fillProjectValues(balances, accts.map(a => a.id), projects)
     const subPrior = fillProjectValues(priorBalances, accts.map(a => a.id), projects)
@@ -583,7 +627,7 @@ async function generateBalanceSheet(
   const otherCurrentAssetAccounts = allAccounts.filter(a =>
     a.accountType === 'ASSET' &&
     a.subType &&
-    !['FIXED_ASSET', 'ACCUMULATED_DEPRECIATION', 'INTANGIBLE_ASSET', 'WORK_IN_PROGRESS',
+    !['FIXED_ASSET', 'ACCUMULATED_DEPRECIATION', 'ACCUMULATED_AMORTIZATION', 'INTANGIBLE_ASSET', 'WORK_IN_PROGRESS',
       'RECEIVABLE', 'ADVANCE', 'DEPOSIT', 'PREPAYMENT', 'TAX_RECEIVABLE', 'CASH', 'BANK',
       'LONG_TERM_LOAN', 'INVESTMENT'].includes(a.subType)
   )
@@ -639,17 +683,30 @@ async function generateBalanceSheet(
     const capVals = fillProjectValues(balances, capitalAccounts.map(a => a.id), projects, true)
     const capPrior = fillProjectValues(priorBalances, capitalAccounts.map(a => a.id), projects, true)
     rows.push({
-      row_id: nextId(), label: 'Capital Account', note_ref: 'Note 13',
+      row_id: nextId(), label: 'Partner Capital', note_ref: 'Note 13',
       row_type: 'line_item', indent_level: 1,
       values: computeVariance(capVals), prior_values: capPrior, drilldown_available: true,
     })
     for (const k of allColKeys) capitalTotal[k] = r2((capitalTotal[k] || 0) + (capVals[k] || 0))
   } else {
     rows.push({
-      row_id: nextId(), label: 'Capital Account', note_ref: 'Note 13',
+      row_id: nextId(), label: 'Partner Capital', note_ref: 'Note 13',
       row_type: 'line_item', indent_level: 1,
       values: zeroValues(projects), prior_values: zeroValues(projects), drilldown_available: false,
     })
+  }
+
+  // Retained Earnings / P&L Account
+  const retainedAccounts = filterBySubType(allAccounts, ['RETAINED_EARNINGS'])
+  if (retainedAccounts.length > 0) {
+    const retVals = fillProjectValues(balances, retainedAccounts.map(a => a.id), projects, true)
+    const retPrior = fillProjectValues(priorBalances, retainedAccounts.map(a => a.id), projects, true)
+    rows.push({
+      row_id: nextId(), label: 'Retained Earnings / P&L Account', note_ref: 'Note 13.1',
+      row_type: 'line_item', indent_level: 1,
+      values: computeVariance(retVals), prior_values: retPrior, drilldown_available: true,
+    })
+    for (const k of allColKeys) capitalTotal[k] = r2((capitalTotal[k] || 0) + (retVals[k] || 0))
   }
 
   // Net Profit / (Loss)

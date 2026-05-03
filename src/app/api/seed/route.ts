@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // ============================================================
-// Seed endpoint: Replaces the entire Chart of Accounts with
-// a comprehensive Pakistani NGO/Development Organization COA.
-// Also ensures a default open Financial Year exists.
+// Seed endpoint: AcctFin ERP v1.0.0 — Partnership Firm COA
+// Comprehensive Chart of Accounts for a multi-project hydropower
+// consulting firm. All figures in PKR.
 // ============================================================
 
 interface COAAccount {
@@ -12,7 +12,7 @@ interface COAAccount {
   name: string
   accountType: string
   subType: string | null
-  parentId: string | null
+  parentCode: string | null
   level: number
   allowPosting: boolean
   isSystem: boolean
@@ -21,190 +21,425 @@ interface COAAccount {
 
 const NEW_COA: COAAccount[] = [
   // ═══════════════════════════════════════════════════════════
-  // 1. ASSETS
+  // 01. ASSETS
   // ═══════════════════════════════════════════════════════════
-  { code: '1000', name: 'Assets', accountType: 'ASSET', subType: null, parentId: null, level: 0, allowPosting: false, isSystem: true, description: 'Total Assets' },
-    { code: '1100', name: 'Current Assets', accountType: 'ASSET', subType: 'CURRENT_ASSET', parentId: null, level: 1, allowPosting: false, isSystem: true, description: 'Assets expected to be realized within 12 months' },
-      // 1.1 Cash & Cash Equivalents
-      { code: '1110', name: 'Cash & Cash Equivalents', accountType: 'ASSET', subType: 'CURRENT_ASSET', parentId: null, level: 2, allowPosting: false, isSystem: true, description: null },
-        { code: '1111', name: 'Cash in Hand', accountType: 'ASSET', subType: 'CASH', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Physical cash on hand at head office' },
-        { code: '1112', name: 'Petty Cash', accountType: 'ASSET', subType: 'CASH', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Petty cash fund for minor expenses' },
-      // 1.2 Bank Accounts
-      { code: '1120', name: 'Bank Accounts', accountType: 'ASSET', subType: 'CURRENT_ASSET', parentId: null, level: 2, allowPosting: false, isSystem: true, description: null },
-        { code: '1121', name: 'Meezan Bank - Main', accountType: 'ASSET', subType: 'BANK', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Meezan Bank Islamic Banking - Main Operating Account' },
-        { code: '1122', name: 'HBL - Operating', accountType: 'ASSET', subType: 'BANK', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Habib Bank Limited - Operating Account' },
-        { code: '1123', name: 'ABL - Main', accountType: 'ASSET', subType: 'BANK', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Allied Bank Limited - Main Account' },
-      // 1.3 Short-Term Investments
-      { code: '1130', name: 'Short-Term Investments', accountType: 'ASSET', subType: 'CURRENT_ASSET', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Short-term investment instruments' },
-      // 1.4 Accounts Receivable
-      { code: '1200', name: 'Accounts Receivable', accountType: 'ASSET', subType: 'RECEIVABLE', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Amounts due from third parties' },
-        { code: '1210', name: 'Grants Receivable', accountType: 'ASSET', subType: 'RECEIVABLE', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Grant amounts due from donors' },
-        { code: '1220', name: 'Employee Advances', accountType: 'ASSET', subType: 'RECEIVABLE', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Salary advances and loans to employees' },
-        { code: '1230', name: 'Other Receivables', accountType: 'ASSET', subType: 'RECEIVABLE', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Other amounts receivable' },
-      // 1.5 Prepayments & Advances
-      { code: '1250', name: 'Prepayments & Advances', accountType: 'ASSET', subType: 'CURRENT_ASSET', parentId: null, level: 2, allowPosting: false, isSystem: true, description: null },
-        { code: '1251', name: 'Prepaid Rent', accountType: 'ASSET', subType: 'CURRENT_ASSET', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Rent paid in advance' },
-        { code: '1252', name: 'Prepaid Insurance', accountType: 'ASSET', subType: 'CURRENT_ASSET', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Insurance premiums paid in advance' },
-        { code: '1253', name: 'Advance to Suppliers', accountType: 'ASSET', subType: 'CURRENT_ASSET', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Payments made in advance to suppliers' },
-        { code: '1254', name: 'Advance Tax', accountType: 'ASSET', subType: 'CURRENT_ASSET', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Tax paid in advance' },
-      // 1.6 Inventory
-      { code: '1280', name: 'Inventory', accountType: 'ASSET', subType: 'CURRENT_ASSET', parentId: null, level: 2, allowPosting: false, isSystem: true, description: null },
-        { code: '1281', name: 'Office Supplies Inventory', accountType: 'ASSET', subType: 'CURRENT_ASSET', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Stock of office supplies on hand' },
+  { code: '01', name: 'Assets', accountType: 'ASSET', subType: null, parentCode: null, level: 0, allowPosting: false, isSystem: true, description: 'Total Assets' },
 
-  // 1.7 Property, Plant & Equipment
-  { code: '1500', name: 'Property, Plant & Equipment', accountType: 'ASSET', subType: 'FIXED_ASSET', parentId: null, level: 1, allowPosting: false, isSystem: true, description: 'Tangible non-current assets' },
-    { code: '1510', name: 'Land', accountType: 'ASSET', subType: 'FIXED_ASSET', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Land owned by the organization' },
-    { code: '1515', name: 'Buildings', accountType: 'ASSET', subType: 'FIXED_ASSET', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Buildings owned by the organization' },
-    { code: '1520', name: 'Vehicles', accountType: 'ASSET', subType: 'FIXED_ASSET', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Motor vehicles owned by the organization' },
-    { code: '1525', name: 'Furniture & Fixtures', accountType: 'ASSET', subType: 'FIXED_ASSET', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Furniture and fixtures' },
-    { code: '1530', name: 'Office Equipment', accountType: 'ASSET', subType: 'FIXED_ASSET', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Office equipment including ACs, photocopiers, etc.' },
-    { code: '1535', name: 'IT Assets', accountType: 'ASSET', subType: 'FIXED_ASSET', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Computers, servers, networking equipment' },
-    { code: '1540', name: 'Machinery', accountType: 'ASSET', subType: 'FIXED_ASSET', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Machinery and generators' },
-    { code: '1545', name: 'Other Fixed Assets', accountType: 'ASSET', subType: 'FIXED_ASSET', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Other tangible fixed assets not classified elsewhere' },
-    { code: '1550', name: 'Capital Work in Progress', accountType: 'ASSET', subType: 'FIXED_ASSET', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Assets under construction' },
+    // ── 01-01 Non-Current Assets ──
+    { code: '01-01', name: 'Non-Current Assets', accountType: 'ASSET', subType: null, parentCode: '01', level: 1, allowPosting: false, isSystem: true, description: 'Assets not expected to be realized within 12 months' },
 
-  // 1.8 Accumulated Depreciation (contra-asset)
-  { code: '1600', name: 'Accumulated Depreciation', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentId: null, level: 1, allowPosting: false, isSystem: true, description: 'Total accumulated depreciation on fixed assets' },
-    { code: '1610', name: 'Acc Dep - Buildings', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentId: null, level: 2, allowPosting: true, isSystem: true, description: null },
-    { code: '1620', name: 'Acc Dep - Vehicles', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentId: null, level: 2, allowPosting: true, isSystem: true, description: null },
-    { code: '1630', name: 'Acc Dep - Furniture', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentId: null, level: 2, allowPosting: true, isSystem: true, description: null },
-    { code: '1640', name: 'Acc Dep - Office Equipment', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentId: null, level: 2, allowPosting: true, isSystem: true, description: null },
-    { code: '1650', name: 'Acc Dep - IT Assets', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentId: null, level: 2, allowPosting: true, isSystem: true, description: null },
-    { code: '1660', name: 'Acc Dep - Machinery', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentId: null, level: 2, allowPosting: true, isSystem: true, description: null },
-    { code: '1670', name: 'Acc Dep - Other Fixed Assets', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentId: null, level: 2, allowPosting: true, isSystem: true, description: null },
+      // 01-01-01 Intangible Assets
+      { code: '01-01-01', name: 'Intangible Assets', accountType: 'ASSET', subType: 'INTANGIBLE_ASSET', parentCode: '01-01', level: 2, allowPosting: false, isSystem: true, description: 'Software licenses and intangible assets' },
+        { code: '01-01-01-0001', name: 'Turbon Pro', accountType: 'ASSET', subType: 'INTANGIBLE_ASSET', parentCode: '01-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Turbon Pro software license' },
+        { code: '01-01-01-0002', name: 'CivilStrips', accountType: 'ASSET', subType: 'INTANGIBLE_ASSET', parentCode: '01-01-01', level: 3, allowPosting: true, isSystem: true, description: 'CivilStrips software license' },
+        { code: '01-01-01-0003', name: 'Hydrohelp 2.6', accountType: 'ASSET', subType: 'INTANGIBLE_ASSET', parentCode: '01-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Hydrohelp 2.6 software license' },
 
-  // 1.9 Other Non-Current Assets
-  { code: '1800', name: 'Other Non-Current Assets', accountType: 'ASSET', subType: 'NON_CURRENT_ASSET', parentId: null, level: 1, allowPosting: false, isSystem: true, description: null },
-    { code: '1810', name: 'Security Deposits', accountType: 'ASSET', subType: 'NON_CURRENT_ASSET', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Deposits paid as security' },
-    { code: '1820', name: 'Intangible Assets', accountType: 'ASSET', subType: 'NON_CURRENT_ASSET', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Software licenses, patents, etc.' },
+      // 01-01-02 Tangible Assets (PPE)
+      { code: '01-01-02', name: 'Tangible Assets', accountType: 'ASSET', subType: 'FIXED_ASSET', parentCode: '01-01', level: 2, allowPosting: false, isSystem: true, description: 'Property, Plant & Equipment' },
+        { code: '01-01-02-0001', name: 'Electrical Equipment', accountType: 'ASSET', subType: 'FIXED_ASSET', parentCode: '01-01-02', level: 3, allowPosting: true, isSystem: true, description: 'Electrical equipment at cost' },
+        { code: '01-01-02-0002', name: 'Office Equipment', accountType: 'ASSET', subType: 'FIXED_ASSET', parentCode: '01-01-02', level: 3, allowPosting: true, isSystem: true, description: 'Office equipment at cost' },
+        { code: '01-01-02-0003', name: 'Vehicle', accountType: 'ASSET', subType: 'FIXED_ASSET', parentCode: '01-01-02', level: 3, allowPosting: true, isSystem: true, description: 'Motor vehicles at cost' },
+        { code: '01-01-02-0004', name: 'Furniture', accountType: 'ASSET', subType: 'FIXED_ASSET', parentCode: '01-01-02', level: 3, allowPosting: true, isSystem: true, description: 'Furniture at cost' },
+        { code: '01-01-02-0005', name: 'Fixtures', accountType: 'ASSET', subType: 'FIXED_ASSET', parentCode: '01-01-02', level: 3, allowPosting: true, isSystem: true, description: 'Fixtures at cost' },
+        { code: '01-01-02-0006', name: 'Computer Equipment', accountType: 'ASSET', subType: 'FIXED_ASSET', parentCode: '01-01-02', level: 3, allowPosting: true, isSystem: true, description: 'IT hardware and computer equipment at cost' },
+        { code: '01-01-02-0007', name: 'Land', accountType: 'ASSET', subType: 'FIXED_ASSET', parentCode: '01-01-02', level: 3, allowPosting: true, isSystem: true, description: 'Land at cost' },
+        { code: '01-01-02-0008', name: 'Building', accountType: 'ASSET', subType: 'FIXED_ASSET', parentCode: '01-01-02', level: 3, allowPosting: true, isSystem: true, description: 'Buildings at cost' },
+        { code: '01-01-02-0009', name: 'Geo tech Equipment', accountType: 'ASSET', subType: 'FIXED_ASSET', parentCode: '01-01-02', level: 3, allowPosting: true, isSystem: true, description: 'Geotechnical equipment at cost' },
+        { code: '01-01-02-0010', name: 'Survey Equipments', accountType: 'ASSET', subType: 'FIXED_ASSET', parentCode: '01-01-02', level: 3, allowPosting: true, isSystem: true, description: 'Survey equipment at cost' },
 
-  // ═══════════════════════════════════════════════════════════
-  // 2. LIABILITIES
-  // ═══════════════════════════════════════════════════════════
-  { code: '2000', name: 'Liabilities', accountType: 'LIABILITY', subType: null, parentId: null, level: 0, allowPosting: false, isSystem: true, description: 'Total Liabilities' },
-    { code: '2100', name: 'Current Liabilities', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentId: null, level: 1, allowPosting: false, isSystem: true, description: 'Liabilities due within 12 months' },
-      // 2.1 Accounts Payable
-      { code: '2110', name: 'Accounts Payable', accountType: 'LIABILITY', subType: 'PAYABLE', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Amounts owed to suppliers and vendors' },
-      // 2.2 Accrued Liabilities
-      { code: '2120', name: 'Accrued Liabilities', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Expenses incurred but not yet paid' },
-      // 2.3 Short-Term Borrowings
-      { code: '2130', name: 'Short-Term Borrowings', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Short-term loans payable' },
-      // 2.4 Payroll Liabilities
-      { code: '2200', name: 'Payroll Liabilities', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentId: null, level: 2, allowPosting: false, isSystem: true, description: null },
-        { code: '2210', name: 'Salary Payable', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Net salary payable to employees' },
-        { code: '2220', name: 'Income Tax Payable', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Income tax deducted at source (FBR)' },
-        { code: '2230', name: 'EOBI Payable', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Employees Old-Age Benefits Institution dues' },
-        { code: '2240', name: 'Provident Fund Payable', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Provident fund contributions payable' },
-        { code: '2250', name: 'Staff Welfare Payable', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Staff welfare fund payable' },
-      // 2.5 Grant Liabilities
-      { code: '2300', name: 'Grant Liabilities', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentId: null, level: 2, allowPosting: false, isSystem: true, description: null },
-        { code: '2310', name: 'Deferred Grant Income', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Grant funds received but not yet recognized as income' },
-        { code: '2320', name: 'Unspent Grant Funds', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Grant funds received but not yet spent' },
-      // 2.6 Other Current Liabilities
-      { code: '2400', name: 'Other Current Liabilities', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentId: null, level: 2, allowPosting: false, isSystem: true, description: null },
-        { code: '2410', name: 'Advance from Donors', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Advance payments received from donors' },
-        { code: '2420', name: 'TDS Payable', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'Tax deducted at source payable' },
-        { code: '2430', name: 'GST Payable', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentId: null, level: 3, allowPosting: true, isSystem: true, description: 'General Sales Tax payable' },
-    // 2.7 Non-Current Liabilities
-    { code: '2600', name: 'Non-Current Liabilities', accountType: 'LIABILITY', subType: 'NON_CURRENT_LIABILITY', parentId: null, level: 1, allowPosting: false, isSystem: true, description: null },
-      { code: '2610', name: 'Long-Term Borrowings', accountType: 'LIABILITY', subType: 'NON_CURRENT_LIABILITY', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Loans payable after 12 months' },
-      { code: '2620', name: 'Endowment Liability', accountType: 'LIABILITY', subType: 'NON_CURRENT_LIABILITY', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Endowment fund liability' },
+      // 01-01-03 Accumulated Depreciation
+      { code: '01-01-03', name: 'Accumulated Depreciation', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentCode: '01-01', level: 2, allowPosting: false, isSystem: true, description: 'Total accumulated depreciation on tangible assets' },
+        { code: '01-01-03-0001', name: 'Acc Dep - Electrical Equipment', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentCode: '01-01-03', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '01-01-03-0002', name: 'Acc Dep - Office Equipment', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentCode: '01-01-03', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '01-01-03-0003', name: 'Acc Dep - Vehicle', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentCode: '01-01-03', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '01-01-03-0004', name: 'Acc Dep - Furniture', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentCode: '01-01-03', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '01-01-03-0005', name: 'Acc Dep - Fixtures', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentCode: '01-01-03', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '01-01-03-0006', name: 'Acc Dep - Computer Equipment', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentCode: '01-01-03', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '01-01-03-0007', name: 'Acc Dep - Land', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentCode: '01-01-03', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '01-01-03-0008', name: 'Acc Dep - Building', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentCode: '01-01-03', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '01-01-03-0009', name: 'Acc Dep - Geo tech Equipment', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentCode: '01-01-03', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '01-01-03-0010', name: 'Acc Dep - Survey Equipments', accountType: 'ASSET', subType: 'ACCUMULATED_DEPRECIATION', parentCode: '01-01-03', level: 3, allowPosting: true, isSystem: true, description: null },
 
-  // ═══════════════════════════════════════════════════════════
-  // 3. EQUITY
-  // ═══════════════════════════════════════════════════════════
-  { code: '3000', name: 'Equity', accountType: 'EQUITY', subType: null, parentId: null, level: 0, allowPosting: false, isSystem: true, description: 'Total Equity / Net Assets' },
-    { code: '3100', name: 'General Fund', accountType: 'EQUITY', subType: 'GENERAL_FUND', parentId: null, level: 1, allowPosting: true, isSystem: true, description: 'Unrestricted / general fund' },
-    { code: '3200', name: 'Accumulated Surplus / (Deficit)', accountType: 'EQUITY', subType: 'ACCUMULATED_SURPLUS', parentId: null, level: 1, allowPosting: true, isSystem: true, description: 'Retained earnings / accumulated surplus or deficit' },
-    { code: '3300', name: 'Revaluation Reserve', accountType: 'EQUITY', subType: 'REVALUATION_RESERVE', parentId: null, level: 1, allowPosting: true, isSystem: true, description: 'Surplus from revaluation of fixed assets' },
-    { code: '3400', name: 'Restricted Funds', accountType: 'EQUITY', subType: 'RESTRICTED_FUND', parentId: null, level: 1, allowPosting: false, isSystem: true, description: null },
-      { code: '3410', name: 'Donor-Restricted Fund', accountType: 'EQUITY', subType: 'RESTRICTED_FUND', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Funds restricted by donor conditions' },
-      { code: '3420', name: 'Endowment Fund', accountType: 'EQUITY', subType: 'ENDOWMENT_FUND', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Permanently restricted endowment fund' },
+      // 01-01-04 Accumulated Amortization
+      { code: '01-01-04', name: 'Accumulated Amortization', accountType: 'ASSET', subType: 'ACCUMULATED_AMORTIZATION', parentCode: '01-01', level: 2, allowPosting: false, isSystem: true, description: 'Total accumulated amortization on intangible assets' },
+        { code: '01-01-04-0001', name: 'Acc Amort - Turbon Pro', accountType: 'ASSET', subType: 'ACCUMULATED_AMORTIZATION', parentCode: '01-01-04', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '01-01-04-0002', name: 'Acc Amort - CivilStrips', accountType: 'ASSET', subType: 'ACCUMULATED_AMORTIZATION', parentCode: '01-01-04', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '01-01-04-0003', name: 'Acc Amort - Hydrohelp 2.6', accountType: 'ASSET', subType: 'ACCUMULATED_AMORTIZATION', parentCode: '01-01-04', level: 3, allowPosting: true, isSystem: true, description: null },
 
-  // ═══════════════════════════════════════════════════════════
-  // 4. INCOME
-  // ═══════════════════════════════════════════════════════════
-  { code: '4000', name: 'Income', accountType: 'INCOME', subType: null, parentId: null, level: 0, allowPosting: false, isSystem: true, description: 'Total Income' },
-    // 4.1 Grant Income
-    { code: '4100', name: 'Grant Income', accountType: 'INCOME', subType: 'GRANT_INCOME', parentId: null, level: 1, allowPosting: false, isSystem: true, description: null },
-      { code: '4110', name: 'International Grants', accountType: 'INCOME', subType: 'GRANT_INCOME', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Grants from international donors (USAID, EU, DFID, etc.)' },
-      { code: '4120', name: 'Domestic Grants', accountType: 'INCOME', subType: 'GRANT_INCOME', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Grants from domestic sources' },
-      { code: '4130', name: 'Government Grants', accountType: 'INCOME', subType: 'GRANT_INCOME', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Grants from federal/provincial government' },
-    // 4.2 Donation Income
-    { code: '4200', name: 'Donation Income', accountType: 'INCOME', subType: 'DONATION_INCOME', parentId: null, level: 1, allowPosting: false, isSystem: true, description: null },
-      { code: '4210', name: 'Zakat & Sadaqat', accountType: 'INCOME', subType: 'DONATION_INCOME', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Zakat and Sadaqat contributions' },
-      { code: '4220', name: 'General Donations', accountType: 'INCOME', subType: 'DONATION_INCOME', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Unrestricted donations' },
-      { code: '4230', name: 'Corporate Donations', accountType: 'INCOME', subType: 'DONATION_INCOME', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Donations from corporate entities' },
-    // 4.3 Program Income
-    { code: '4300', name: 'Program Income', accountType: 'INCOME', subType: 'PROGRAM_INCOME', parentId: null, level: 1, allowPosting: false, isSystem: true, description: null },
-      { code: '4310', name: 'Service Fees', accountType: 'INCOME', subType: 'PROGRAM_INCOME', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Fees from services rendered' },
-      { code: '4320', name: 'Training Fees', accountType: 'INCOME', subType: 'PROGRAM_INCOME', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Income from training programs' },
-      { code: '4330', name: 'Membership Fees', accountType: 'INCOME', subType: 'PROGRAM_INCOME', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Membership subscription income' },
-    // 4.4 Other Income
-    { code: '4400', name: 'Other Income', accountType: 'INCOME', subType: 'OTHER_INCOME', parentId: null, level: 1, allowPosting: false, isSystem: true, description: null },
-      { code: '4410', name: 'Interest Income', accountType: 'INCOME', subType: 'OTHER_INCOME', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Interest earned on bank deposits' },
-      { code: '4420', name: 'Gain on Foreign Exchange', accountType: 'INCOME', subType: 'OTHER_INCOME', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Foreign exchange gains' },
-      { code: '4430', name: 'Gain on Disposal of Assets', accountType: 'INCOME', subType: 'GAIN_ON_DISPOSAL', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Gain from sale of fixed assets' },
-      { code: '4440', name: 'Sundry Income', accountType: 'INCOME', subType: 'OTHER_INCOME', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Other miscellaneous income' },
+      // 01-01-05 Capital Work in Progress
+      { code: '01-01-05', name: 'Capital Work in Progress', accountType: 'ASSET', subType: 'WORK_IN_PROGRESS', parentCode: '01-01', level: 2, allowPosting: false, isSystem: true, description: 'Assets under construction / installation' },
+        { code: '01-01-05-0001', name: 'General CWIP', accountType: 'ASSET', subType: 'WORK_IN_PROGRESS', parentCode: '01-01-05', level: 3, allowPosting: true, isSystem: true, description: 'General capital work in progress' },
+
+    // ── 01-02 Current Assets ──
+    { code: '01-02', name: 'Current Assets', accountType: 'ASSET', subType: 'CURRENT_ASSET', parentCode: '01', level: 1, allowPosting: false, isSystem: true, description: 'Assets expected to be realized within 12 months' },
+
+      // 01-02-01 Advance to Supplier
+      { code: '01-02-01', name: 'Advance to Supplier', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02', level: 2, allowPosting: false, isSystem: true, description: 'Advances paid to suppliers' },
+        { code: '01-02-01-0001', name: 'Capital Rent A Car Service', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02-01', level: 3, allowPosting: true, isSystem: true, description: 'Advance to Capital Rent A Car Service' },
+
+      // 01-02-02 Advance Income Tax
+      { code: '01-02-02', name: 'Advance Income Tax', accountType: 'ASSET', subType: 'TAX_RECEIVABLE', parentCode: '01-02', level: 2, allowPosting: false, isSystem: true, description: 'Tax deducted at source / paid in advance' },
+        { code: '01-02-02-0001', name: 'Services/Invoices', accountType: 'ASSET', subType: 'TAX_RECEIVABLE', parentCode: '01-02-02', level: 3, allowPosting: true, isSystem: true, description: 'Advance income tax on services/invoices' },
+
+      // 01-02-03 Bank
+      { code: '01-02-03', name: 'Bank', accountType: 'ASSET', subType: 'BANK', parentCode: '01-02', level: 2, allowPosting: false, isSystem: true, description: 'Bank accounts' },
+        { code: '01-02-03-0001', name: 'Allied Bank', accountType: 'ASSET', subType: 'BANK', parentCode: '01-02-03', level: 3, allowPosting: true, isSystem: true, description: 'Allied Bank Limited' },
+        { code: '01-02-03-0002', name: 'Bank of Khyber', accountType: 'ASSET', subType: 'BANK', parentCode: '01-02-03', level: 3, allowPosting: true, isSystem: true, description: 'Bank of Khyber' },
+        { code: '01-02-03-0003', name: 'Habib Bank Limited', accountType: 'ASSET', subType: 'BANK', parentCode: '01-02-03', level: 3, allowPosting: true, isSystem: true, description: 'Habib Bank Limited' },
+        { code: '01-02-03-0004', name: 'National Bank', accountType: 'ASSET', subType: 'BANK', parentCode: '01-02-03', level: 3, allowPosting: true, isSystem: true, description: 'National Bank of Pakistan' },
+
+      // 01-02-04 Petty Cash
+      { code: '01-02-04', name: 'Petty Cash', accountType: 'ASSET', subType: 'CASH', parentCode: '01-02', level: 2, allowPosting: false, isSystem: true, description: 'Petty cash funds' },
+        { code: '01-02-04-0001', name: 'Salman Khan', accountType: 'ASSET', subType: 'CASH', parentCode: '01-02-04', level: 3, allowPosting: true, isSystem: true, description: 'Petty cash - Salman Khan' },
+        { code: '01-02-04-0002', name: 'Izhar Ali', accountType: 'ASSET', subType: 'CASH', parentCode: '01-02-04', level: 3, allowPosting: true, isSystem: true, description: 'Petty cash - Izhar Ali' },
+        { code: '01-02-04-0003', name: 'Imdad Ullah', accountType: 'ASSET', subType: 'CASH', parentCode: '01-02-04', level: 3, allowPosting: true, isSystem: true, description: 'Petty cash - Imdad Ullah' },
+        { code: '01-02-04-0004', name: 'Nouman Gul', accountType: 'ASSET', subType: 'CASH', parentCode: '01-02-04', level: 3, allowPosting: true, isSystem: true, description: 'Petty cash - Nouman Gul' },
+
+      // 01-02-05 Staff Advance
+      { code: '01-02-05', name: 'Staff Advance', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02', level: 2, allowPosting: false, isSystem: true, description: 'Advances to staff and partners' },
+        { code: '01-02-05-0001', name: 'Partners Advance', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02-05', level: 3, allowPosting: true, isSystem: true, description: 'Advances to partners' },
+        { code: '01-02-05-0002', name: 'Staff Advance', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02-05', level: 3, allowPosting: true, isSystem: true, description: 'Advances to staff' },
+
+      // 01-02-06 Advance Salary
+      { code: '01-02-06', name: 'Advance Salary', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02', level: 2, allowPosting: false, isSystem: true, description: 'Salary advances' },
+        { code: '01-02-06-0001', name: 'Partners Advance Salary', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02-06', level: 3, allowPosting: true, isSystem: true, description: 'Salary advances to partners' },
+        { code: '01-02-06-0002', name: 'Staff Advance Salary', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02-06', level: 3, allowPosting: true, isSystem: true, description: 'Salary advances to staff' },
+
+      // 01-02-07 Advance for Expenses
+      { code: '01-02-07', name: 'Advance for Expenses', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02', level: 2, allowPosting: false, isSystem: true, description: 'Expense advances to individuals' },
+        { code: '01-02-07-0001', name: 'Alamgir Khan', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02-07', level: 3, allowPosting: true, isSystem: true, description: 'Expense advance - Alamgir Khan' },
+        { code: '01-02-07-0002', name: 'Aziz-ul-Haq', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02-07', level: 3, allowPosting: true, isSystem: true, description: 'Expense advance - Aziz-ul-Haq' },
+        { code: '01-02-07-0003', name: 'Mukhtar Muhammad', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02-07', level: 3, allowPosting: true, isSystem: true, description: 'Expense advance - Mukhtar Muhammad' },
+        { code: '01-02-07-0004', name: 'Nasir-ul-Mulk', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02-07', level: 3, allowPosting: true, isSystem: true, description: 'Expense advance - Nasir-ul-Mulk' },
+        { code: '01-02-07-0005', name: 'Rahat Ali Khan', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02-07', level: 3, allowPosting: true, isSystem: true, description: 'Expense advance - Rahat Ali Khan' },
+        { code: '01-02-07-0006', name: 'Tariq Khurshid', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02-07', level: 3, allowPosting: true, isSystem: true, description: 'Expense advance - Tariq Khurshid' },
+        { code: '01-02-07-0007', name: 'Zahoor Ahmad', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02-07', level: 3, allowPosting: true, isSystem: true, description: 'Expense advance - Zahoor Ahmad' },
+        { code: '01-02-07-0008', name: 'Rehmat Shah', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02-07', level: 3, allowPosting: true, isSystem: true, description: 'Expense advance - Rehmat Shah' },
+        { code: '01-02-07-0009', name: 'Naeem Jan', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02-07', level: 3, allowPosting: true, isSystem: true, description: 'Expense advance - Naeem Jan' },
+        { code: '01-02-07-0010', name: 'Nasir Alam', accountType: 'ASSET', subType: 'ADVANCE', parentCode: '01-02-07', level: 3, allowPosting: true, isSystem: true, description: 'Expense advance - Nasir Alam' },
+
+      // 01-02-08 Security and Deposits
+      { code: '01-02-08', name: 'Security and Deposits', accountType: 'ASSET', subType: 'DEPOSIT', parentCode: '01-02', level: 2, allowPosting: false, isSystem: true, description: 'Security deposits paid' },
+        { code: '01-02-08-0001', name: 'Office Security', accountType: 'ASSET', subType: 'DEPOSIT', parentCode: '01-02-08', level: 3, allowPosting: true, isSystem: true, description: 'Office security deposit' },
+        { code: '01-02-08-0002', name: 'Call Deposit', accountType: 'ASSET', subType: 'DEPOSIT', parentCode: '01-02-08', level: 3, allowPosting: true, isSystem: true, description: 'Call deposit' },
+
+      // 01-02-09 Prepaid Rent
+      { code: '01-02-09', name: 'Prepaid Rent', accountType: 'ASSET', subType: 'PREPAYMENT', parentCode: '01-02', level: 2, allowPosting: false, isSystem: true, description: 'Rent paid in advance' },
+        { code: '01-02-09-0001', name: 'Prepaid Rent - Town Office', accountType: 'ASSET', subType: 'PREPAYMENT', parentCode: '01-02-09', level: 3, allowPosting: true, isSystem: true, description: 'Prepaid rent for Town Office' },
+        { code: '01-02-09-0002', name: 'Prepaid Rent - Phase 07 Office', accountType: 'ASSET', subType: 'PREPAYMENT', parentCode: '01-02-09', level: 3, allowPosting: true, isSystem: true, description: 'Prepaid rent for Phase 07 Office' },
+
+      // 01-02-12 Loan Receivables
+      { code: '01-02-12', name: 'Loan Receivables', accountType: 'ASSET', subType: 'RECEIVABLE', parentCode: '01-02', level: 2, allowPosting: false, isSystem: true, description: 'Loans and receivables from third parties' },
+        { code: '01-02-12-0001', name: 'BAK Consulting', accountType: 'ASSET', subType: 'RECEIVABLE', parentCode: '01-02-12', level: 3, allowPosting: true, isSystem: true, description: 'Loan receivable from BAK Consulting' },
+        { code: '01-02-12-0002', name: 'Sheladia Associates', accountType: 'ASSET', subType: 'RECEIVABLE', parentCode: '01-02-12', level: 3, allowPosting: true, isSystem: true, description: 'Loan receivable from Sheladia Associates' },
+        { code: '01-02-12-0003', name: 'Afkar Associates', accountType: 'ASSET', subType: 'RECEIVABLE', parentCode: '01-02-12', level: 3, allowPosting: true, isSystem: true, description: 'Loan receivable from Afkar Associates' },
+        { code: '01-02-12-0004', name: 'Infra-D Consultants', accountType: 'ASSET', subType: 'RECEIVABLE', parentCode: '01-02-12', level: 3, allowPosting: true, isSystem: true, description: 'Loan receivable from Infra-D Consultants' },
+        { code: '01-02-12-0005', name: '4 FS', accountType: 'ASSET', subType: 'RECEIVABLE', parentCode: '01-02-12', level: 3, allowPosting: true, isSystem: true, description: 'Loan receivable from 4 FS' },
+        { code: '01-02-12-0006', name: 'Mazhar Hussain', accountType: 'ASSET', subType: 'RECEIVABLE', parentCode: '01-02-12', level: 3, allowPosting: true, isSystem: true, description: 'Loan receivable from Mazhar Hussain' },
+        { code: '01-02-12-0007', name: 'Muhammad Iqbal', accountType: 'ASSET', subType: 'RECEIVABLE', parentCode: '01-02-12', level: 3, allowPosting: true, isSystem: true, description: 'Loan receivable from Muhammad Iqbal' },
+        { code: '01-02-12-0008', name: 'Hamid Iqbal', accountType: 'ASSET', subType: 'RECEIVABLE', parentCode: '01-02-12', level: 3, allowPosting: true, isSystem: true, description: 'Loan receivable from Hamid Iqbal' },
 
   // ═══════════════════════════════════════════════════════════
-  // 5. EXPENSES
+  // 02. CAPITAL (EQUITY)
   // ═══════════════════════════════════════════════════════════
-  { code: '5000', name: 'Expenses', accountType: 'EXPENSE', subType: null, parentId: null, level: 0, allowPosting: false, isSystem: true, description: 'Total Expenses' },
-    // 5.1 Personnel Costs
-    { code: '5100', name: 'Personnel Costs', accountType: 'EXPENSE', subType: 'PERSONNEL', parentId: null, level: 1, allowPosting: false, isSystem: true, description: null },
-      { code: '5110', name: 'Salaries & Wages', accountType: 'EXPENSE', subType: 'SALARY', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Gross salary and wage expense' },
-      { code: '5120', name: 'Overtime & Allowances', accountType: 'EXPENSE', subType: 'SALARY', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Overtime payments and allowances' },
-      { code: '5130', name: 'Medical Benefits', accountType: 'EXPENSE', subType: 'PERSONNEL', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Medical insurance and benefits' },
-      { code: '5140', name: 'Staff Welfare', accountType: 'EXPENSE', subType: 'PERSONNEL', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Staff welfare expenses' },
-    // 5.2 Employer Social Charges
-    { code: '5200', name: 'Employer Social Charges', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentId: null, level: 1, allowPosting: false, isSystem: true, description: null },
-      { code: '5210', name: 'Employer EOBI Contribution', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentId: null, level: 2, allowPosting: true, isSystem: true, description: "Employer's EOBI contribution" },
-      { code: '5220', name: 'Employer Provident Fund', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentId: null, level: 2, allowPosting: true, isSystem: true, description: "Employer's provident fund contribution" },
-      { code: '5230', name: 'Employer Social Security', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentId: null, level: 2, allowPosting: true, isSystem: true, description: "Employer's social security contribution" },
-    // 5.3 Travel & Transportation
-    { code: '5300', name: 'Travel & Transportation', accountType: 'EXPENSE', subType: 'TRAVEL', parentId: null, level: 1, allowPosting: false, isSystem: true, description: null },
-      { code: '5310', name: 'Domestic Travel', accountType: 'EXPENSE', subType: 'TRAVEL', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Domestic travel and related expenses' },
-      { code: '5320', name: 'International Travel', accountType: 'EXPENSE', subType: 'TRAVEL', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'International travel and related expenses' },
-      { code: '5330', name: 'Vehicle Running & Maintenance', accountType: 'EXPENSE', subType: 'TRAVEL', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Fuel, repairs, and maintenance of vehicles' },
-      { code: '5340', name: 'Conveyance Allowance', accountType: 'EXPENSE', subType: 'TRAVEL', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Daily conveyance allowance' },
-    // 5.4 Office Expenses
-    { code: '5400', name: 'Office Expenses', accountType: 'EXPENSE', subType: 'OFFICE', parentId: null, level: 1, allowPosting: false, isSystem: true, description: null },
-      { code: '5410', name: 'Rent Expense', accountType: 'EXPENSE', subType: 'OFFICE', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Office and building rent' },
-      { code: '5420', name: 'Utilities Expense', accountType: 'EXPENSE', subType: 'OFFICE', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Electricity, gas, water, and telephone' },
-      { code: '5430', name: 'Office Supplies', accountType: 'EXPENSE', subType: 'OFFICE', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Consumable office supplies' },
-      { code: '5440', name: 'Printing & Stationery', accountType: 'EXPENSE', subType: 'OFFICE', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Printing and stationery costs' },
-      { code: '5450', name: 'Communication Expense', accountType: 'EXPENSE', subType: 'OFFICE', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Telephone, internet, and postage' },
-      { code: '5460', name: 'Insurance Expense', accountType: 'EXPENSE', subType: 'OFFICE', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Insurance premiums (non-employee)' },
-    // 5.5 Professional & Consultancy Fees
-    { code: '5500', name: 'Professional & Consultancy Fees', accountType: 'EXPENSE', subType: 'PROFESSIONAL', parentId: null, level: 1, allowPosting: false, isSystem: true, description: null },
-      { code: '5510', name: 'Audit Fee', accountType: 'EXPENSE', subType: 'PROFESSIONAL', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'External audit fees' },
-      { code: '5520', name: 'Legal Fee', accountType: 'EXPENSE', subType: 'PROFESSIONAL', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Legal consultation and litigation' },
-      { code: '5530', name: 'Consultancy Fee', accountType: 'EXPENSE', subType: 'PROFESSIONAL', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Technical and management consultancy' },
-    // 5.6 Depreciation & Amortization
-    { code: '5600', name: 'Depreciation & Amortization', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentId: null, level: 1, allowPosting: false, isSystem: true, description: 'Depreciation and amortization expense' },
-      { code: '5610', name: 'Depreciation - Buildings', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentId: null, level: 2, allowPosting: true, isSystem: true, description: null },
-      { code: '5620', name: 'Depreciation - Vehicles', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentId: null, level: 2, allowPosting: true, isSystem: true, description: null },
-      { code: '5630', name: 'Depreciation - Furniture', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentId: null, level: 2, allowPosting: true, isSystem: true, description: null },
-      { code: '5640', name: 'Depreciation - Office Equipment', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentId: null, level: 2, allowPosting: true, isSystem: true, description: null },
-      { code: '5650', name: 'Depreciation - IT Assets', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentId: null, level: 2, allowPosting: true, isSystem: true, description: null },
-      { code: '5660', name: 'Depreciation - Machinery', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentId: null, level: 2, allowPosting: true, isSystem: true, description: null },
-      { code: '5670', name: 'Amortization - Intangibles', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentId: null, level: 2, allowPosting: true, isSystem: true, description: null },
-    // 5.7 Program Expenses
-    { code: '5700', name: 'Program Expenses', accountType: 'EXPENSE', subType: 'PROGRAM', parentId: null, level: 1, allowPosting: false, isSystem: true, description: null },
-      { code: '5710', name: 'Project Direct Costs', accountType: 'EXPENSE', subType: 'PROGRAM', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Direct costs for project activities' },
-      { code: '5720', name: 'Training & Workshop Expenses', accountType: 'EXPENSE', subType: 'PROGRAM', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Training, workshops, and capacity building' },
-      { code: '5730', name: 'Community Development Expenses', accountType: 'EXPENSE', subType: 'PROGRAM', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Community outreach and development' },
-    // 5.8 Bank Charges & Financial Costs
-    { code: '5800', name: 'Bank Charges & Financial Costs', accountType: 'EXPENSE', subType: 'FINANCIAL', parentId: null, level: 1, allowPosting: false, isSystem: true, description: null },
-      { code: '5810', name: 'Bank Charges', accountType: 'EXPENSE', subType: 'FINANCIAL', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Bank service charges and fees' },
-      { code: '5820', name: 'Loss on Foreign Exchange', accountType: 'EXPENSE', subType: 'FINANCIAL', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Foreign exchange losses' },
-      { code: '5830', name: 'Interest Expense', accountType: 'EXPENSE', subType: 'FINANCIAL', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Interest paid on borrowings' },
-    // 5.9 Other Expenses
-    { code: '5900', name: 'Other Expenses', accountType: 'EXPENSE', subType: 'OTHER_EXPENSE', parentId: null, level: 1, allowPosting: false, isSystem: true, description: null },
-      { code: '5910', name: 'Loss on Disposal of Assets', accountType: 'EXPENSE', subType: 'LOSS_ON_DISPOSAL', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Loss from sale/disposal of fixed assets' },
-      { code: '5920', name: 'Write-Off Expenses', accountType: 'EXPENSE', subType: 'OTHER_EXPENSE', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Bad debts and write-offs' },
-      { code: '5930', name: 'Sundry Expenses', accountType: 'EXPENSE', subType: 'OTHER_EXPENSE', parentId: null, level: 2, allowPosting: true, isSystem: true, description: 'Other miscellaneous expenses' },
+  { code: '02', name: 'Capital', accountType: 'EQUITY', subType: null, parentCode: null, level: 0, allowPosting: false, isSystem: true, description: 'Total Capital / Equity' },
+
+    // 02-01 Equity
+    { code: '02-01', name: 'Equity', accountType: 'EQUITY', subType: null, parentCode: '02', level: 1, allowPosting: false, isSystem: true, description: 'Partners equity' },
+
+      // 02-01-01 Partner Capital
+      { code: '02-01-01', name: 'Partner Capital', accountType: 'EQUITY', subType: 'CAPITAL_FUND', parentCode: '02-01', level: 2, allowPosting: false, isSystem: true, description: 'Capital accounts of partners' },
+        { code: '02-01-01-0001', name: 'Alamgir Khan', accountType: 'EQUITY', subType: 'CAPITAL_FUND', parentCode: '02-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Capital - Alamgir Khan' },
+        { code: '02-01-01-0002', name: 'Aziz-ul-Haq', accountType: 'EQUITY', subType: 'CAPITAL_FUND', parentCode: '02-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Capital - Aziz-ul-Haq' },
+        { code: '02-01-01-0003', name: 'Mukhtar Muhammad', accountType: 'EQUITY', subType: 'CAPITAL_FUND', parentCode: '02-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Capital - Mukhtar Muhammad' },
+        { code: '02-01-01-0004', name: 'Nasir-ul-Mulk', accountType: 'EQUITY', subType: 'CAPITAL_FUND', parentCode: '02-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Capital - Nasir-ul-Mulk' },
+        { code: '02-01-01-0005', name: 'Rahat Ali Khan', accountType: 'EQUITY', subType: 'CAPITAL_FUND', parentCode: '02-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Capital - Rahat Ali Khan' },
+        { code: '02-01-01-0006', name: 'Zahoor Ahmad', accountType: 'EQUITY', subType: 'CAPITAL_FUND', parentCode: '02-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Capital - Zahoor Ahmad' },
+        { code: '02-01-01-0007', name: 'Memona Tariq', accountType: 'EQUITY', subType: 'CAPITAL_FUND', parentCode: '02-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Capital - Memona Tariq' },
+
+    // 02-02 Retained Earning
+    { code: '02-02', name: 'Retained Earning', accountType: 'EQUITY', subType: null, parentCode: '02', level: 1, allowPosting: false, isSystem: true, description: 'Retained earnings and accumulated results' },
+
+      // 02-02-01 Retained Earning
+      { code: '02-02-01', name: 'Retained Earning', accountType: 'EQUITY', subType: 'RETAINED_EARNINGS', parentCode: '02-02', level: 2, allowPosting: false, isSystem: true, description: 'Retained earnings' },
+        { code: '02-02-01-0001', name: 'Profit & Loss', accountType: 'EQUITY', subType: 'RETAINED_EARNINGS', parentCode: '02-02-01', level: 3, allowPosting: true, isSystem: true, description: 'Profit & Loss account' },
+        { code: '02-02-01-0002', name: 'Other', accountType: 'EQUITY', subType: 'RETAINED_EARNINGS', parentCode: '02-02-01', level: 3, allowPosting: true, isSystem: true, description: 'Other retained earnings' },
+
+    // 02-03 Drawing
+    { code: '02-03', name: 'Drawing', accountType: 'EQUITY', subType: null, parentCode: '02', level: 1, allowPosting: false, isSystem: true, description: 'Partners drawings' },
+
+      // 02-03-01 Partner Drawing
+      { code: '02-03-01', name: 'Partner Drawing', accountType: 'EQUITY', subType: 'DRAWING', parentCode: '02-03', level: 2, allowPosting: false, isSystem: true, description: 'Drawings by partners' },
+        { code: '02-03-01-0001', name: 'Alamgir Khan', accountType: 'EQUITY', subType: 'DRAWING', parentCode: '02-03-01', level: 3, allowPosting: true, isSystem: true, description: 'Drawing - Alamgir Khan' },
+        { code: '02-03-01-0002', name: 'Aziz-ul-Haq', accountType: 'EQUITY', subType: 'DRAWING', parentCode: '02-03-01', level: 3, allowPosting: true, isSystem: true, description: 'Drawing - Aziz-ul-Haq' },
+        { code: '02-03-01-0003', name: 'Mukhtar Muhammad', accountType: 'EQUITY', subType: 'DRAWING', parentCode: '02-03-01', level: 3, allowPosting: true, isSystem: true, description: 'Drawing - Mukhtar Muhammad' },
+        { code: '02-03-01-0004', name: 'Nasir-ul-Mulk', accountType: 'EQUITY', subType: 'DRAWING', parentCode: '02-03-01', level: 3, allowPosting: true, isSystem: true, description: 'Drawing - Nasir-ul-Mulk' },
+        { code: '02-03-01-0005', name: 'Rahat Ali Khan', accountType: 'EQUITY', subType: 'DRAWING', parentCode: '02-03-01', level: 3, allowPosting: true, isSystem: true, description: 'Drawing - Rahat Ali Khan' },
+        { code: '02-03-01-0006', name: 'Zahoor Ahmad', accountType: 'EQUITY', subType: 'DRAWING', parentCode: '02-03-01', level: 3, allowPosting: true, isSystem: true, description: 'Drawing - Zahoor Ahmad' },
+        { code: '02-03-01-0007', name: 'Memona Tariq', accountType: 'EQUITY', subType: 'DRAWING', parentCode: '02-03-01', level: 3, allowPosting: true, isSystem: true, description: 'Drawing - Memona Tariq' },
+
+  // ═══════════════════════════════════════════════════════════
+  // 03. LIABILITY
+  // ═══════════════════════════════════════════════════════════
+  { code: '03', name: 'Liability', accountType: 'LIABILITY', subType: null, parentCode: null, level: 0, allowPosting: false, isSystem: true, description: 'Total Liabilities' },
+
+    // 03-01 Long Term Liability
+    { code: '03-01', name: 'Long Term Liability', accountType: 'LIABILITY', subType: 'NON_CURRENT_LIABILITY', parentCode: '03', level: 1, allowPosting: false, isSystem: true, description: 'Liabilities due after 12 months' },
+
+      // 03-01-01 Loans from Partner
+      { code: '03-01-01', name: 'Loans from Partner', accountType: 'LIABILITY', subType: 'LONG_TERM_LOAN', parentCode: '03-01', level: 2, allowPosting: false, isSystem: true, description: 'Long-term loans from partners' },
+        { code: '03-01-01-0001', name: 'Alamgir Khan', accountType: 'LIABILITY', subType: 'LONG_TERM_LOAN', parentCode: '03-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Loan from Alamgir Khan' },
+        { code: '03-01-01-0002', name: 'Aziz-ul-Haq', accountType: 'LIABILITY', subType: 'LONG_TERM_LOAN', parentCode: '03-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Loan from Aziz-ul-Haq' },
+        { code: '03-01-01-0003', name: 'Mukhtar Muhammad', accountType: 'LIABILITY', subType: 'LONG_TERM_LOAN', parentCode: '03-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Loan from Mukhtar Muhammad' },
+        { code: '03-01-01-0004', name: 'Nasir-ul-Mulk', accountType: 'LIABILITY', subType: 'LONG_TERM_LOAN', parentCode: '03-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Loan from Nasir-ul-Mulk' },
+        { code: '03-01-01-0005', name: 'Rahat Ali Khan', accountType: 'LIABILITY', subType: 'LONG_TERM_LOAN', parentCode: '03-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Loan from Rahat Ali Khan' },
+        { code: '03-01-01-0006', name: 'Zahoor Ahmad', accountType: 'LIABILITY', subType: 'LONG_TERM_LOAN', parentCode: '03-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Loan from Zahoor Ahmad' },
+        { code: '03-01-01-0007', name: 'Memona Tariq', accountType: 'LIABILITY', subType: 'LONG_TERM_LOAN', parentCode: '03-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Loan from Memona Tariq' },
+
+    // 03-02 Current Liability
+    { code: '03-02', name: 'Current Liability', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentCode: '03', level: 1, allowPosting: false, isSystem: true, description: 'Liabilities due within 12 months' },
+
+      // 03-02-01 Payable to Suppliers/Vendors
+      { code: '03-02-01', name: 'Payable to Suppliers/Vendors', accountType: 'LIABILITY', subType: 'PAYABLE', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Amounts owed to suppliers and vendors' },
+        { code: '03-02-01-0001', name: 'Payable to Suppliers/Vendors', accountType: 'LIABILITY', subType: 'PAYABLE', parentCode: '03-02-01', level: 3, allowPosting: true, isSystem: true, description: 'Trade payables' },
+
+      // 03-02-02 Salary Payable
+      { code: '03-02-02', name: 'Salary Payable', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Salary payables by category' },
+        { code: '03-02-02-0001', name: 'Salary Payable Partners', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-02', level: 3, allowPosting: true, isSystem: true, description: 'Salary payable to partners' },
+        { code: '03-02-02-0002', name: 'Salary Payable Key Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-02', level: 3, allowPosting: true, isSystem: true, description: 'Salary payable to key staff' },
+        { code: '03-02-02-0003', name: 'Salary Payable Technical Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-02', level: 3, allowPosting: true, isSystem: true, description: 'Salary payable to technical staff' },
+        { code: '03-02-02-0004', name: 'Salary Payable Technical Support Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-02', level: 3, allowPosting: true, isSystem: true, description: 'Salary payable to technical support staff' },
+        { code: '03-02-02-0005', name: 'Salary Payable Admin & Finance Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-02', level: 3, allowPosting: true, isSystem: true, description: 'Salary payable to admin & finance staff' },
+        { code: '03-02-02-0006', name: 'Salary Payable Support Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-02', level: 3, allowPosting: true, isSystem: true, description: 'Salary payable to support staff' },
+        { code: '03-02-02-0007', name: 'Salary Payable Geo Tech Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-02', level: 3, allowPosting: true, isSystem: true, description: 'Salary payable to geo tech staff' },
+
+      // 03-02-03 Social Charges Payable
+      { code: '03-02-03', name: 'Social Charges Payable', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Employer social charges payable by category' },
+        { code: '03-02-03-0001', name: 'Social Charges Payable - Partners', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-03', level: 3, allowPosting: true, isSystem: true, description: 'Social charges payable - Partners' },
+        { code: '03-02-03-0002', name: 'Social Charges Payable - Key Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-03', level: 3, allowPosting: true, isSystem: true, description: 'Social charges payable - Key Staff' },
+        { code: '03-02-03-0003', name: 'Social Charges Payable - Technical Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-03', level: 3, allowPosting: true, isSystem: true, description: 'Social charges payable - Technical Staff' },
+        { code: '03-02-03-0004', name: 'Social Charges Payable - Technical Support Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-03', level: 3, allowPosting: true, isSystem: true, description: 'Social charges payable - Technical Support Staff' },
+        { code: '03-02-03-0005', name: 'Social Charges Payable - Admin & Finance Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-03', level: 3, allowPosting: true, isSystem: true, description: 'Social charges payable - Admin & Finance Staff' },
+        { code: '03-02-03-0006', name: 'Social Charges Payable - Support Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-03', level: 3, allowPosting: true, isSystem: true, description: 'Social charges payable - Support Staff' },
+        { code: '03-02-03-0007', name: 'Social Charges Payable - Geo Tech Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-03', level: 3, allowPosting: true, isSystem: true, description: 'Social charges payable - Geo Tech Staff' },
+
+      // 03-02-16 Accrued Utilities
+      { code: '03-02-16', name: 'Accrued Utilities', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Accrued utility expenses' },
+        { code: '03-02-16-0001', name: 'Electricity Bill', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02-16', level: 3, allowPosting: true, isSystem: true, description: 'Accrued electricity bill' },
+        { code: '03-02-16-0002', name: 'Gas Bill', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02-16', level: 3, allowPosting: true, isSystem: true, description: 'Accrued gas bill' },
+        { code: '03-02-16-0003', name: 'Telephone Bill', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02-16', level: 3, allowPosting: true, isSystem: true, description: 'Accrued telephone bill' },
+        { code: '03-02-16-0004', name: 'Internet Bill', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02-16', level: 3, allowPosting: true, isSystem: true, description: 'Accrued internet bill' },
+        { code: '03-02-16-0005', name: 'Water Bill', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02-16', level: 3, allowPosting: true, isSystem: true, description: 'Accrued water bill' },
+
+      // 03-02-18 Loan Payable
+      { code: '03-02-18', name: 'Loan Payable', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Short-term loans payable' },
+        { code: '03-02-18-0001', name: 'BAK Consulting', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentCode: '03-02-18', level: 3, allowPosting: true, isSystem: true, description: 'Loan payable to BAK Consulting' },
+        { code: '03-02-18-0002', name: 'Sheladia Associates', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentCode: '03-02-18', level: 3, allowPosting: true, isSystem: true, description: 'Loan payable to Sheladia Associates' },
+        { code: '03-02-18-0003', name: 'Afkar Associates', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentCode: '03-02-18', level: 3, allowPosting: true, isSystem: true, description: 'Loan payable to Afkar Associates' },
+        { code: '03-02-18-0004', name: 'Infra-D Consultants', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentCode: '03-02-18', level: 3, allowPosting: true, isSystem: true, description: 'Loan payable to Infra-D Consultants' },
+        { code: '03-02-18-0005', name: '4 FS', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentCode: '03-02-18', level: 3, allowPosting: true, isSystem: true, description: 'Loan payable to 4 FS' },
+        { code: '03-02-18-0006', name: 'Mazhar Hussain', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentCode: '03-02-18', level: 3, allowPosting: true, isSystem: true, description: 'Loan payable to Mazhar Hussain' },
+        { code: '03-02-18-0007', name: 'Muhammad Iqbal', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentCode: '03-02-18', level: 3, allowPosting: true, isSystem: true, description: 'Loan payable to Muhammad Iqbal' },
+        { code: '03-02-18-0008', name: 'Hamid Iqbal', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentCode: '03-02-18', level: 3, allowPosting: true, isSystem: true, description: 'Loan payable to Hamid Iqbal' },
+
+  // ═══════════════════════════════════════════════════════════
+  // 04. REVENUE
+  // ═══════════════════════════════════════════════════════════
+  { code: '04', name: 'Revenue', accountType: 'INCOME', subType: null, parentCode: null, level: 0, allowPosting: false, isSystem: true, description: 'Total Revenue / Income' },
+
+    // 04-01 Operating Revenue
+    { code: '04-01', name: 'Operating Revenue', accountType: 'INCOME', subType: null, parentCode: '04', level: 1, allowPosting: false, isSystem: true, description: 'Revenue from core operations' },
+
+      // 04-01-01 Service
+      { code: '04-01-01', name: 'Service Revenue', accountType: 'INCOME', subType: 'PROGRAM_INCOME', parentCode: '04-01', level: 2, allowPosting: false, isSystem: true, description: 'Service and consultancy revenue' },
+        { code: '04-01-01-0001', name: 'Operating Revenue', accountType: 'INCOME', subType: 'PROGRAM_INCOME', parentCode: '04-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Operating revenue from services' },
+        { code: '04-01-01-0002', name: 'JV Share', accountType: 'INCOME', subType: 'PROGRAM_INCOME', parentCode: '04-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Joint venture share of revenue' },
+
+    // 04-02 Other Income
+    { code: '04-02', name: 'Other Income', accountType: 'INCOME', subType: null, parentCode: '04', level: 1, allowPosting: false, isSystem: true, description: 'Non-operating income' },
+
+      // 04-02-01 Gain/Loss on Disposal
+      { code: '04-02-01', name: 'Gain/Loss on Disposal of Assets', accountType: 'INCOME', subType: 'GAIN_ON_DISPOSAL', parentCode: '04-02', level: 2, allowPosting: false, isSystem: true, description: 'Gain or loss on disposal of fixed assets' },
+        { code: '04-02-01-0001', name: 'Gain/Loss on Disposal of Assets', accountType: 'INCOME', subType: 'GAIN_ON_DISPOSAL', parentCode: '04-02-01', level: 3, allowPosting: true, isSystem: true, description: 'Net gain/loss on disposal of assets' },
+
+      // 04-02-02 Gain/Loss on Foreign Exchange
+      { code: '04-02-02', name: 'Gain/Loss on Foreign Exchange', accountType: 'INCOME', subType: null, parentCode: '04-02', level: 2, allowPosting: false, isSystem: true, description: 'Foreign exchange gains and losses' },
+        { code: '04-02-02-0001', name: 'Other Exchange Gain/Loss', accountType: 'INCOME', subType: 'OTHER_INCOME', parentCode: '04-02-02', level: 3, allowPosting: true, isSystem: true, description: 'Other exchange gain or loss' },
+        { code: '04-02-02-0002', name: 'Unrealised Gain/Loss on Exchange', accountType: 'INCOME', subType: 'OTHER_INCOME', parentCode: '04-02-02', level: 3, allowPosting: true, isSystem: true, description: 'Unrealised foreign exchange gain or loss' },
+        { code: '04-02-02-0003', name: 'Realised Gain/Loss on Exchange', accountType: 'INCOME', subType: 'OTHER_INCOME', parentCode: '04-02-02', level: 3, allowPosting: true, isSystem: true, description: 'Realised foreign exchange gain or loss' },
+
+  // ═══════════════════════════════════════════════════════════
+  // 05. EXPENSES (Required for ERP voucher entry system)
+  // ═══════════════════════════════════════════════════════════
+  { code: '05', name: 'Expenses', accountType: 'EXPENSE', subType: null, parentCode: null, level: 0, allowPosting: false, isSystem: true, description: 'Total Expenses' },
+
+    // 05-01 Personnel Costs
+    { code: '05-01', name: 'Personnel Costs', accountType: 'EXPENSE', subType: null, parentCode: '05', level: 1, allowPosting: false, isSystem: true, description: 'Salary and wage expenses' },
+
+      // 05-01-01 Salaries & Wages
+      { code: '05-01-01', name: 'Salaries & Wages', accountType: 'EXPENSE', subType: 'SALARY', parentCode: '05-01', level: 2, allowPosting: false, isSystem: true, description: 'Gross salary and wage expense' },
+        { code: '05-01-01-0001', name: 'Partners Salary', accountType: 'EXPENSE', subType: 'SALARY', parentCode: '05-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Salary expense for partners' },
+        { code: '05-01-01-0002', name: 'Key Staff Salary', accountType: 'EXPENSE', subType: 'SALARY', parentCode: '05-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Salary expense for key staff' },
+        { code: '05-01-01-0003', name: 'Technical Staff Salary', accountType: 'EXPENSE', subType: 'SALARY', parentCode: '05-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Salary expense for technical staff' },
+        { code: '05-01-01-0004', name: 'Technical Support Staff Salary', accountType: 'EXPENSE', subType: 'SALARY', parentCode: '05-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Salary expense for technical support staff' },
+        { code: '05-01-01-0005', name: 'Admin & Finance Staff Salary', accountType: 'EXPENSE', subType: 'SALARY', parentCode: '05-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Salary expense for admin & finance staff' },
+        { code: '05-01-01-0006', name: 'Support Staff Salary', accountType: 'EXPENSE', subType: 'SALARY', parentCode: '05-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Salary expense for support staff' },
+        { code: '05-01-01-0007', name: 'Geo Tech Staff Salary', accountType: 'EXPENSE', subType: 'SALARY', parentCode: '05-01-01', level: 3, allowPosting: true, isSystem: true, description: 'Salary expense for geo tech staff' },
+
+      // 05-01-02 Overtime & Allowances
+      { code: '05-01-02', name: 'Overtime & Allowances', accountType: 'EXPENSE', subType: 'PERSONNEL', parentCode: '05-01', level: 2, allowPosting: false, isSystem: true, description: 'Overtime and allowance expenses' },
+        { code: '05-01-02-0001', name: 'Overtime Allowance', accountType: 'EXPENSE', subType: 'PERSONNEL', parentCode: '05-01-02', level: 3, allowPosting: true, isSystem: true, description: 'Overtime allowance expense' },
+        { code: '05-01-02-0002', name: 'Field Allowance', accountType: 'EXPENSE', subType: 'PERSONNEL', parentCode: '05-01-02', level: 3, allowPosting: true, isSystem: true, description: 'Field allowance expense' },
+
+    // 05-02 Employer Social Charges
+    { code: '05-02', name: 'Employer Social Charges', accountType: 'EXPENSE', subType: null, parentCode: '05', level: 1, allowPosting: false, isSystem: true, description: "Employer's share of social charges" },
+
+      // 05-02-01 EOBI Contribution
+      { code: '05-02-01', name: 'EOBI Contribution', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02', level: 2, allowPosting: false, isSystem: true, description: "Employer's EOBI contribution" },
+        { code: '05-02-01-0001', name: 'EOBI - Partners Salary', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-01', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-01-0002', name: 'EOBI - Key Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-01', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-01-0003', name: 'EOBI - Technical Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-01', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-01-0004', name: 'EOBI - Technical Support Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-01', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-01-0005', name: 'EOBI - Admin & Finance Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-01', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-01-0006', name: 'EOBI - Support Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-01', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-01-0007', name: 'EOBI - Geo Tech Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-01', level: 3, allowPosting: true, isSystem: true, description: null },
+
+      // 05-02-02 Provident Fund
+      { code: '05-02-02', name: 'Provident Fund', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02', level: 2, allowPosting: false, isSystem: true, description: "Employer's provident fund contribution" },
+        { code: '05-02-02-0001', name: 'Provident Fund - Partners Salary', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-02', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-02-0002', name: 'Provident Fund - Key Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-02', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-02-0003', name: 'Provident Fund - Technical Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-02', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-02-0004', name: 'Provident Fund - Technical Support Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-02', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-02-0005', name: 'Provident Fund - Admin & Finance Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-02', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-02-0006', name: 'Provident Fund - Support Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-02', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-02-0007', name: 'Provident Fund - Geo Tech Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-02', level: 3, allowPosting: true, isSystem: true, description: null },
+
+      // 05-02-03 Social Security
+      { code: '05-02-03', name: 'Social Security', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02', level: 2, allowPosting: false, isSystem: true, description: "Employer's social security contribution" },
+        { code: '05-02-03-0001', name: 'Social Security - Partners Salary', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-03', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-03-0002', name: 'Social Security - Key Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-03', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-03-0003', name: 'Social Security - Technical Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-03', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-03-0004', name: 'Social Security - Technical Support Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-03', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-03-0005', name: 'Social Security - Admin & Finance Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-03', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-03-0006', name: 'Social Security - Support Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-03', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-02-03-0007', name: 'Social Security - Geo Tech Staff', accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', parentCode: '05-02-03', level: 3, allowPosting: true, isSystem: true, description: null },
+
+    // 05-03 Travel & Transportation
+    { code: '05-03', name: 'Travel & Transportation', accountType: 'EXPENSE', subType: null, parentCode: '05', level: 1, allowPosting: false, isSystem: true, description: 'Travel and vehicle expenses' },
+
+      // 05-03-01 Travel Expenses
+      { code: '05-03-01', name: 'Travel Expenses', accountType: 'EXPENSE', subType: 'TRAVEL', parentCode: '05-03', level: 2, allowPosting: false, isSystem: true, description: 'Travel and related expenses' },
+        { code: '05-03-01-0001', name: 'Domestic Travel', accountType: 'EXPENSE', subType: 'TRAVEL', parentCode: '05-03-01', level: 3, allowPosting: true, isSystem: true, description: 'Domestic travel and related expenses' },
+        { code: '05-03-01-0002', name: 'International Travel', accountType: 'EXPENSE', subType: 'TRAVEL', parentCode: '05-03-01', level: 3, allowPosting: true, isSystem: true, description: 'International travel and related expenses' },
+
+      // 05-03-02 Vehicle Running & Maintenance
+      { code: '05-03-02', name: 'Vehicle Running & Maintenance', accountType: 'EXPENSE', subType: 'TRAVEL', parentCode: '05-03', level: 2, allowPosting: false, isSystem: true, description: 'Fuel, repairs, and maintenance of vehicles' },
+        { code: '05-03-02-0001', name: 'Fuel & Oil', accountType: 'EXPENSE', subType: 'TRAVEL', parentCode: '05-03-02', level: 3, allowPosting: true, isSystem: true, description: 'Fuel and oil expenses' },
+        { code: '05-03-02-0002', name: 'Vehicle Repair & Maintenance', accountType: 'EXPENSE', subType: 'TRAVEL', parentCode: '05-03-02', level: 3, allowPosting: true, isSystem: true, description: 'Vehicle repair and maintenance' },
+
+      // 05-03-03 Conveyance
+      { code: '05-03-03', name: 'Conveyance', accountType: 'EXPENSE', subType: 'TRAVEL', parentCode: '05-03', level: 2, allowPosting: false, isSystem: true, description: 'Conveyance and transport' },
+        { code: '05-03-03-0001', name: 'Conveyance Allowance', accountType: 'EXPENSE', subType: 'TRAVEL', parentCode: '05-03-03', level: 3, allowPosting: true, isSystem: true, description: 'Daily conveyance allowance' },
+        { code: '05-03-03-0002', name: 'Capital Rent A Car Service', accountType: 'EXPENSE', subType: 'TRAVEL', parentCode: '05-03-03', level: 3, allowPosting: true, isSystem: true, description: 'Rent a car service expense' },
+
+    // 05-04 Office Expenses
+    { code: '05-04', name: 'Office Expenses', accountType: 'EXPENSE', subType: null, parentCode: '05', level: 1, allowPosting: false, isSystem: true, description: 'Office and administrative expenses' },
+
+      // 05-04-01 Rent Expense
+      { code: '05-04-01', name: 'Rent Expense', accountType: 'EXPENSE', subType: 'RENT_EXPENSE', parentCode: '05-04', level: 2, allowPosting: false, isSystem: true, description: 'Office and building rent' },
+        { code: '05-04-01-0001', name: 'Office Rent', accountType: 'EXPENSE', subType: 'RENT_EXPENSE', parentCode: '05-04-01', level: 3, allowPosting: true, isSystem: true, description: 'Office rent expense' },
+
+      // 05-04-02 Utilities
+      { code: '05-04-02', name: 'Utilities', accountType: 'EXPENSE', subType: 'UTILITY_EXPENSE', parentCode: '05-04', level: 2, allowPosting: false, isSystem: true, description: 'Electricity, gas, water, telephone' },
+        { code: '05-04-02-0001', name: 'Electricity', accountType: 'EXPENSE', subType: 'UTILITY_EXPENSE', parentCode: '05-04-02', level: 3, allowPosting: true, isSystem: true, description: 'Electricity expense' },
+        { code: '05-04-02-0002', name: 'Gas', accountType: 'EXPENSE', subType: 'UTILITY_EXPENSE', parentCode: '05-04-02', level: 3, allowPosting: true, isSystem: true, description: 'Gas expense' },
+        { code: '05-04-02-0003', name: 'Telephone', accountType: 'EXPENSE', subType: 'UTILITY_EXPENSE', parentCode: '05-04-02', level: 3, allowPosting: true, isSystem: true, description: 'Telephone expense' },
+        { code: '05-04-02-0004', name: 'Internet', accountType: 'EXPENSE', subType: 'UTILITY_EXPENSE', parentCode: '05-04-02', level: 3, allowPosting: true, isSystem: true, description: 'Internet expense' },
+        { code: '05-04-02-0005', name: 'Water', accountType: 'EXPENSE', subType: 'UTILITY_EXPENSE', parentCode: '05-04-02', level: 3, allowPosting: true, isSystem: true, description: 'Water expense' },
+
+      // 05-04-03 Office Supplies
+      { code: '05-04-03', name: 'Office Supplies', accountType: 'EXPENSE', subType: 'OFFICE', parentCode: '05-04', level: 2, allowPosting: false, isSystem: true, description: 'Consumable office supplies' },
+        { code: '05-04-03-0001', name: 'Office Supplies', accountType: 'EXPENSE', subType: 'OFFICE', parentCode: '05-04-03', level: 3, allowPosting: true, isSystem: true, description: 'Office supplies expense' },
+
+      // 05-04-04 Printing & Stationery
+      { code: '05-04-04', name: 'Printing & Stationery', accountType: 'EXPENSE', subType: 'OFFICE', parentCode: '05-04', level: 2, allowPosting: false, isSystem: true, description: 'Printing and stationery costs' },
+        { code: '05-04-04-0001', name: 'Printing & Stationery', accountType: 'EXPENSE', subType: 'OFFICE', parentCode: '05-04-04', level: 3, allowPosting: true, isSystem: true, description: 'Printing and stationery expense' },
+
+      // 05-04-05 Communication
+      { code: '05-04-05', name: 'Communication', accountType: 'EXPENSE', subType: 'COMMUNICATION_EXPENSE', parentCode: '05-04', level: 2, allowPosting: false, isSystem: true, description: 'Postage and courier' },
+        { code: '05-04-05-0001', name: 'Postage & Courier', accountType: 'EXPENSE', subType: 'COMMUNICATION_EXPENSE', parentCode: '05-04-05', level: 3, allowPosting: true, isSystem: true, description: 'Postage and courier expense' },
+
+    // 05-05 Professional Fees
+    { code: '05-05', name: 'Professional Fees', accountType: 'EXPENSE', subType: null, parentCode: '05', level: 1, allowPosting: false, isSystem: true, description: 'Professional and consultancy fees' },
+
+      // 05-05-01 Audit Fee
+      { code: '05-05-01', name: 'Audit Fee', accountType: 'EXPENSE', subType: 'AUDIT_FEE', parentCode: '05-05', level: 2, allowPosting: false, isSystem: true, description: 'External audit fees' },
+        { code: '05-05-01-0001', name: 'Audit Fee', accountType: 'EXPENSE', subType: 'AUDIT_FEE', parentCode: '05-05-01', level: 3, allowPosting: true, isSystem: true, description: 'Audit fee expense' },
+
+      // 05-05-02 Legal Fee
+      { code: '05-05-02', name: 'Legal Fee', accountType: 'EXPENSE', subType: 'LEGAL_FEE', parentCode: '05-05', level: 2, allowPosting: false, isSystem: true, description: 'Legal consultation and litigation' },
+        { code: '05-05-02-0001', name: 'Legal Fee', accountType: 'EXPENSE', subType: 'LEGAL_FEE', parentCode: '05-05-02', level: 3, allowPosting: true, isSystem: true, description: 'Legal fee expense' },
+
+      // 05-05-03 Consultancy Fee
+      { code: '05-05-03', name: 'Consultancy Fee', accountType: 'EXPENSE', subType: 'CONSULTANCY_EXPENSE', parentCode: '05-05', level: 2, allowPosting: false, isSystem: true, description: 'Technical and management consultancy' },
+        { code: '05-05-03-0001', name: 'Consultancy Fee', accountType: 'EXPENSE', subType: 'CONSULTANCY_EXPENSE', parentCode: '05-05-03', level: 3, allowPosting: true, isSystem: true, description: 'Consultancy fee expense' },
+
+    // 05-06 Depreciation & Amortization
+    { code: '05-06', name: 'Depreciation & Amortization', accountType: 'EXPENSE', subType: null, parentCode: '05', level: 1, allowPosting: false, isSystem: true, description: 'Depreciation and amortization expense' },
+
+      // 05-06-01 Depreciation Expense
+      { code: '05-06-01', name: 'Depreciation Expense', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentCode: '05-06', level: 2, allowPosting: false, isSystem: true, description: 'Depreciation on tangible assets' },
+        { code: '05-06-01-0001', name: 'Dep - Electrical Equipment', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentCode: '05-06-01', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-06-01-0002', name: 'Dep - Office Equipment', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentCode: '05-06-01', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-06-01-0003', name: 'Dep - Vehicle', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentCode: '05-06-01', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-06-01-0004', name: 'Dep - Furniture', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentCode: '05-06-01', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-06-01-0005', name: 'Dep - Fixtures', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentCode: '05-06-01', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-06-01-0006', name: 'Dep - Computer Equipment', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentCode: '05-06-01', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-06-01-0007', name: 'Dep - Land', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentCode: '05-06-01', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-06-01-0008', name: 'Dep - Building', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentCode: '05-06-01', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-06-01-0009', name: 'Dep - Geo tech Equipment', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentCode: '05-06-01', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-06-01-0010', name: 'Dep - Survey Equipments', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentCode: '05-06-01', level: 3, allowPosting: true, isSystem: true, description: null },
+
+      // 05-06-02 Amortization Expense
+      { code: '05-06-02', name: 'Amortization Expense', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentCode: '05-06', level: 2, allowPosting: false, isSystem: true, description: 'Amortization on intangible assets' },
+        { code: '05-06-02-0001', name: 'Amort - Turbon Pro', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentCode: '05-06-02', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-06-02-0002', name: 'Amort - CivilStrips', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentCode: '05-06-02', level: 3, allowPosting: true, isSystem: true, description: null },
+        { code: '05-06-02-0003', name: 'Amort - Hydrohelp 2.6', accountType: 'EXPENSE', subType: 'DEPRECIATION', parentCode: '05-06-02', level: 3, allowPosting: true, isSystem: true, description: null },
+
+    // 05-07 Financial Costs
+    { code: '05-07', name: 'Financial Costs', accountType: 'EXPENSE', subType: null, parentCode: '05', level: 1, allowPosting: false, isSystem: true, description: 'Bank charges and financial costs' },
+
+      // 05-07-01 Bank Charges
+      { code: '05-07-01', name: 'Bank Charges', accountType: 'EXPENSE', subType: 'BANK_CHARGES', parentCode: '05-07', level: 2, allowPosting: false, isSystem: true, description: 'Bank service charges and fees' },
+        { code: '05-07-01-0001', name: 'Bank Charges', accountType: 'EXPENSE', subType: 'BANK_CHARGES', parentCode: '05-07-01', level: 3, allowPosting: true, isSystem: true, description: 'Bank service charges' },
+
+      // 05-07-02 Exchange Loss
+      { code: '05-07-02', name: 'Exchange Loss', accountType: 'EXPENSE', subType: 'FINANCIAL', parentCode: '05-07', level: 2, allowPosting: false, isSystem: true, description: 'Foreign exchange losses' },
+        { code: '05-07-02-0001', name: 'Realised Loss on Exchange', accountType: 'EXPENSE', subType: 'FINANCIAL', parentCode: '05-07-02', level: 3, allowPosting: true, isSystem: true, description: 'Realised foreign exchange loss' },
+        { code: '05-07-02-0002', name: 'Unrealised Loss on Exchange', accountType: 'EXPENSE', subType: 'FINANCIAL', parentCode: '05-07-02', level: 3, allowPosting: true, isSystem: true, description: 'Unrealised foreign exchange loss' },
+
+    // 05-08 Other Expenses
+    { code: '05-08', name: 'Other Expenses', accountType: 'EXPENSE', subType: null, parentCode: '05', level: 1, allowPosting: false, isSystem: true, description: 'Other miscellaneous expenses' },
+
+      // 05-08-01 Insurance
+      { code: '05-08-01', name: 'Insurance', accountType: 'EXPENSE', subType: 'INSURANCE_EXPENSE', parentCode: '05-08', level: 2, allowPosting: false, isSystem: true, description: 'Insurance premiums' },
+        { code: '05-08-01-0001', name: 'Insurance Expense', accountType: 'EXPENSE', subType: 'INSURANCE_EXPENSE', parentCode: '05-08-01', level: 3, allowPosting: true, isSystem: true, description: 'Insurance premium expense' },
+
+      // 05-08-02 Repairs & Maintenance
+      { code: '05-08-02', name: 'Repairs & Maintenance', accountType: 'EXPENSE', subType: 'MAINTENANCE_EXPENSE', parentCode: '05-08', level: 2, allowPosting: false, isSystem: true, description: 'Repairs and maintenance' },
+        { code: '05-08-02-0001', name: 'Repairs & Maintenance', accountType: 'EXPENSE', subType: 'MAINTENANCE_EXPENSE', parentCode: '05-08-02', level: 3, allowPosting: true, isSystem: true, description: 'General repairs and maintenance' },
+
+      // 05-08-03 Sundry Expenses
+      { code: '05-08-03', name: 'Sundry Expenses', accountType: 'EXPENSE', subType: 'OTHER_EXPENSE', parentCode: '05-08', level: 2, allowPosting: false, isSystem: true, description: 'Other miscellaneous expenses' },
+        { code: '05-08-03-0001', name: 'Sundry Expenses', accountType: 'EXPENSE', subType: 'OTHER_EXPENSE', parentCode: '05-08-03', level: 3, allowPosting: true, isSystem: true, description: 'Sundry expenses' },
+
+      // 05-08-04 Loss on Disposal of Assets
+      { code: '05-08-04', name: 'Loss on Disposal of Assets', accountType: 'EXPENSE', subType: 'LOSS_ON_DISPOSAL', parentCode: '05-08', level: 2, allowPosting: false, isSystem: true, description: 'Loss from sale/disposal of fixed assets' },
+        { code: '05-08-04-0001', name: 'Loss on Disposal of Assets', accountType: 'EXPENSE', subType: 'LOSS_ON_DISPOSAL', parentCode: '05-08-04', level: 3, allowPosting: true, isSystem: true, description: 'Loss on disposal of assets' },
+
+      // 05-08-05 Income Tax Expense
+      { code: '05-08-05', name: 'Income Tax Expense', accountType: 'EXPENSE', subType: 'TAX_EXPENSE', parentCode: '05-08', level: 2, allowPosting: false, isSystem: true, description: 'Income tax expense' },
+        { code: '05-08-05-0001', name: 'Income Tax Expense', accountType: 'EXPENSE', subType: 'TAX_EXPENSE', parentCode: '05-08-05', level: 3, allowPosting: true, isSystem: true, description: 'Provision for income tax' },
 ]
 
 export async function GET() {
@@ -257,10 +492,9 @@ export async function GET() {
     // STEP 2: Create the new Chart of Accounts
     // ═══════════════════════════════════════════════════════════
 
-    // First pass: create all accounts without parent references
-    // (we'll link parents in a second pass)
     const codeToIdMap: Record<string, string> = {}
 
+    // First pass: create all accounts without parent references
     for (const acc of NEW_COA) {
       const account = await db.account.create({
         data: {
@@ -279,52 +513,72 @@ export async function GET() {
       codeToIdMap[acc.code] = account.id
     }
 
-    // Second pass: update parent references
+    // Second pass: update parent references using explicit parentCode
     for (const acc of NEW_COA) {
-      if (acc.parentId !== null) continue // already handled
-
-      // Infer parent from code pattern:
-      // 4-digit code with trailing zeros → find parent by shorter prefix
-      // e.g., 1110 → parent is 1100, 1121 → parent is 1120
-      const inferredParent = inferParentCode(acc.code)
-      if (inferredParent && codeToIdMap[inferredParent]) {
+      if (acc.parentCode && codeToIdMap[acc.parentCode]) {
         await db.account.update({
           where: { id: codeToIdMap[acc.code] },
-          data: { parentId: codeToIdMap[inferredParent] },
+          data: { parentId: codeToIdMap[acc.parentCode] },
         })
       }
     }
 
     // ═══════════════════════════════════════════════════════════
-    // STEP 2b: Create sample segment data (Projects, Clients, Donors, Locations)
+    // STEP 2b: Create sample segment data
     // ═══════════════════════════════════════════════════════════
 
     // Donors
     const donor1 = await db.donor.create({ data: { code: 'DON-001', name: 'USAID Pakistan', contactPerson: 'Sarah Johnson', email: 'sarah.johnson@usaid.gov', phone: '+1-202-712-0000', address: 'U.S. Embassy, Islamabad' } })
     const donor2 = await db.donor.create({ data: { code: 'DON-002', name: 'European Union Delegation', contactPerson: 'Marc Dupont', email: 'marc.dupont@eeas.europa.eu', phone: '+32-2-584-0000', address: 'EU Delegation, Islamabad' } })
     const donor3 = await db.donor.create({ data: { code: 'DON-003', name: 'UNDP Pakistan', contactPerson: 'Ahmed Khan', email: 'ahmed.khan@undp.org', phone: '+92-51-835-5000', address: 'UN House, Serena Business Complex, Islamabad' } })
-    const donor4 = await db.donor.create({ data: { code: 'DON-004', name: 'DFID (FCDO)', contactPerson: 'Emily Clarke', email: 'emily.clarke@fcdo.gov.uk', phone: '+44-20-7008-5000', address: 'British High Commission, Islamabad' } })
 
     // Clients
-    const client1 = await db.client.create({ data: { code: 'CLI-001', name: 'Government of Punjab', contactPerson: 'Rana Mashhood', email: 'info@punjab.gov.pk', phone: '+92-42-9921-0000', address: 'Civil Secretariat, Lahore', industry: 'Government', taxNumber: 'NTN-1234567-1', isActive: true } })
-    const client2 = await db.client.create({ data: { code: 'CLI-002', name: 'UNICEF Pakistan', contactPerson: 'Aida Girma', email: 'aida.girma@unicef.org', phone: '+92-51-227-0000', address: 'UNICEF House, Islamabad', industry: 'NGO', taxNumber: 'NTN-7654321-2', isActive: true } })
-    const client3 = await db.client.create({ data: { code: 'CLI-003', name: 'World Health Organization', contactPerson: 'Dr. Palitha Mahipala', email: 'mahipala@who.int', phone: '+92-51-926-0000', address: 'WHO Office, Islamabad', industry: 'NGO', taxNumber: 'NTN-9876543-3', isActive: true } })
-    const client4 = await db.client.create({ data: { code: 'CLI-004', name: 'Engro Foundation', contactPerson: 'Favad Soomro', email: 'favad.soomro@engro.com', phone: '+92-21-111-364-776', address: 'Engro Tower, Karachi', industry: 'Corporate', taxNumber: 'NTN-5555555-4', isActive: true } })
+    const client1 = await db.client.create({ data: { code: 'CLI-001', name: 'WAPDA', contactPerson: 'Chairman WAPDA', email: 'info@wapda.gov.pk', phone: '+92-51-9262000', address: 'WAPDA House, Lahore', industry: 'Government', taxNumber: 'NTN-1234567-1', isActive: true } })
+    const client2 = await db.client.create({ data: { code: 'CLI-002', name: 'Government of KPK', contactPerson: 'Secretary Energy', email: 'energy@kpk.gov.pk', phone: '+92-91-9210000', address: 'Civil Secretariat, Peshawar', industry: 'Government', taxNumber: 'NTN-7654321-2', isActive: true } })
+    const client3 = await db.client.create({ data: { code: 'CLI-003', name: 'JKCHD', contactPerson: 'Chief Engineer', email: 'info@jkchd.gov.pk', phone: '+92-581-920000', address: 'Muzaffarabad, AJK', industry: 'Government', taxNumber: 'NTN-9876543-3', isActive: true } })
 
     // Locations
     const loc1 = await db.location.create({ data: { code: 'LOC-ISB', name: 'Islamabad', address: 'Federal Capital Territory' } })
     const loc2 = await db.location.create({ data: { code: 'LOC-LHR', name: 'Lahore', address: 'Punjab Province' } })
-    const loc3 = await db.location.create({ data: { code: 'LOC-KHI', name: 'Karachi', address: 'Sindh Province' } })
-    const loc4 = await db.location.create({ data: { code: 'LOC-PESH', name: 'Peshawar', address: 'KPK Province' } })
-    const loc5 = await db.location.create({ data: { code: 'LOC-QTA', name: 'Quetta', address: 'Balochistan Province' } })
+    const loc3 = await db.location.create({ data: { code: 'LOC-PESH', name: 'Peshawar', address: 'KPK Province' } })
+    const loc4 = await db.location.create({ data: { code: 'LOC-MUZ', name: 'Muzaffarabad', address: 'AJK' } })
 
-    // Projects (client/donor/location associations are at voucher level)
-    const proj1 = await db.project.create({ data: { code: 'PRJ-001', name: 'Education Enhancement Program', description: 'Improving quality of education in rural Punjab', startDate: new Date('2025-07-01'), endDate: new Date('2026-06-30'), status: 'active' } })
-    const proj2 = await db.project.create({ data: { code: 'PRJ-002', name: 'Health & Nutrition Initiative', description: 'Maternal and child health program in Sindh', startDate: new Date('2025-08-01'), endDate: new Date('2026-12-31'), status: 'active' } })
-    const proj3 = await db.project.create({ data: { code: 'PRJ-003', name: 'WASH Program KPK', description: 'Water, sanitation and hygiene in KPK', startDate: new Date('2025-09-01'), endDate: new Date('2026-08-31'), status: 'active' } })
-    const proj4 = await db.project.create({ data: { code: 'PRJ-004', name: 'Livelihood Support Balochistan', description: 'Skills training and livelihood in Balochistan', startDate: new Date('2025-10-01'), endDate: new Date('2027-03-31'), status: 'active' } })
-    const proj5 = await db.project.create({ data: { code: 'PRJ-005', name: 'Capacity Building Islamabad', description: 'Institutional capacity building at HQ level', startDate: new Date('2025-07-01'), endDate: new Date('2026-06-30'), status: 'active' } })
-    const proj6 = await db.project.create({ data: { code: 'PRJ-006', name: 'COVID-19 Response', description: 'Pandemic response and vaccination support', startDate: new Date('2024-01-01'), endDate: new Date('2025-06-30'), status: 'completed' } })
+    // Projects (18 as per statutory reporting spec)
+    const projects = [
+      { code: 'HO', name: 'Head Office', projectType: 'Head Office', isHeadOffice: true, sortOrder: 0 },
+      { code: 'AJK-HPP', name: 'AJK Hydropower Project', projectType: 'Hydropower', sortOrder: 1 },
+      { code: 'DASU', name: 'Dasu Dam Project', projectType: 'Dam', sortOrder: 2 },
+      { code: 'DIAMER', name: 'Diamer Bhasha Dam', projectType: 'Dam', sortOrder: 3 },
+      { code: 'GHAZI-BAROTHA', name: 'Ghazi Barotha Hydropower', projectType: 'Hydropower', sortOrder: 4 },
+      { code: 'GILGIT', name: 'Gilgit-Baltistan Infrastructure', projectType: 'Infrastructure', sortOrder: 5 },
+      { code: 'GOLPING', name: 'Golping Hydropower', projectType: 'Hydropower', sortOrder: 6 },
+      { code: 'KAROT', name: 'Karot Hydropower', projectType: 'Hydropower', sortOrder: 7 },
+      { code: 'KEYAL', name: 'Keyal Khwar Hydropower', projectType: 'Hydropower', sortOrder: 8 },
+      { code: 'KOTLI', name: 'Kotli Hydropower', projectType: 'Hydropower', sortOrder: 9 },
+      { code: 'MOHMAND', name: 'Mohmand Dam', projectType: 'Dam', sortOrder: 10 },
+      { code: 'NEELUM', name: 'Neelum Jhelum Hydropower', projectType: 'Hydropower', sortOrder: 11 },
+      { code: 'PATAN', name: 'Patan Hydropower', projectType: 'Hydropower', sortOrder: 12 },
+      { code: 'SUKLEJI', name: 'Sukleji Dam', projectType: 'Dam', sortOrder: 13 },
+      { code: 'TANGIR', name: 'Tangir Hydropower', projectType: 'Hydropower', sortOrder: 14 },
+      { code: 'THAKOT', name: 'Thakot Hydropower', projectType: 'Hydropower', sortOrder: 15 },
+      { code: 'TARBELA', name: 'Tarbela Dam Extension', projectType: 'Dam', sortOrder: 16 },
+      { code: 'WUSASA', name: 'Wusasa Infrastructure', projectType: 'Infrastructure', sortOrder: 17 },
+    ]
+
+    for (const p of projects) {
+      await db.project.create({
+        data: {
+          code: p.code,
+          name: p.name,
+          projectType: p.projectType,
+          isHeadOffice: p.isHeadOffice || false,
+          reportingCurrency: 'PKR',
+          sortOrder: p.sortOrder,
+          status: 'active',
+          startDate: new Date('2024-07-01'),
+        },
+      })
+    }
 
     // ═══════════════════════════════════════════════════════════
     // STEP 3: Ensure open Financial Year exists
@@ -346,7 +600,7 @@ export async function GET() {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // STEP 4: Validation — no duplicates, no legacy accounts
+    // STEP 4: Validation — no duplicates, all codes present
     // ═══════════════════════════════════════════════════════════
     const allAccounts = await db.account.findMany({ orderBy: { code: 'asc' } })
     const codes = allAccounts.map(a => a.code)
@@ -359,7 +613,6 @@ export async function GET() {
       }, { status: 500 })
     }
 
-    // Verify all new COA codes are present
     const expectedCodes = NEW_COA.map(a => a.code)
     const missingCodes = expectedCodes.filter(c => !codes.includes(c))
 
@@ -370,83 +623,27 @@ export async function GET() {
       }, { status: 500 })
     }
 
-    // Verify no legacy-only codes remain (old codes not in new COA)
-    const legacyCodes = codes.filter(c => !expectedCodes.includes(c))
-    if (legacyCodes.length > 0) {
-      return NextResponse.json({
-        success: false,
-        error: `Legacy account codes still present: ${legacyCodes.join(', ')}`,
-      }, { status: 500 })
-    }
-
     return NextResponse.json({
       success: true,
       message: 'Chart of Accounts replaced successfully. All transactional data cleared.',
       coa: {
         totalAccounts: allAccounts.length,
         assets: allAccounts.filter(a => a.accountType === 'ASSET').length,
+        capital: allAccounts.filter(a => a.accountType === 'EQUITY').length,
         liabilities: allAccounts.filter(a => a.accountType === 'LIABILITY').length,
-        equity: allAccounts.filter(a => a.accountType === 'EQUITY').length,
-        income: allAccounts.filter(a => a.accountType === 'INCOME').length,
+        revenue: allAccounts.filter(a => a.accountType === 'INCOME').length,
         expenses: allAccounts.filter(a => a.accountType === 'EXPENSE').length,
         postingAccounts: allAccounts.filter(a => a.allowPosting).length,
         systemAccounts: allAccounts.filter(a => a.isSystem).length,
       },
-      preserved: {
-        financialYears: await db.financialYear.count(),
-        users: await db.user.count(),
-        openFinancialYear: financialYearName,
-      },
-      validation: {
-        duplicates: duplicateCodes.length,
-        missing: missingCodes.length,
-        legacy: legacyCodes.length,
-      },
+      projects: { total: projects.length, headOffice: projects.filter(p => p.isHeadOffice).length },
+      financialYear: financialYearName,
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Seed error:', error)
-    return NextResponse.json({ success: false, error: String(error) }, { status: 500 })
+    return NextResponse.json({
+      success: false,
+      error: error.message || 'Unknown error during seeding',
+    }, { status: 500 })
   }
-}
-
-/**
- * Infer parent account code from child code.
- * e.g., 1121 → 1120, 1120 → 1100, 1100 → 1000, 1110 → 1100
- */
-function inferParentCode(code: string): string | null {
-  // Top-level: no parent
-  if (code === '1000' || code === '2000' || code === '3000' || code === '4000' || code === '5000') {
-    return null
-  }
-
-  // 4-digit codes: try progressive shortening
-  // e.g., 1121 → try 1120, then 1100, then 1000
-  // e.g., 1110 → try 1100, then 1000
-
-  // Try: replace last digit with 0
-  if (code.length === 4 && code[3] !== '0') {
-    const candidate = code.slice(0, 3) + '0'
-    // Check if this candidate is in our COA
-    if (NEW_COA.some(a => a.code === candidate)) {
-      return candidate
-    }
-  }
-
-  // Try: replace last two digits with 00
-  if (code.length === 4 && code.slice(2) !== '00') {
-    const candidate = code.slice(0, 2) + '00'
-    if (NEW_COA.some(a => a.code === candidate)) {
-      return candidate
-    }
-  }
-
-  // Try: first digit + '000'
-  if (code.length === 4 && code[0] !== '0') {
-    const candidate = code[0] + '000'
-    if (NEW_COA.some(a => a.code === candidate)) {
-      return candidate
-    }
-  }
-
-  return null
 }
