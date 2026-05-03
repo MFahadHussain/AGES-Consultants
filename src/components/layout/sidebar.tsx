@@ -27,6 +27,14 @@ import {
   ChevronRight,
   Search,
   UserCog,
+  UserCircle,
+  GitBranch,
+  Gift,
+  CalendarCheck,
+  HandCoins,
+  Scale,
+  Link2,
+  FileCheck2,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Input } from '@/components/ui/input'
@@ -47,6 +55,8 @@ const ROLE_MODULES: Record<UserRole, ModuleKey[]> = {
     'customers', 'suppliers', 'projects', 'donors', 'locations', 'clients',
     'budgets', 'taxation', 'aging', 'financial-year',
     'reports', 'fixed-assets', 'payroll',
+    'employees', 'project-assignments', 'allowances', 'attendance',
+    'loans', 'tax-slabs', 'payroll-gl-mapping', 'final-settlement',
     'user-management', 'import-export', 'audit-log', 'settings',
   ],
   manager: [
@@ -54,6 +64,8 @@ const ROLE_MODULES: Record<UserRole, ModuleKey[]> = {
     'customers', 'suppliers', 'projects', 'donors', 'locations', 'clients',
     'budgets', 'taxation', 'aging', 'financial-year',
     'reports', 'fixed-assets', 'payroll',
+    'employees', 'project-assignments', 'allowances', 'attendance',
+    'loans', 'final-settlement',
     'audit-log',
   ],
   accountant: [
@@ -61,12 +73,15 @@ const ROLE_MODULES: Record<UserRole, ModuleKey[]> = {
     'customers', 'suppliers', 'projects', 'donors', 'locations', 'clients',
     'budgets', 'taxation', 'aging', 'financial-year',
     'reports', 'fixed-assets', 'payroll',
+    'employees', 'project-assignments', 'allowances', 'attendance',
+    'loans', 'payroll-gl-mapping',
   ],
   auditor: [
     'dashboard', 'chart-of-accounts', 'vouchers', 'ledgers',
     'customers', 'suppliers', 'projects', 'donors', 'locations', 'clients',
     'budgets', 'aging', 'financial-year',
     'reports', 'fixed-assets', 'payroll',
+    'employees', 'attendance', 'tax-slabs', 'payroll-gl-mapping',
     'audit-log',
   ],
   viewer: [
@@ -134,6 +149,20 @@ const navigation: NavGroup[] = [
     ],
   },
   {
+    label: 'HR & Payroll',
+    items: [
+      { key: 'employees', label: 'Employee Master', icon: UserCircle },
+      { key: 'project-assignments', label: 'Project Assignments', icon: GitBranch },
+      { key: 'allowances', label: 'Allowances & Benefits', icon: Gift },
+      { key: 'attendance', label: 'Attendance', icon: CalendarCheck },
+      { key: 'loans', label: 'Loans & Advances', icon: HandCoins },
+      { key: 'tax-slabs', label: 'Tax Slabs', icon: Scale },
+      { key: 'payroll', label: 'Payroll Engine', icon: Banknote },
+      { key: 'payroll-gl-mapping', label: 'GL Account Mapping', icon: Link2 },
+      { key: 'final-settlement', label: 'Final Settlement', icon: FileCheck2 },
+    ],
+  },
+  {
     label: 'Reports',
     items: [
       { key: 'reports', label: 'Financial Reports', icon: FileBarChart },
@@ -143,7 +172,6 @@ const navigation: NavGroup[] = [
     label: 'Integration',
     items: [
       { key: 'fixed-assets', label: 'Fixed Assets', icon: Package },
-      { key: 'payroll', label: 'Payroll Integration', icon: Banknote },
     ],
   },
   {
@@ -165,7 +193,7 @@ export function Sidebar() {
   const { activeModule, setActiveModule, sidebarOpen, searchQuery, setSearchQuery, authUser } = useAppStore()
   const allowedModules = useAllowedModules()
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
-    Overview: true, Accounting: true, Masters: true, Reports: true,
+    Overview: true, Accounting: true, Masters: true, 'HR & Payroll': true, Reports: true,
   })
 
   const toggleGroup = (label: string) => {

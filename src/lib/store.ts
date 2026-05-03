@@ -23,6 +23,14 @@ export type ModuleKey =
   | 'fixed-assets'
   | 'payroll'
   | 'user-management'
+  | 'employees'
+  | 'project-assignments'
+  | 'allowances'
+  | 'attendance'
+  | 'loans'
+  | 'tax-slabs'
+  | 'payroll-gl-mapping'
+  | 'final-settlement'
 
 export interface AuthUser {
   id: string

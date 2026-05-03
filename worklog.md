@@ -666,3 +666,65 @@ Stage Summary:
 - Created: src/components/ui/account-combobox.tsx (reusable searchable account combobox)
 - Modified: src/components/modules/voucher-management.tsx (replaced Select with AccountCombobox)
 - Features: Search by code/name, grouped by account type, scrollable list, header account badges, keyboard navigation
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Build comprehensive Payroll + Project + Attendance Management System
+
+Work Log:
+- Designed and implemented complete database schema for 12 new Prisma models:
+  Employee, EmployeeSalaryHistory, EmployeeProjectAssignment, Allowance, EmployeeAllowance, Attendance, Loan, LoanInstallment, TaxSlab, PayrollAccountMapping, FinalSettlement
+  Enhanced: PayrollBatch (added 12+ new financial fields, workflow fields), PayrollBatchLine (added 15+ new calculation fields)
+- Pushed schema to SQLite database, resolved relation field issues
+- Built 8 new API routes:
+  /api/employees (full CRUD with CNIC validation, salary history tracking, financial usage protection)
+  /api/allowances (CRUD with soft-delete for referenced items)
+  /api/employee-allowances (CRUD with duplicate detection, project-specific enforcement)
+  /api/attendance (CRUD with upsert pattern, bulk mode, SC category mapping)
+  /api/project-assignments (CRUD with overlap detection, allocation validation)
+  /api/loans (CRUD with auto installment schedule, disburse/close/write-off actions)
+  /api/tax-slabs (CRUD with progressive tax calculator)
+  /api/payroll-gl-mapping (CRUD with seed-defaults for 12 component types)
+  /api/final-settlement (CRUD with auto-calculation, approve/pay/post workflow)
+- Rewrote /api/payroll with 9 actions including full "run-payroll" engine:
+  Loads employees, attendance, allowances, loans, tax slabs
+  Calculates: daily rate, eligible/leave/absent days, allowances, gross salary
+  SC calculation: (salary × 20% × workingRatio) - (dailyRate × leaveDays)
+  EOBI: Employee 1%, Employer 5% of basic
+  PF: 8.33% each for employee and employer
+  Income Tax: Progressive slab-based calculation from TaxSlab table
+  Loan deductions from active loans
+  Net Pay = Gross - Total Deductions
+  Workflow: draft → reviewed → approved → posted
+  Post-to-GL creates balanced journal entries using PayrollAccountMapping
+- Built 8 new frontend module components:
+  employee-master.tsx (6-tab form, search/filter, pagination, view detail dialog)
+  project-assignments.tsx (multi-project visual indicators, allocation tracking, activate/deactivate)
+  allowances.tsx (2-tab: definitions + employee assignments, project-specific visibility)
+  attendance.tsx (monthly grid with click-to-cycle statuses, bulk save, SC legend)
+  loans.tsx (disburse/close/write-off actions, installment schedule table)
+  tax-slabs.tsx (CRUD + tax calculator with slab breakdown)
+  payroll-gl-mapping.tsx (GL account mapping with seed defaults)
+  final-settlement.tsx (draft→approved→paid→posted workflow, GL posting)
+- Completely rewrote payroll.tsx with enhanced Payroll Engine UI:
+  5 KPI cards, workflow progress bar, run-payroll action, expandable batch details
+  17-column employee table, SC/tax breakdown expansion, status-based actions
+- Updated store.ts with 8 new ModuleKey types
+- Updated sidebar.tsx with HR & Payroll navigation group (9 modules)
+- Updated page.tsx with lazy-loaded imports for all 8 new modules
+- Created /api/seed-payroll endpoint with idempotent seeding:
+  6 Pakistan tax slabs for FY 2024-25
+  4 default allowances (Medical, HRA, Transport, Project)
+  12 GL account mappings
+  5 sample employees with attendance and project assignments
+- All lint checks pass with 0 errors
+
+Stage Summary:
+- Complete Payroll + Project + Attendance Management System built and operational
+- 12 new database models, 8 new API routes, 8 new UI modules
+- Full payroll calculation engine with SC (20%), EOBI, PF, progressive income tax
+- Workflow: Draft → Reviewed → Approved → Posted to GL
+- GL integration via PayrollAccountMapping for balanced journal entries
+- 5 sample employees seeded with attendance data
+- All modules accessible from HR & Payroll sidebar group

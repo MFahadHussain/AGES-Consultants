@@ -117,6 +117,8 @@ model Project {
 
   vouchers    Voucher[]
   budgets     Budget[]
+  employeeAssignments EmployeeProjectAssignment[]
+  defaultEmployees    Employee[] // Employees with this as default project
 }
 
 model FinancialReportConfig {
@@ -650,47 +652,358 @@ model FAMSSetting {
 }
 
 // ============================================================
-// INTEGRATION: Payroll (Reference for payroll integration)
+// PAYROLL & HR MANAGEMENT SYSTEM
 // ============================================================
 
+// --- Employee Master (Highly Normalized) ---
+model Employee {
+  id                String   @id @default(cuid())
+  employeeCode      String   @unique // Auto-generated: EMP-0001
+
+  // Personal Info
+  name              String
+  fatherName        String?
+  cnic              String   @unique // Must be unique
+  ntn               String?
+  dateOfBirth       DateTime?
+  religion          String?
+  gender            String?  // Male, Female, Other
+  contactNo         String?
+  email             String?
+  permanentAddress  String?
+  presentAddress    String?
+  profilePhotoUrl   String?  // File path for profile photo
+
+  // Employment Info
+  designation       String?
+  department        String?
+  joiningDate       DateTime?
+  leavingDate       DateTime? // Null if active
+  employmentType    String?   // Permanent, Contract, Temporary, Intern, Consultant
+  category          String?   // Management, Staff, Worker, Officer
+  defaultProjectId  String?   // Default project assignment
+  defaultProject    Project? @relation(fields: [defaultProjectId], references: [id])
+  status            String   @default("active") // active, inactive, terminated, resigned, retired
+
+  // Banking
+  bankName          String?
+  branchName        String?
+  branchCode        String?
+  bankAccountNumber String?
+
+  // Statutory
+  eobiNumber        String?
+  socialSecurityNo  String?
+
+  // Qualification
+  qualification1    String?
+  institute1        String?
+  year1             String?
+  qualification2    String?
+  institute2        String?
+  year2             String?
+
+  // Experience
+  previousEmployer  String?
+  yearsOfExperience String?
+
+  // Next of Kin
+  nokName           String?
+  nokCnic           String?
+  nokContact        String?
+  nokRelation       String?
+
+  // Salary
+  baseSalary        Float    @default(0) // Current base salary
+  paymentType       String   @default("monthly") // monthly, daily, hourly
+
+  // System
+  isFinancialUsed   Boolean  @default(false) // Cannot delete after financial usage
+  createdBy         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  salaryHistory     EmployeeSalaryHistory[]
+  projectAssignments EmployeeProjectAssignment[]
+  allowances        EmployeeAllowance[]
+  attendanceRecords Attendance[]
+  loanRecords       Loan[]
+  payrollLines      PayrollBatchLine[]
+  finalSettlement   FinalSettlement?
+}
+
+model EmployeeSalaryHistory {
+  id              String   @id @default(cuid())
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  effectiveDate   DateTime // When the salary change took effect
+  previousSalary  Float    @default(0)
+  newSalary       Float
+  changeReason    String?  // Annual increment, Promotion, Adjustment, Lateral move
+  approvedBy      String?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+}
+
+// --- Employee-Project Assignment Engine ---
+model EmployeeProjectAssignment {
+  id              String   @id @default(cuid())
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id])
+  role            String?  // Role/Designation on this project
+  salaryAmount    Float    @default(0) // Project-specific salary
+  allocationType  String   @default("fixed") // fixed, percentage, attendance_based
+  allocationValue Float    @default(100) // Percentage or fixed amount
+  startDate       DateTime
+  endDate         DateTime? // Null = ongoing
+  isActive        Boolean  @default(true)
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// --- Allowances & Benefits Engine ---
+model Allowance {
+  id              String   @id @default(cuid())
+  code            String   @unique // MED, HRA, TA, PA
+  name            String   // Medical Allowance, Housing, Transport, Project Allowance
+  allowanceType   String   @default("fixed") // fixed, percentage
+  value           Float    @default(0) // Fixed amount or percentage
+  baseOnSalary    Boolean  @default(false) // If percentage, is it on base salary?
+  isTaxable       Boolean  @default(true) // Whether subject to income tax
+  isProjectSpecific Boolean @default(false) // Can vary by project
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  employeeAllowances EmployeeAllowance[]
+}
+
+model EmployeeAllowance {
+  id              String   @id @default(cuid())
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  allowanceId     String
+  allowance       Allowance @relation(fields: [allowanceId], references: [id])
+  customValue     Float?   // Override the default value if set
+  projectId       String?  // If project-specific
+  isActive        Boolean  @default(true)
+  effectiveDate   DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// --- Attendance Engine ---
+model Attendance {
+  id              String   @id @default(cuid())
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date            DateTime // The date of attendance
+  status          String   @default("P") // P, W, H, CL, SL, EL, CO, T, WH, CD, A
+  projectId       String?  // Which project the employee worked on that day
+  checkInTime     String?  // HH:mm format
+  checkOutTime    String?  // HH:mm format
+  overtimeHours   Float    @default(0)
+  remarks         String?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([employeeId, date])
+}
+
+// --- Loans & Advances ---
+model Loan {
+  id              String   @id @default(cuid())
+  loanNumber      String   @unique // LOAN-YYYY-NNNN
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  loanType        String   // Personal, Emergency, Vehicle, Housing, Advance Salary, Other
+  principalAmount Float
+  interestRate    Float    @default(0) // Percentage, 0 for interest-free
+  tenureMonths    Int      // Total number of installments
+  disbursedAmount Float    @default(0)
+  balanceAmount   Float    @default(0) // Remaining balance
+  monthlyDeduction Float   @default(0) // Monthly deduction amount
+  disbursementDate DateTime
+  startDate       DateTime // When deductions start
+  endDate         DateTime? // When deductions end
+  status          String   @default("active") // active, closed, written_off
+  isDisbursed     Boolean  @default(false)
+  disbursedBy     String?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  installments    LoanInstallment[]
+}
+
+model LoanInstallment {
+  id              String   @id @default(cuid())
+  loanId          String
+  loan            Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  installmentNo   Int      // 1, 2, 3...
+  dueDate         DateTime
+  amount          Float    // Principal + interest for this installment
+  principalPart   Float    @default(0)
+  interestPart    Float    @default(0)
+  paidAmount      Float    @default(0)
+  paidDate        DateTime?
+  status          String   @default("pending") // pending, paid, partially_paid, waived
+  payrollBatchLineId String? // Link to the payroll line that deducted this
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// --- Tax Slabs (Pakistan Income Tax) ---
+model TaxSlab {
+  id              String   @id @default(cuid())
+  fiscalYear      String   // "2024-25"
+  slabOrder       Int      // Order of the slab
+  minAmount       Float    @default(0)
+  maxAmount       Float?   // Null = no upper limit
+  fixedAmount     Float    @default(0) // Fixed tax amount for this slab
+  rate            Float    @default(0) // Percentage rate on amount exceeding min
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// --- Payroll Account Mapping (GL Integration) ---
+model PayrollAccountMapping {
+  id              String   @id @default(cuid())
+  componentType   String   @unique // SALARY_EXPENSE, ALLOWANCE_EXPENSE, INCOME_TAX_PAYABLE, EOBI_EMPLOYEE, EOBI_EMPLOYER, PF_EMPLOYEE, PF_EMPLOYER, SOCIAL_CHARGES, SALARY_PAYABLE, GRATUITY, LOAN_DEDUCTION, ADVANCE_DEDUCTION
+  debitAccountId  String?  // GL account to debit
+  creditAccountId String?  // GL account to credit
+  description     String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// --- Final Settlement ---
+model FinalSettlement {
+  id                    String   @id @default(cuid())
+  employeeId            String   @unique
+  employee              Employee @relation(fields: [employeeId], references: [id])
+  leavingDate           DateTime
+  settlementType        String   // Resignation, Termination, Retirement, Death
+  basicSalary           Float    @default(0)
+  unpaidSalary          Float    @default(0)
+  leaveEncashment       Float    @default(0)
+  gratuity              Float    @default(0)
+  socialChargesPayout   Float    @default(0)
+  loanBalance           Float    @default(0) // Outstanding loan to deduct
+  advanceBalance        Float    @default(0) // Outstanding advance to deduct
+  otherDeductions       Float    @default(0)
+  totalPayable          Float    @default(0)
+  totalDeductions       Float    @default(0)
+  netSettlement         Float    @default(0)
+  status                String   @default("draft") // draft, approved, paid, posted
+  postedVoucherId       String?
+  approvedBy            String?
+  paidBy                String?
+  createdBy             String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// --- Enhanced Payroll Batch ---
 model PayrollBatch {
   id              String   @id @default(cuid())
   batchNumber     String   @unique
   name            String   @default("Payroll Batch")
   period          String   // "2024-01"
   projectId       String?  // Project for cross-charging
-  totalGross      Float    @default(0)
-  totalDeductions Float    @default(0)
-  totalNetPay     Float    @default(0)
-  totalEmployerCharges Float @default(0)
-  status          String   @default("draft") // draft, approved, posted
+
+  // Financial totals
+  totalBasicSalary      Float    @default(0)
+  totalAllowances       Float    @default(0)
+  totalGross            Float    @default(0)
+  totalIncomeTax        Float    @default(0)
+  totalEobiEmployee     Float    @default(0)
+  totalEobiEmployer     Float    @default(0)
+  totalPfEmployee       Float    @default(0)
+  totalPfEmployer       Float    @default(0)
+  totalLoanDeduction    Float    @default(0)
+  totalAdvanceDeduction Float    @default(0)
+  totalOtherDeductions  Float    @default(0)
+  totalDeductions       Float    @default(0)
+  totalNetPay           Float    @default(0)
+  totalEmployerCharges  Float    @default(0)
+  totalSocialCharges    Float    @default(0)
+  totalGratuity         Float    @default(0)
+
+  // Workflow
+  status          String   @default("draft") // draft, reviewed, approved, posted
   postedToGL      Boolean  @default(false)
   postedVoucherId String?  // Reference to GL voucher
+  reviewedBy      String?
+  approvedBy      String?
+  postedBy        String?
+  createdBy       String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  lines         PayrollBatchLine[]
+  lines           PayrollBatchLine[]
 }
 
 model PayrollBatchLine {
   id              String      @id @default(cuid())
-  batchId        String
-  batch          PayrollBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  employeeName   String
-  employeeId     String
-  basicSalary    Float       @default(0)
-  allowances     Float       @default(0)
-  grossSalary    Float       @default(0)
-  incomeTax      Float       @default(0)
-  eobiDeduction  Float       @default(0)
-  providentFund  Float       @default(0)
-  loanDeduction  Float       @default(0)
-  otherDeductions Float      @default(0)
-  netPay         Float       @default(0)
-  employerEOBI   Float       @default(0)
-  employerPF     Float       @default(0)
-  projectId      String?     // For cross-charging
-  department     String?
+  batchId         String
+  batch           PayrollBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  employeeId      String
+  employeeName    String
+  employeeCode    String?
+
+  // Salary breakdown
+  basicSalary     Float       @default(0)
+  dailyRate       Float       @default(0) // basicSalary / daysInMonth
+  workingDays     Int         @default(0)
+  eligibleDays    Int         @default(0)
+  leaveDays       Int         @default(0)
+  absentDays      Int         @default(0)
+
+  // Allowances (stored as JSON for flexibility)
+  allowanceDetails String?    // JSON: [{allowanceId, name, amount, isTaxable}]
+
+  // Gross
+  allowances      Float       @default(0)
+  grossSalary     Float       @default(0)
+
+  // Deductions
+  incomeTax       Float       @default(0)
+  eobiEmployee    Float       @default(0)
+  eobiEmployer    Float       @default(0)
+  pfEmployee      Float       @default(0)
+  pfEmployer      Float       @default(0)
+  loanDeduction   Float       @default(0)
+  advanceDeduction Float      @default(0)
+  otherDeductions Float       @default(0)
+  totalDeductions Float       @default(0)
+
+  // Net
+  netPay          Float       @default(0)
+
+  // Social Charges (Employer)
+  socialCharges   Float       @default(0)
+  gratuity        Float       @default(0)
+
+  // SC Calculation breakdown
+  scBreakdown     String?     // JSON: {monthlySC, workingRatio, earnedSC, leaveDeduction, finalSC}
+
+  // Project & Cost Center
+  projectId       String?
+  department      String?
+
+  // Tax calculation breakdown
+  taxBreakdown    String?     // JSON: {taxableIncome, taxSlab, fixedTax, variableTax}
+
+  // Relations
+  employee        Employee  @relation(fields: [employeeId], references: [id])
 }
 
 // ============================================================

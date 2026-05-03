@@ -10,7 +10,6 @@ import LoginPage from '@/components/auth/LoginPage'
 import { lazy, Suspense, useEffect, useState } from 'react'
 
 // Lazy-load all modules to prevent compiling everything on initial page load
-// This dramatically reduces memory usage during development
 const Dashboard = lazy(() => import('@/components/modules/dashboard').then(m => ({ default: m.Dashboard })))
 const ChartOfAccounts = lazy(() => import('@/components/modules/chart-of-accounts').then(m => ({ default: m.ChartOfAccounts })))
 const VoucherManagement = lazy(() => import('@/components/modules/voucher-management').then(m => ({ default: m.VoucherManagement })))
@@ -33,6 +32,16 @@ const ImportExport = lazy(() => import('@/components/modules/import-export').the
 const AuditTrail = lazy(() => import('@/components/modules/audit-trail').then(m => ({ default: m.AuditTrail })))
 const SettingsModule = lazy(() => import('@/components/modules/settings').then(m => ({ default: m.SettingsModule })))
 const UserManagement = lazy(() => import('@/components/modules/user-management').then(m => ({ default: m.UserManagement })))
+
+// HR & Payroll modules
+const EmployeeMaster = lazy(() => import('@/components/modules/employee-master').then(m => ({ default: m.EmployeeMaster })))
+const ProjectAssignments = lazy(() => import('@/components/modules/project-assignments').then(m => ({ default: m.ProjectAssignments })))
+const AllowancesModule = lazy(() => import('@/components/modules/allowances').then(m => ({ default: m.AllowancesModule })))
+const AttendanceModule = lazy(() => import('@/components/modules/attendance').then(m => ({ default: m.AttendanceModule })))
+const LoansModule = lazy(() => import('@/components/modules/loans').then(m => ({ default: m.LoansModule })))
+const TaxSlabsModule = lazy(() => import('@/components/modules/tax-slabs').then(m => ({ default: m.TaxSlabsModule })))
+const PayrollGLMapping = lazy(() => import('@/components/modules/payroll-gl-mapping').then(m => ({ default: m.PayrollGLMapping })))
+const FinalSettlementModule = lazy(() => import('@/components/modules/final-settlement').then(m => ({ default: m.FinalSettlementModule })))
 
 const moduleComponents: Record<ModuleKey, React.LazyExoticComponent<React.ComponentType>> = {
   dashboard: Dashboard,
@@ -57,6 +66,14 @@ const moduleComponents: Record<ModuleKey, React.LazyExoticComponent<React.Compon
   'user-management': UserManagement,
   'fixed-assets': FixedAssetsIntegration,
   payroll: PayrollIntegration,
+  employees: EmployeeMaster,
+  'project-assignments': ProjectAssignments,
+  allowances: AllowancesModule,
+  attendance: AttendanceModule,
+  loans: LoansModule,
+  'tax-slabs': TaxSlabsModule,
+  'payroll-gl-mapping': PayrollGLMapping,
+  'final-settlement': FinalSettlementModule,
 }
 
 function ModuleLoader() {
