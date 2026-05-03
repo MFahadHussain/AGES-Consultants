@@ -115,6 +115,18 @@ const ACCOUNT_ROLES: Record<string, { accountType?: string; subType?: string; co
   LOAN_FROM_PARTNER:    { accountType: 'LIABILITY', subType: 'LONG_TERM_LOAN', allowPosting: true },
   LOAN_PAYABLE:         { accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', nameContains: 'Loan Payable', allowPosting: true },
   ACCRUED_UTILITIES:    { accountType: 'LIABILITY', subType: 'ACCRUAL', allowPosting: true },
+  ESCALATION_PAYABLE:   { accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', nameContains: 'Escalation Payable', allowPosting: true },
+  WHT_PAYABLE_SUPPLIER: { accountType: 'LIABILITY', subType: 'TAX_PAYABLE', nameContains: 'WHT Payable Supplier', allowPosting: true },
+  WHT_PAYABLE_EMPLOYEE: { accountType: 'LIABILITY', subType: 'TAX_PAYABLE', nameContains: 'WHT Payable Employees', allowPosting: true },
+  WHT_PAYABLE_OFFICE_RENT: { accountType: 'LIABILITY', subType: 'TAX_PAYABLE', nameContains: 'WHT Payable Office Rent', allowPosting: true },
+  SALES_TAX_ON_SERVICES: { accountType: 'LIABILITY', subType: 'TAX_PAYABLE', nameContains: 'Sales Tax on Services', allowPosting: true },
+  WHT_PAYABLE_SUPPLIER_CLIENT: { accountType: 'LIABILITY', subType: 'TAX_PAYABLE', nameContains: 'WHT Payable Supplier - Client', allowPosting: true },
+  GST_PAYABLE_CLIENT:   { accountType: 'LIABILITY', subType: 'TAX_PAYABLE', nameContains: 'GST Payable Supplier - Client', allowPosting: true },
+  WHT_OFFICE_RENT_CLIENT: { accountType: 'LIABILITY', subType: 'TAX_PAYABLE', nameContains: 'WHT Office Rent - Client', allowPosting: true },
+  RETENTION_MONEY_PAYABLE: { accountType: 'LIABILITY', subType: 'PAYABLE', nameContains: 'Retention Money', allowPosting: true },
+  ACCRUED_OFFICE_RENT:  { accountType: 'LIABILITY', subType: 'ACCRUAL', nameContains: 'Accrued Office Rent', allowPosting: true },
+  ACCRUED_VEHICLE_RENT: { accountType: 'LIABILITY', subType: 'ACCRUAL', nameContains: 'Accrued Vehicle Rent', allowPosting: true },
+  PROVISION_TAXATION:   { accountType: 'LIABILITY', subType: 'TAX_PAYABLE', nameContains: 'Provision for Taxation', allowPosting: true },
 
   // Expense categories
   SALARY_EXPENSE:       { accountType: 'EXPENSE', subType: 'SALARY', allowPosting: true },

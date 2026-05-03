@@ -223,6 +223,68 @@ const NEW_COA: COAAccount[] = [
         { code: '03-02-03-0006', name: 'Social Charges Payable - Support Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-03', level: 3, allowPosting: true, isSystem: true, description: 'Social charges payable - Support Staff' },
         { code: '03-02-03-0007', name: 'Social Charges Payable - Geo Tech Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-03', level: 3, allowPosting: true, isSystem: true, description: 'Social charges payable - Geo Tech Staff' },
 
+      // 03-02-04 Escalation Payable
+      { code: '03-02-04', name: 'Escalation Payable', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Salary escalation payables by category' },
+        { code: '03-02-04-0001', name: 'Escalation Payable Partners', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-04', level: 3, allowPosting: true, isSystem: true, description: 'Escalation payable to partners' },
+        { code: '03-02-04-0002', name: 'Escalation Payable Key Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-04', level: 3, allowPosting: true, isSystem: true, description: 'Escalation payable to key staff' },
+        { code: '03-02-04-0003', name: 'Escalation Payable Technical Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-04', level: 3, allowPosting: true, isSystem: true, description: 'Escalation payable to technical staff' },
+        { code: '03-02-04-0004', name: 'Escalation Payable Technical Support Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-04', level: 3, allowPosting: true, isSystem: true, description: 'Escalation payable to technical support staff' },
+        { code: '03-02-04-0005', name: 'Escalation Payable Admin & Finance Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-04', level: 3, allowPosting: true, isSystem: true, description: 'Escalation payable to admin & finance staff' },
+        { code: '03-02-04-0006', name: 'Escalation Payable Support Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-04', level: 3, allowPosting: true, isSystem: true, description: 'Escalation payable to support staff' },
+        { code: '03-02-04-0007', name: 'Escalation Payable Geo Tech Staff', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-04', level: 3, allowPosting: true, isSystem: true, description: 'Escalation payable to geo tech staff' },
+
+      // 03-02-05 EOBI Payable
+      { code: '03-02-05', name: 'EOBI Payable', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Employees Old-Age Benefits Institution payable' },
+        { code: '03-02-05-0001', name: 'Employer Contribution', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-05', level: 3, allowPosting: true, isSystem: true, description: 'EOBI employer contribution payable' },
+        { code: '03-02-05-0002', name: 'Employee Contribution', accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', parentCode: '03-02-05', level: 3, allowPosting: true, isSystem: true, description: 'EOBI employee contribution payable' },
+
+      // 03-02-06 WHT Payable Supplier
+      { code: '03-02-06', name: 'WHT Payable Supplier', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Withholding tax payable to suppliers' },
+        { code: '03-02-06-0001', name: 'WHT Payable Suppliers', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02-06', level: 3, allowPosting: true, isSystem: true, description: 'Withholding tax payable to suppliers' },
+
+      // 03-02-07 WHT Payable Employees
+      { code: '03-02-07', name: 'WHT Payable Employees', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Withholding tax payable on employee salaries' },
+        { code: '03-02-07-0001', name: 'WHT Payable Employees', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02-07', level: 3, allowPosting: true, isSystem: true, description: 'Withholding tax payable on employee salaries' },
+
+      // 03-02-08 WHT Payable Office Rent
+      { code: '03-02-08', name: 'WHT Payable Office Rent', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Withholding tax payable on office rent' },
+        { code: '03-02-08-0001', name: 'WHT Payable Office', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02-08', level: 3, allowPosting: true, isSystem: true, description: 'Withholding tax payable on office rent' },
+        { code: '03-02-08-0002', name: 'WHT Payable Accommodation', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02-08', level: 3, allowPosting: true, isSystem: true, description: 'Withholding tax payable on accommodation rent' },
+        { code: '03-02-08-0003', name: 'WHT Payable Site Office', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02-08', level: 3, allowPosting: true, isSystem: true, description: 'Withholding tax payable on site office rent' },
+        { code: '03-02-08-0004', name: 'WHT Payable Laboratory', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02-08', level: 3, allowPosting: true, isSystem: true, description: 'Withholding tax payable on laboratory rent' },
+
+      // 03-02-09 Sales Tax on Services Payable
+      { code: '03-02-09', name: 'Sales Tax on Services Payable', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Sales tax on services payable' },
+        { code: '03-02-09-0001', name: 'Sales Tax on Services (Invoices)', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02-09', level: 3, allowPosting: true, isSystem: true, description: 'Sales tax on services - invoices' },
+        { code: '03-02-09-0002', name: 'STS - Suppliers', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02-09', level: 3, allowPosting: true, isSystem: true, description: 'Sales tax on services - suppliers' },
+
+      // 03-02-10 WHT Payable Supplier - Client
+      { code: '03-02-10', name: 'WHT Payable Supplier - Client', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Withholding tax payable to suppliers on behalf of client' },
+        { code: '03-02-10-0001', name: 'WHT Payable Suppliers - Client', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02-10', level: 3, allowPosting: true, isSystem: true, description: 'Withholding tax payable to suppliers - client' },
+
+      // 03-02-11 GST Payable Supplier - Client
+      { code: '03-02-11', name: 'GST Payable Supplier - Client', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'GST payable to suppliers on behalf of client' },
+        { code: '03-02-11-0001', name: 'Client-Sale Tax Payable', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02-11', level: 3, allowPosting: true, isSystem: true, description: 'Client sale tax payable' },
+
+      // 03-02-12 WHT Office Rent - Client
+      { code: '03-02-12', name: 'WHT Office Rent - Client', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Withholding tax on office rent - client' },
+        { code: '03-02-12-0001', name: 'WHT Office Rent - Client', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02-12', level: 3, allowPosting: true, isSystem: true, description: 'Withholding tax on office rent - client' },
+
+      // 03-02-13 Retention Money Payable
+      { code: '03-02-13', name: 'Retention Money Payable', accountType: 'LIABILITY', subType: 'PAYABLE', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Retention money payable to contractors/suppliers' },
+        { code: '03-02-13-0001', name: 'Country Survey & Mapping', accountType: 'LIABILITY', subType: 'PAYABLE', parentCode: '03-02-13', level: 3, allowPosting: true, isSystem: true, description: 'Retention money payable - Country Survey & Mapping' },
+
+      // 03-02-14 Accrued Office Rent
+      { code: '03-02-14', name: 'Accrued Office Rent', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Accrued office rent expenses' },
+        { code: '03-02-14-0001', name: 'Accrued Office', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02-14', level: 3, allowPosting: true, isSystem: true, description: 'Accrued office rent' },
+        { code: '03-02-14-0002', name: 'Accrued Accommodation', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02-14', level: 3, allowPosting: true, isSystem: true, description: 'Accrued accommodation rent' },
+        { code: '03-02-14-0003', name: 'Accrued Site Office', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02-14', level: 3, allowPosting: true, isSystem: true, description: 'Accrued site office rent' },
+        { code: '03-02-14-0004', name: 'Accrued Laboratory', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02-14', level: 3, allowPosting: true, isSystem: true, description: 'Accrued laboratory rent' },
+
+      // 03-02-15 Accrued Vehicle Rent
+      { code: '03-02-15', name: 'Accrued Vehicle Rent', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Accrued vehicle rent expenses' },
+        { code: '03-02-15-0001', name: 'Capital Rent A Car Service Payable', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02-15', level: 3, allowPosting: true, isSystem: true, description: 'Capital Rent A Car Service payable' },
+
       // 03-02-16 Accrued Utilities
       { code: '03-02-16', name: 'Accrued Utilities', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Accrued utility expenses' },
         { code: '03-02-16-0001', name: 'Electricity Bill', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02-16', level: 3, allowPosting: true, isSystem: true, description: 'Accrued electricity bill' },
@@ -230,6 +292,10 @@ const NEW_COA: COAAccount[] = [
         { code: '03-02-16-0003', name: 'Telephone Bill', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02-16', level: 3, allowPosting: true, isSystem: true, description: 'Accrued telephone bill' },
         { code: '03-02-16-0004', name: 'Internet Bill', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02-16', level: 3, allowPosting: true, isSystem: true, description: 'Accrued internet bill' },
         { code: '03-02-16-0005', name: 'Water Bill', accountType: 'LIABILITY', subType: 'ACCRUAL', parentCode: '03-02-16', level: 3, allowPosting: true, isSystem: true, description: 'Accrued water bill' },
+
+      // 03-02-17 Provision for Taxation Payables
+      { code: '03-02-17', name: 'Provision for Taxation Payables', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Provision for taxation payables' },
+        { code: '03-02-17-0001', name: 'Provision for Taxation Payables', accountType: 'LIABILITY', subType: 'TAX_PAYABLE', parentCode: '03-02-17', level: 3, allowPosting: true, isSystem: true, description: 'Provision for taxation payables' },
 
       // 03-02-18 Loan Payable
       { code: '03-02-18', name: 'Loan Payable', accountType: 'LIABILITY', subType: 'CURRENT_LIABILITY', parentCode: '03-02', level: 2, allowPosting: false, isSystem: true, description: 'Short-term loans payable' },

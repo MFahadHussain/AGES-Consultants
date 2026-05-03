@@ -214,3 +214,36 @@ Stage Summary:
 - All 18 projects seeded (HO + 17 Hydropower/Dam/Infrastructure)
 - FAMS re-seeded with settings and fiscal years
 - All API endpoints verified working
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Add new Chart of Accounts from user-uploaded image (liability accounts 03-02-04 through 03-02-17)
+
+Work Log:
+- Used VLM (Vision Language Model) to extract chart of accounts from uploaded image (pasted_image_1777801877611.png)
+- Image contained new Current Liability accounts (03-02-04 through 03-02-15, 03-02-17) missing from existing COA
+- Added 40 new accounts to seed/route.ts NEW_COA array:
+  - 03-02-04: Escalation Payable (7 sub-accounts: Partners, Key Staff, Technical Staff, Technical Support Staff, Admin & Finance Staff, Support Staff, Geo Tech Staff)
+  - 03-02-05: EOBI Payable (2 sub-accounts: Employer Contribution, Employee Contribution)
+  - 03-02-06: WHT Payable Supplier (1 sub-account)
+  - 03-02-07: WHT Payable Employees (1 sub-account)
+  - 03-02-08: WHT Payable Office Rent (4 sub-accounts: Office, Accommodation, Site Office, Laboratory)
+  - 03-02-09: Sales Tax on Services Payable (2 sub-accounts: Invoices, Suppliers)
+  - 03-02-10: WHT Payable Supplier - Client (1 sub-account)
+  - 03-02-11: GST Payable Supplier - Client (1 sub-account)
+  - 03-02-12: WHT Office Rent - Client (1 sub-account)
+  - 03-02-13: Retention Money Payable (1 sub-account: Country Survey & Mapping)
+  - 03-02-14: Accrued Office Rent (4 sub-accounts: Office, Accommodation, Site Office, Laboratory)
+  - 03-02-15: Accrued Vehicle Rent (1 sub-account: Capital Rent A Car Service Payable)
+  - 03-02-17: Provision for Taxation Payables (1 sub-account)
+- Added 15 new role mappings to account-roles.ts (ESCALATION_PAYABLE, WHT_PAYABLE_SUPPLIER, WHT_PAYABLE_EMPLOYEE, etc.)
+- Re-seeded database: COA grew from 263 to 303 total accounts (84 liability accounts)
+- Verified all new accounts in database with correct hierarchy, codes, types, and sub-types
+- Lint check passed with 0 errors
+
+Stage Summary:
+- COA expanded from 263 → 303 accounts (+40 new accounts)
+- Liability section expanded from ~44 → 84 accounts
+- All new accounts use TAX_PAYABLE sub-type for tax-related accounts, PAYROLL_LIABILITY for payroll, ACCRUAL for accrued, PAYABLE for retention
+- Gap in 03-02-XX numbering fully filled (03-02-01 through 03-02-18 now complete)
