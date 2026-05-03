@@ -642,3 +642,27 @@ Stage Summary:
   - Viewer: Minimal view with read-only notice, basic KPIs, voucher status chart, report links only
 - Sidebar now filters modules by role (viewer only sees Dashboard, COA, Ledgers, Projects, Donors, Reports)
 - Lint passes with 0 errors
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Replace Account dropdown with searchable Combobox in Voucher modal
+
+Work Log:
+- Explored voucher-management.tsx and found the Account selector uses a plain `<Select>` with flat list
+- Confirmed shadcn/ui Command and Popover components are available (no pre-built Combobox)
+- Created new AccountCombobox component at src/components/ui/account-combobox.tsx
+- Built using Command + Popover pattern (standard shadcn/ui approach)
+- Implemented dual search by Account Code and Account Name
+- Added account type grouping with color-coded headers (Assets=01, Capital=02, Liabilities=03, Revenue=04, Expenses=05)
+- Added fixed-height scrollable area (280px) for large COA
+- Added header account badge for non-posting accounts
+- Added keyboard shortcuts hint in footer
+- Integrated into voucher-management.tsx by replacing Select with AccountCombobox
+- Fixed lint error (empty interface → type alias)
+- All tests pass, app compiles and loads
+
+Stage Summary:
+- Created: src/components/ui/account-combobox.tsx (reusable searchable account combobox)
+- Modified: src/components/modules/voucher-management.tsx (replaced Select with AccountCombobox)
+- Features: Search by code/name, grouped by account type, scrollable list, header account badges, keyboard navigation

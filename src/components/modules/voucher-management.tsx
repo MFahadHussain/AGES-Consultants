@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { numberToWords } from '@/lib/number-to-words'
+import { AccountCombobox, type AccountOption } from '@/components/ui/account-combobox'
 
 const voucherTypes = [
   { value: 'BP', label: 'Bank Payment', color: 'bg-red-100 text-red-800' },
@@ -184,7 +185,7 @@ interface Voucher {
   client?: { name: string } | null
   _count?: { entries: number; attachments: number }
 }
-interface Account { id: string; code: string; name: string; accountType: string }
+type Account = AccountOption
 
 const defaultForm = {
   voucherType: 'BP',
@@ -638,10 +639,12 @@ export function VoucherManagement() {
           {form.entries.map((entry, i) => (
             <div key={i} className="grid grid-cols-12 gap-2 items-end">
               <div className="col-span-4">{i === 0 && <Label className="text-[10px]">Account</Label>}
-                <Select value={entry.accountId} onValueChange={v => updateEntry(i, 'accountId', v)}>
-                  <SelectTrigger className="h-7 text-[10px]"><SelectValue placeholder="Select account" /></SelectTrigger>
-                  <SelectContent className="max-h-60">{accounts.map(a => <SelectItem key={a.id} value={a.id}><span className="font-mono">{a.code}</span> {a.name}</SelectItem>)}</SelectContent>
-                </Select>
+                <AccountCombobox
+                  accounts={accounts}
+                  value={entry.accountId}
+                  onChange={v => updateEntry(i, 'accountId', v)}
+                  placeholder="Search account…"
+                />
               </div>
               <div className="col-span-2">{i === 0 && <Label className="text-[10px]">Debit</Label>}<Input type="number" className="h-7 text-[10px]" value={entry.debit || ''} onChange={e => updateEntry(i, 'debit', parseFloat(e.target.value) || 0)} /></div>
               <div className="col-span-2">{i === 0 && <Label className="text-[10px]">Credit</Label>}<Input type="number" className="h-7 text-[10px]" value={entry.credit || ''} onChange={e => updateEntry(i, 'credit', parseFloat(e.target.value) || 0)} /></div>
