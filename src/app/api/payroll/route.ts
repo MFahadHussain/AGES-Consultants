@@ -262,12 +262,21 @@ export async function POST(request: Request) {
       if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
       if (batch.status !== 'draft') return NextResponse.json({ error: 'Can only add lines to draft batches' }, { status: 400 })
 
+      // Conditional deduction check: if employeeId is real, check EOBI/PF/IncomeTax flags
+      let empFlags: { eobiEnabled: boolean; pfEnabled: boolean; incomeTaxEnabled: boolean } | null = null
+      if (line.employeeId && !String(line.employeeId).startsWith('MANUAL-')) {
+        const emp = await db.employee.findUnique({ where: { id: line.employeeId }, select: { eobiEnabled: true, pfEnabled: true, incomeTaxEnabled: true } })
+        if (emp) empFlags = emp
+      }
+
       const basicSalary = line.basicSalary || 0
       const allowances = line.allowances || 0
       const grossSalary = basicSalary + allowances
-      const incomeTax = line.incomeTax || 0
-      const eobiEmployee = line.eobiEmployee || 0
-      const pfEmployee = line.pfEmployee || 0
+      const incomeTax = (empFlags && !empFlags.incomeTaxEnabled) ? 0 : (line.incomeTax || 0)
+      const eobiEmployee = (empFlags && !empFlags.eobiEnabled) ? 0 : (line.eobiEmployee || 0)
+      const eobiEmployer = (empFlags && !empFlags.eobiEnabled) ? 0 : (line.eobiEmployer || 0)
+      const pfEmployee = (empFlags && !empFlags.pfEnabled) ? 0 : (line.pfEmployee || 0)
+      const pfEmployer = (empFlags && !empFlags.pfEnabled) ? 0 : (line.pfEmployer || 0)
       const loanDeduction = line.loanDeduction || 0
       const advanceDeduction = line.advanceDeduction || 0
       const otherDeductions = line.otherDeductions || 0
@@ -291,9 +300,9 @@ export async function POST(request: Request) {
           grossSalary,
           incomeTax,
           eobiEmployee,
-          eobiEmployer: line.eobiEmployer || 0,
+          eobiEmployer,
           pfEmployee,
-          pfEmployer: line.pfEmployer || 0,
+          pfEmployer,
           loanDeduction,
           advanceDeduction,
           otherDeductions,
@@ -327,12 +336,27 @@ export async function POST(request: Request) {
       if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
       if (batch.status !== 'draft') return NextResponse.json({ error: 'Can only update lines in draft batches' }, { status: 400 })
 
+      // Conditional deduction check: if employeeId is real, check EOBI/PF/IncomeTax flags
+      let empFlags: { eobiEnabled: boolean; pfEnabled: boolean; incomeTaxEnabled: boolean } | null = null
+      const empId = line.employeeId || existingLine.employeeId
+      if (empId && !String(empId).startsWith('MANUAL-')) {
+        const emp = await db.employee.findUnique({ where: { id: empId }, select: { eobiEnabled: true, pfEnabled: true, incomeTaxEnabled: true } })
+        if (emp) empFlags = emp
+      }
+
       const basicSalary = line.basicSalary ?? existingLine.basicSalary
       const allowances = line.allowances ?? existingLine.allowances
       const grossSalary = basicSalary + allowances
-      const incomeTax = line.incomeTax ?? existingLine.incomeTax
-      const eobiEmployee = line.eobiEmployee ?? existingLine.eobiEmployee
-      const pfEmployee = line.pfEmployee ?? existingLine.pfEmployee
+      const rawIncomeTax = line.incomeTax ?? existingLine.incomeTax
+      const rawEobiEmployee = line.eobiEmployee ?? existingLine.eobiEmployee
+      const rawEobiEmployer = line.eobiEmployer ?? existingLine.eobiEmployer
+      const rawPfEmployee = line.pfEmployee ?? existingLine.pfEmployee
+      const rawPfEmployer = line.pfEmployer ?? existingLine.pfEmployer
+      const incomeTax = (empFlags && !empFlags.incomeTaxEnabled) ? 0 : rawIncomeTax
+      const eobiEmployee = (empFlags && !empFlags.eobiEnabled) ? 0 : rawEobiEmployee
+      const eobiEmployer = (empFlags && !empFlags.eobiEnabled) ? 0 : rawEobiEmployer
+      const pfEmployee = (empFlags && !empFlags.pfEnabled) ? 0 : rawPfEmployee
+      const pfEmployer = (empFlags && !empFlags.pfEnabled) ? 0 : rawPfEmployer
       const loanDeduction = line.loanDeduction ?? existingLine.loanDeduction
       const advanceDeduction = line.advanceDeduction ?? existingLine.advanceDeduction
       const otherDeductions = line.otherDeductions ?? existingLine.otherDeductions
@@ -355,9 +379,9 @@ export async function POST(request: Request) {
           grossSalary,
           incomeTax,
           eobiEmployee,
-          eobiEmployer: line.eobiEmployer ?? existingLine.eobiEmployer,
+          eobiEmployer,
           pfEmployee,
-          pfEmployer: line.pfEmployer ?? existingLine.pfEmployer,
+          pfEmployer,
           loanDeduction,
           advanceDeduction,
           otherDeductions,

@@ -98,3 +98,26 @@ Stage Summary:
 - All systems functional and verified
 - Assad Ali Khan seeded with 7 project assignments
 - Full payroll workflow tested and working
+
+---
+Task ID: 7
+Agent: Main
+Task: Fix EmployeeProfile TypeError and add conditional deduction checks to add-line/update-line API paths
+
+Work Log:
+- Fixed TypeError "Cannot read properties of undefined (reading 'id')" at employee-profile.tsx line 518
+- Root cause: `emp` could be undefined when `employees` array was empty (before API returns data)
+- Created safe `empId = emp?.id || ''` derived variable
+- Replaced all `emp.id` references with `empId` in derived values, hooks, and handlers
+- Replaced `emp.employeeCode || emp.id` with `emp?.employeeCode || empId` in render
+- Added conditional EOBI/PF/Income Tax deduction checks to `add-line` API action (payroll/route.ts)
+- Added conditional EOBI/PF/Income Tax deduction checks to `update-line` API action (payroll/route.ts)
+- Both actions now fetch employee flags and zero out deductions when the corresponding flag is disabled
+- Ran lint: 0 errors, 4 pre-existing warnings
+- Verified dev server running and API responses correct
+
+Stage Summary:
+- EmployeeProfile no longer crashes with TypeError when employees array is empty
+- add-line and update-line API paths now enforce conditional EOBI/PF/Income Tax checks
+- The run-payroll path already had these checks via calculateMonthlyPayroll.ts
+- All three deduction paths are now consistent

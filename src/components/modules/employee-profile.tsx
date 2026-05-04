@@ -515,11 +515,12 @@ export function EmployeeProfile() {
 
   // ---- Derived ----
   const emp = useMemo(() => employees.find(e => e.id === selectedId) || employees[0], [employees, selectedId])
-  const scLedger = scLedgers[emp.id] || []
-  const loans = loansStore[emp.id] || []
-  const advances = advStore[emp.id] || []
-  const docs = docStore[emp.id] || []
-  const attMonth = attMonths[emp.id] || new Date().toISOString().slice(0, 7)
+  const empId = emp?.id || ''
+  const scLedger = empId ? (scLedgers[empId] || []) : []
+  const loans = empId ? (loansStore[empId] || []) : []
+  const advances = empId ? (advStore[empId] || []) : []
+  const docs = empId ? (docStore[empId] || []) : []
+  const attMonth = empId ? (attMonths[empId] || new Date().toISOString().slice(0, 7)) : new Date().toISOString().slice(0, 7)
 
   const initials = emp?.name?.split(' ').map(w=>w[0]).join('').slice(0,2) || '??'
 
@@ -559,7 +560,7 @@ export function EmployeeProfile() {
   }, [attData])
 
   // API payroll result key
-  const payrollKey = `${emp.id}-${payrollMonth}`
+  const payrollKey = `${empId}-${payrollMonth}`
   const apiPayrollResult = payrollResults[payrollKey]
 
   // Effective payroll result (API if available)
@@ -582,13 +583,13 @@ export function EmployeeProfile() {
 
   // Run Payroll Calculation
   const handleRunPayroll = useCallback(async () => {
-    if (!emp?.id) return
+    if (!empId) return
     setPayrollLoading(true)
     try {
       const res = await fetch('/api/payroll/calculate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ employeeId: emp.id, month: payrollMonth, skipValidation: true }),
+        body: JSON.stringify({ employeeId: empId, month: payrollMonth, skipValidation: true }),
       })
       if (res.ok) {
         const data = await res.json()
@@ -603,7 +604,7 @@ export function EmployeeProfile() {
     } finally {
       setPayrollLoading(false)
     }
-  }, [emp.id, payrollMonth, payrollKey])
+  }, [empId, payrollMonth, payrollKey])
 
   // Search keyboard
   const filteredEmployees = useMemo(() => {
@@ -627,11 +628,11 @@ export function EmployeeProfile() {
   }, [])
 
   // Profile edit
-  const startEdit = () => { setEditForm({...emp}); setEditMode(true) }
+  const startEdit = () => { if (emp) setEditForm({...emp}); setEditMode(true) }
   const cancelEdit = () => { setEditMode(false); setEditForm({}) }
   const saveEdit = async () => {
     try {
-      const res = await fetch(`/api/employees?id=${emp.id}`, {
+      const res = await fetch(`/api/employees?id=${empId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -647,7 +648,7 @@ export function EmployeeProfile() {
       })
       if (res.ok) {
         // Update local state
-        setEmployees(prev => prev.map(e => e.id === emp.id ? {...e, ...editForm} as EmployeeData : e))
+        setEmployees(prev => prev.map(e => e.id === empId ? {...e, ...editForm} as EmployeeData : e))
         setEditMode(false)
         setEditForm({})
         toast.success('Profile updated successfully')
@@ -667,7 +668,7 @@ export function EmployeeProfile() {
       return
     }
     setScLedgers(prev => {
-      const ledger = [...(prev[emp.id]||[])]
+      const ledger = [...(prev[empId]||[])]
       scCoveredMonths.forEach(m => {
         const idx = ledger.findIndex(l => l.month === m)
         if (idx >= 0) {
@@ -681,7 +682,7 @@ export function EmployeeProfile() {
       })
       let cum = 0
       ledger.forEach(l => { cum += l.scAmount - l.paid; l.outstanding = cum })
-      return {...prev, [emp.id]: ledger}
+      return {...prev, [empId]: ledger}
     })
     setShowScForm(false)
     setScPayment({amount:'',date:'',reference:''})
@@ -701,7 +702,7 @@ export function EmployeeProfile() {
     let bal = amount
     for (let m=1; m<=tenure; m++) { const intP=Math.round(bal*r); const prP=emi-intP; bal=bal-prP; schedule.push({month:m,emi,principal:prP,interest:intP,balance:Math.max(0,bal)}) }
     const newLoan: LoanData = { id:`LN-${Date.now().toString(36).toUpperCase()}`, loanType:newLoanForm.loanType, principal:amount, disbursedDate:newLoanForm.date, tenure, emi, interestRate:rate, remaining:amount, monthsLeft:tenure, status:'Active', schedule }
-    setLoansStore(prev => ({...prev, [emp.id]: [...(prev[emp.id]||[]), newLoan]}))
+    setLoansStore(prev => ({...prev, [empId]: [...(prev[empId]||[]), newLoan]}))
     setNewLoanOpen(false)
     setNewLoanForm({loanType:'Personal',amount:'',date:'',tenure:'',interestRate:'12'})
     toast.success('Loan added successfully')
@@ -713,7 +714,7 @@ export function EmployeeProfile() {
     const monthly = parseFloat(newAdvForm.monthlyRecovery)
     if (!amount || !newAdvForm.purpose || !monthly) { toast.error('Please fill all required fields'); return }
     const newAdv: AdvanceData = { id:`ADV-${Date.now().toString(36).toUpperCase()}`, date:new Date().toISOString().split('T')[0], amount, purpose:newAdvForm.purpose, recoveryMode:newAdvForm.recoveryMode, monthlyRecovery:monthly, recovered:0, balance:amount, status:'Recovering' }
-    setAdvStore(prev => ({...prev, [emp.id]: [...(prev[emp.id]||[]), newAdv]}))
+    setAdvStore(prev => ({...prev, [empId]: [...(prev[empId]||[]), newAdv]}))
     setNewAdvOpen(false)
     setNewAdvForm({amount:'',purpose:'',recoveryMode:'Installments',monthlyRecovery:''})
     toast.success('Advance added successfully')
@@ -846,7 +847,7 @@ export function EmployeeProfile() {
         <div className="flex flex-col items-center text-center">
           <div className="h-16 w-16 bg-slate-900 text-white rounded-2xl flex items-center justify-center text-2xl font-semibold mb-3">{initials}</div>
           <h2 className="text-xl font-semibold text-slate-900">{emp.name}</h2>
-          <div className="mt-1.5"><span className="bg-slate-100 text-slate-500 text-[11px] rounded px-2 py-0.5 font-mono">{emp.employeeCode || emp.id}</span></div>
+          <div className="mt-1.5"><span className="bg-slate-100 text-slate-500 text-[11px] rounded px-2 py-0.5 font-mono">{emp?.employeeCode || empId}</span></div>
           <p className="text-[13px] text-slate-500 mt-2">{emp.designation || '—'}</p>
           <p className="text-[13px] text-slate-500">{emp.department || '—'}</p>
           <div className="mt-2.5">
@@ -1509,7 +1510,7 @@ export function EmployeeProfile() {
       {/* Month Selector */}
       <div className="flex items-center gap-3">
         <Label className="text-xs text-slate-500">Month</Label>
-        <Select value={attMonth} onValueChange={v=>setAttMonths(p=>({...p,[emp.id]:v}))}>
+        <Select value={attMonth} onValueChange={v=>setAttMonths(p=>({...p,[empId]:v}))}>
           <SelectTrigger className="h-8 text-xs w-44"><SelectValue/></SelectTrigger>
           <SelectContent>
             {availableMonths.map(m=><SelectItem key={m} value={m}>{fmtMonth(m)}</SelectItem>)}
