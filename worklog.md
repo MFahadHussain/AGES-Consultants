@@ -76,3 +76,22 @@ Stage Summary:
 - Multi-contract SC calculated per project using each project's monthly salary
 - FBR tax slabs updated to 2025-26 rates
 - All display components updated to show new SC breakdown format
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Fix PrismaClientValidationError when running payroll (Unknown argument 'contractEarnings')
+
+Work Log:
+- Analyzed screenshot showing PrismaClientValidationError during payroll batch line creation
+- Reproduced error by running payroll API: "Unknown argument `contractEarnings`. Available options are marked with ?."
+- Root cause: The `contractEarnings` field existed in the Prisma schema but the Prisma Client hadn't been regenerated after the schema was updated in a previous session
+- The Next.js dev server was using a stale cached Prisma Client that didn't know about the `contractEarnings` field
+- Fix: Ran `bun run db:push` which regenerated the Prisma Client, then restarted the Next.js dev server
+- Verified: Payroll now runs successfully, creating batch lines with all fields including contractEarnings and the new scBreakdown fields
+
+Stage Summary:
+- The PrismaClientValidationError was caused by stale Prisma Client cache, not by the SC fixes
+- Regenerating Prisma Client and restarting the dev server resolved the issue
+- Payroll batch PAY-202606-001 now processes successfully for Assad Ali Khan
+- SC calculation results verified: eligDays=30, ratio=1.0, scBase=265000, finalSC=53000
