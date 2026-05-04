@@ -1051,12 +1051,34 @@ export function PayrollIntegration() {
               <div>
                 <p className="text-xs font-semibold mb-2">Social Charges Breakdown</p>
                 <div className="p-3 rounded border bg-muted/30 text-xs space-y-1">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Monthly SC (20% of salary):</span><span>{formatCurrency(scBreakdown.monthlySC)}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Working Ratio:</span><span>{(scBreakdown.workingRatio * 100).toFixed(2)}%</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Earned SC:</span><span>{formatCurrency(scBreakdown.earnedSC)}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Leave Deduction:</span><span className="text-red-600">-{formatCurrency(scBreakdown.leaveDeduction)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Total Working Days (Month):</span><span>{selectedLine.calendarDays || selectedLine.workingDays}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">SC Eligible Days:</span><span>{scBreakdown.scEligDays ?? '-'} <span className="text-muted-foreground">(P + W + H + WH + T + CO)</span></span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Leave Days (paid, no SC):</span><span>{scBreakdown.leaveDaysPaid ?? scBreakdown.leaveDeduction > 0 ? '-' : '0'} <span className="text-muted-foreground">(SL + CL + EL)</span></span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Absent Days (info):</span><span>{selectedLine.absentDays}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Attendance Ratio:</span><span>{((scBreakdown.attendanceRatio ?? scBreakdown.workingRatio) * 100).toFixed(2)}%</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Monthly Salary:</span><span>{formatCurrency(selectedLine.grossSalary)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">SC Base (salary × ratio):</span><span>{formatCurrency(scBreakdown.scBase ?? scBreakdown.earnedSC)}</span></div>
                   <Separator />
-                  <div className="flex justify-between font-bold"><span>Final SC:</span><span>{formatCurrency(scBreakdown.finalSC)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Other Payable (8.33%):</span><span>{formatCurrency(Math.round((scBreakdown.scBase ?? scBreakdown.earnedSC) * 0.0833))}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Earned Leave (8.33%):</span><span>{formatCurrency(Math.round((scBreakdown.scBase ?? scBreakdown.earnedSC) * 0.0833))}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Sick Leave (1.67%):</span><span>{formatCurrency(Math.round((scBreakdown.scBase ?? scBreakdown.earnedSC) * 0.0167))}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Casual Leave (1.67%):</span><span>{formatCurrency(Math.round((scBreakdown.scBase ?? scBreakdown.earnedSC) * 0.0167))}</span></div>
+                  <Separator />
+                  <div className="flex justify-between font-bold"><span>TOTAL SC (20.00%):</span><span>{formatCurrency(scBreakdown.finalSC)}</span></div>
+                  <div className="text-[10px] text-amber-600 mt-1">⚠ Added to SC balance ledger — not deducted from net pay</div>
+                  {/* Per-project SC breakdown for multi-contract */}
+                  {scBreakdown.projectScDetails && scBreakdown.projectScDetails.length > 0 && (
+                    <>
+                      <Separator />
+                      <p className="font-semibold text-[10px] mt-1">Per-Project SC Breakdown</p>
+                      {scBreakdown.projectScDetails.map((psc: any, idx: number) => (
+                        <div key={idx} className="pl-2 border-l-2 border-muted space-y-0.5 mt-1">
+                          <div className="flex justify-between"><span className="text-muted-foreground">{psc.projectName}:</span><span>{formatCurrency(psc.projectSC)}</span></div>
+                          <div className="text-[10px] text-muted-foreground">SC Days: {psc.projectScEligDays} | Ratio: {(psc.projectRatio * 100).toFixed(2)}% | Base: {formatCurrency(psc.projectScBase)}</div>
+                        </div>
+                      ))}
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -2108,14 +2130,26 @@ export function PayrollIntegration() {
                                           if (!sc) return null
                                           return (
                                             <div className="p-2 rounded border bg-background">
-                                              <p className="text-[10px] font-semibold mb-1">SC Calculation</p>
-                                              <div className="grid grid-cols-5 gap-2 text-[10px]">
-                                                <div>Monthly: {formatCurrency(sc.monthlySC)}</div>
-                                                <div>Ratio: {(sc.workingRatio * 100).toFixed(1)}%</div>
-                                                <div>Earned: {formatCurrency(sc.earnedSC)}</div>
-                                                <div>Leave Ded: {formatCurrency(sc.leaveDeduction)}</div>
-                                                <div className="font-bold">Final: {formatCurrency(sc.finalSC)}</div>
+                                              <p className="text-[10px] font-semibold mb-1">Social Charges Calculation</p>
+                                              <div className="grid grid-cols-3 gap-2 text-[10px]">
+                                                <div>SC Eligible Days: {sc.scEligDays ?? '-'}</div>
+                                                <div>Leave (no SC): {sc.leaveDaysPaid ?? 0}</div>
+                                                <div>Ratio: {((sc.attendanceRatio ?? sc.workingRatio) * 100).toFixed(1)}%</div>
+                                                <div>SC Base: {formatCurrency(sc.scBase ?? sc.earnedSC)}</div>
+                                                <div>Monthly SC: {formatCurrency(sc.monthlySC)}</div>
+                                                <div className="font-bold">Final SC: {formatCurrency(sc.finalSC)}</div>
                                               </div>
+                                              <div className="text-[10px] text-amber-600 mt-1">⚠ Added to SC ledger — not deducted from net pay</div>
+                                              {sc.projectScDetails && sc.projectScDetails.length > 0 && (
+                                                <div className="mt-1 space-y-0.5">
+                                                  <p className="text-[9px] font-semibold">Per-Project:</p>
+                                                  {sc.projectScDetails.map((psc: any, i: number) => (
+                                                    <div key={i} className="text-[9px] text-muted-foreground">
+                                                      {psc.projectName}: {formatCurrency(psc.projectSC)} ({(psc.projectRatio * 100).toFixed(1)}%)
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              )}
                                             </div>
                                           )
                                         })()}

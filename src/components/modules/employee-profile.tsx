@@ -14,7 +14,7 @@ import { toast } from 'sonner'
 import {
   Eye, ChevronDown, ChevronRight, Calendar, MapPin, Landmark, Phone, Mail,
   Briefcase, Edit3, Upload, Plus, Loader2, Info, Search, Printer, Save,
-  FileText, File, Calculator, BarChart3, PieChart
+  FileText, File, Calculator, BarChart3, PieChart, AlertCircle
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 
@@ -97,6 +97,14 @@ interface PayrollResult {
   leaveDeduction: number
   finalSC: number
   scBalance: number
+  scEligDays?: number
+  leaveDaysPaid?: number
+  attendanceRatio?: number
+  scBase?: number
+  projectScDetails?: {
+    projectId: string; projectName: string; projectScEligDays: number
+    projectRatio: number; projectScBase: number; projectSC: number
+  }[]
   contractEarnings?: ContractEarningRow[]
   totalContractEarnings?: number
   scComponents: {
@@ -1222,22 +1230,45 @@ export function EmployeeProfile() {
             <div className="border-t border-slate-100 pt-3 space-y-3">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 <div className="bg-slate-50 rounded-lg p-2">
-                  <span className="text-slate-500">Eligible Days</span>
-                  <p className="font-semibold text-slate-900">{apiPayrollResult.eligibleDays}/{apiPayrollResult.daysInMonth}</p>
+                  <span className="text-slate-500">SC Eligible Days</span>
+                  <p className="font-semibold text-slate-900">{apiPayrollResult.scEligDays ?? apiPayrollResult.eligibleDays}/{apiPayrollResult.daysInMonth}</p>
                 </div>
                 <div className="bg-slate-50 rounded-lg p-2">
-                  <span className="text-slate-500">Working Ratio</span>
-                  <p className="font-semibold text-slate-900">{(apiPayrollResult.workingRatio * 100).toFixed(2)}%</p>
+                  <span className="text-slate-500">Attendance Ratio</span>
+                  <p className="font-semibold text-slate-900">{((apiPayrollResult.attendanceRatio ?? apiPayrollResult.workingRatio) * 100).toFixed(2)}%</p>
                 </div>
                 <div className="bg-slate-50 rounded-lg p-2">
-                  <span className="text-slate-500">Final SC Payable</span>
+                  <span className="text-slate-500">Final SC (to ledger)</span>
                   <p className="font-semibold text-emerald-600">{formatPKR(apiPayrollResult.finalSC)}</p>
                 </div>
                 <div className="bg-slate-50 rounded-lg p-2">
-                  <span className="text-slate-500">SC Balance (deferred)</span>
-                  <p className="font-semibold text-amber-600">{formatPKR(apiPayrollResult.scBalance)}</p>
+                  <span className="text-slate-500">SC Base (sal × ratio)</span>
+                  <p className="font-semibold text-amber-600">{formatPKR(apiPayrollResult.scBase ?? 0)}</p>
                 </div>
               </div>
+              {/* SC Details */}
+              {(apiPayrollResult.leaveDaysPaid > 0 || (apiPayrollResult.projectScDetails && apiPayrollResult.projectScDetails.length > 0)) && (
+                <div className="bg-amber-50 rounded-lg p-2 text-[10px] space-y-1">
+                  <div className="flex items-center gap-1 text-amber-700 font-semibold">
+                    <AlertCircle className="h-3 w-3"/>
+                    Social Charges: Leave days (SL/CL/EL) are paid but excluded from SC calculation
+                  </div>
+                  {apiPayrollResult.leaveDaysPaid > 0 && (
+                    <div className="text-amber-600">Leave days (no SC): {apiPayrollResult.leaveDaysPaid}</div>
+                  )}
+                  {apiPayrollResult.projectScDetails && apiPayrollResult.projectScDetails.length > 0 && (
+                    <div className="space-y-0.5 mt-1">
+                      <span className="font-semibold">Per-Project SC:</span>
+                      {apiPayrollResult.projectScDetails.map((psc: any, i: number) => (
+                        <div key={i} className="pl-2 text-amber-700">
+                          {psc.projectName}: {formatPKR(psc.projectSC)} ({(psc.projectRatio * 100).toFixed(1)}% × {formatPKR(psc.projectScBase)})
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="text-amber-600">⚠ Added to SC balance ledger — not deducted from net pay</div>
+                </div>
+              )}
               {/* Deductions summary */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 <div className="bg-slate-50 rounded-lg p-2">

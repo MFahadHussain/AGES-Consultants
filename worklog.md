@@ -48,3 +48,31 @@ Stage Summary:
 - Employee toggles interactive and saving to API
 - Print module generates salary slips with contract breakdown
 - All lint checks pass, dev server running on port 3000
+---
+Task ID: 1
+Agent: Main Agent
+Task: Apply two SC calculation fixes to payroll engine + update displays
+
+Work Log:
+- Read calculateMonthlyPayroll.ts (payroll engine), payroll.tsx (display), employee-profile.tsx (display)
+- Added PAID_STATUSES and SC_EARN_STATUSES status sets (FIX 1: SL/CL/EL paid but not SC eligible)
+- Updated LEAVE_STATUSES to include EL (was missing)
+- Replaced SC calculation section with attendance ratio formula (FIX 2: SC = monthlySalary × scEligDays/calendarDays × 20%)
+- Added per-project SC calculation for multi-contract employees
+- SC components now applied to scBase (not finalSC) — rates stay same (8.33/8.33/1.67/1.67)
+- Removed leaveDeduction from SC (leave days already excluded from ratio)
+- SC no longer deducted from net pay — goes to SC balance ledger
+- Updated FBR tax slabs from 2024-25 to 2025-26
+- Updated PayrollResult interface with new SC fields (scEligDays, leaveDaysPaid, attendanceRatio, scBase, projectScDetails)
+- Updated SC breakdown display in payroll.tsx line detail dialog and expanded row
+- Updated SC display in employee-profile.tsx with new fields and per-project breakdown
+- Added AlertCircle import to employee-profile.tsx
+- Verified: lint passes (0 errors), app responds 200, payroll calculation API works correctly
+
+Stage Summary:
+- Payroll engine v3.1 with SC Fix applied
+- SC calculation now uses attendance ratio (scEligDays/calendarDays)
+- Leave days (SL, CL, EL) are paid in salary but excluded from SC base
+- Multi-contract SC calculated per project using each project's monthly salary
+- FBR tax slabs updated to 2025-26 rates
+- All display components updated to show new SC breakdown format

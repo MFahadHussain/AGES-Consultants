@@ -1,5 +1,5 @@
 // ============================================================================
-// Payroll Calculation Engine v3.0 — Multi-Contract + YTD Tax
+// Payroll Calculation Engine v3.1 — Multi-Contract + YTD Tax + SC Fix
 // ============================================================================
 // CRITICAL RULES:
 //   1. This is a MULTI-CONTRACT payroll system, NOT multi-project allocation
@@ -10,6 +10,10 @@
 //   6. Social contributions (EOBI, ESSI, Gratuity, PF) are conditional on flags
 //   7. Fiscal year runs July to June (Pakistan)
 //   8. All PKR amounts must be integers (Math.round)
+//   9. SL, CL, EL are PAID (earn salary) but NOT SC eligible
+//  10. SC = monthlySalary × (scEligDays / calendarDays) × 20%
+//  11. SC is NOT deducted from net pay — goes to SC balance ledger
+//  12. For multi-contract, SC is calculated per project using that project's salary
 //
 // EXAMPLE (Assad Ali Khan):
 //   AGES HO contract:    Rs 265,000/mo, 10 days worked → 265,000/30 × 10 = 88,333
@@ -23,11 +27,20 @@ import { db } from '@/lib/db'
 
 // ── Status Classification ──────────────────────────────────────────────────
 
-/** Statuses eligible for salary + SC earning */
+/** Statuses that earn salary (paid days) — includes leave days */
+const PAID_STATUSES = new Set(['P', 'W', 'H', 'WH', 'T', 'CO', 'SL', 'EL', 'CL'])
+
+/** Statuses eligible for salary + SC earning (legacy compat) */
 const ELIGIBLE_STATUSES = new Set(['P', 'W', 'H', 'T', 'WH', 'WW', 'CL', 'SL', 'EL', 'HP'])
 
-/** Leave statuses that trigger SC deduction */
-const LEAVE_STATUSES = new Set(['CL', 'SL'])
+/** SC EARN statuses — leave days (SL, CL, EL) are PAID but do NOT earn SC */
+const SC_EARN_STATUSES = new Set(['P', 'W', 'H', 'WH', 'T', 'CO'])
+
+/** Leave statuses that are paid but NOT SC eligible */
+const LEAVE_STATUSES_PAID = new Set(['CL', 'SL', 'EL'])
+
+/** Leave statuses (legacy) */
+const LEAVE_STATUSES = new Set(['CL', 'SL', 'EL'])
 
 /** Paid non-billable statuses (salary continues, no project required) */
 const PAID_NON_BILLABLE = new Set(['W', 'HP', 'CL', 'SL', 'EL', 'T'])
@@ -46,7 +59,7 @@ const SC_COMPONENTS = {
   casualLeave:  0.0167, // 1.67%
 }
 
-// ── Pakistan FBR Tax Slabs 2024-25 (Salaried Persons) ──────────────────────
+// ── Pakistan FBR Tax Slabs 2025-26 (Salaried Persons) ──────────────────────
 
 interface TaxSlabEntry {
   min: number
@@ -55,13 +68,13 @@ interface TaxSlabEntry {
   rate: number // percentage on amount exceeding min
 }
 
-const FBR_TAX_SLABS_2024_25: TaxSlabEntry[] = [
+const FBR_TAX_SLABS_2025_26: TaxSlabEntry[] = [
   { min: 0,      max: 600000,   fixedTax: 0,      rate: 0   },
-  { min: 600001, max: 1200000,  fixedTax: 0,      rate: 5   },
-  { min: 1200001, max: 2200000, fixedTax: 60000,  rate: 15  },
-  { min: 2200001, max: 3200000, fixedTax: 210000, rate: 25  },
-  { min: 3200001, max: 4100000, fixedTax: 460000, rate: 30  },
-  { min: 4100001, max: null,    fixedTax: 730000, rate: 35  },
+  { min: 600001, max: 1200000,  fixedTax: 0,      rate: 1   },
+  { min: 1200001, max: 2200000, fixedTax: 6000,   rate: 11  },
+  { min: 2200001, max: 3200000, fixedTax: 116000, rate: 23  },
+  { min: 3200001, max: 4100000, fixedTax: 346000, rate: 30  },
+  { min: 4100001, max: null,    fixedTax: 616000, rate: 35  },
 ]
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -98,8 +111,8 @@ function getFiscalYear(date: Date): { fyStart: Date; fyEnd: Date; fyLabel: strin
  * Calculate annual tax using Pakistan FBR slabs.
  */
 function calculateFbrTax(annualIncome: number): { annualTax: number; slab: TaxSlabEntry; variableTax: number } {
-  let applicableSlab = FBR_TAX_SLABS_2024_25[0]
-  for (const slab of FBR_TAX_SLABS_2024_25) {
+  let applicableSlab = FBR_TAX_SLABS_2025_26[0]
+  for (const slab of FBR_TAX_SLABS_2025_26) {
     if (annualIncome >= slab.min && (slab.max === null || annualIncome <= slab.max)) {
       applicableSlab = slab
       break
@@ -194,12 +207,25 @@ export interface PayrollResult {
   leaveDeduction: number
   finalSC: number
   scBalance: number
+  scEligDays: number       // SC eligible days (excludes SL, CL, EL)
+  leaveDaysPaid: number   // Leave days paid in salary but NOT SC eligible
+  attendanceRatio: number // scEligDays / calendarDays
+  scBase: number          // monthlySalary × attendanceRatio
   scComponents: {
     otherPayable: number
     earnedLeave: number
     sickLeave: number
     casualLeave: number
   }
+  /** Per-project SC breakdown for multi-contract employees */
+  projectScDetails: {
+    projectId: string
+    projectName: string
+    projectScEligDays: number
+    projectRatio: number
+    projectScBase: number
+    projectSC: number
+  }[]
 
   // ── Project Allocations (backward compat — maps from contractEarnings) ──
   projectAllocations: ProjectAllocation[]
@@ -245,6 +271,18 @@ export interface PayrollResult {
     earnedSC: number
     leaveDeduction: number
     finalSC: number
+    scEligDays: number
+    leaveDaysPaid: number
+    attendanceRatio: number
+    scBase: number
+    projectScDetails: {
+      projectId: string
+      projectName: string
+      projectScEligDays: number
+      projectRatio: number
+      projectScBase: number
+      projectSC: number
+    }[]
   }
 }
 
@@ -308,6 +346,12 @@ export async function calculateMonthlyPayroll(
   const leaveDays = attendance.filter(a => LEAVE_STATUSES.has(a.status)).length
   const absentDays = attendance.filter(a => a.status === 'A' || a.status === 'CD').length
   const payableDays = calendarDays - absentDays
+
+  // FIX 1: Separate paid days and SC-eligible days
+  // SL, CL, EL are PAID (employee gets salary) but NOT SC eligible
+  const paidDaysCount = attendance.filter(a => PAID_STATUSES.has(a.status)).length
+  const scEligDays = attendance.filter(a => SC_EARN_STATUSES.has(a.status)).length
+  const leaveDaysPaid = attendance.filter(a => LEAVE_STATUSES_PAID.has(a.status)).length
 
   // ── 5. Fetch active project assignments (contracts) ──
   const projectAssignments = await db.employeeProjectAssignment.findMany({
@@ -551,32 +595,152 @@ export async function calculateMonthlyPayroll(
     ? roundPKR(totalContractEarnings / totalBillableDays)
     : roundPKR(employee.baseSalary / calendarDays)
 
-  // ── 7. SC Calculation ──
-  const workingRatio = calendarDays > 0 ? roundPKR((eligibleDays / calendarDays) * 10000) / 10000 : 0
-  const monthlySC = roundPKR(monthlySalary * SC_RATE)
-  const earnedSC = roundPKR(monthlySC * workingRatio)
-  const leaveDeduction = roundPKR(dailyRate * leaveDays)
-  const finalSC = Math.max(0, roundPKR(earnedSC - leaveDeduction))
-  const scBalance = leaveDeduction
+  // ── 7. SC Calculation (FIX 1 + FIX 2) ──
+  // FIX 1: SL, CL, EL are PAID but NOT SC eligible
+  // FIX 2: SC = monthlySalary × (scEligDays / calendarDays) × 20%
+  //         No leave deduction from SC — leave days already excluded from ratio
 
+  const attendanceRatio = calendarDays > 0 ? scEligDays / calendarDays : 0
+  const monthlySC = roundPKR(monthlySalary * SC_RATE) // Full 20% of salary (for reference)
+
+  let finalSC = 0
+  let scBase = 0
+  const projectScDetails: {
+    projectId: string
+    projectName: string
+    projectScEligDays: number
+    projectRatio: number
+    projectScBase: number
+    projectSC: number
+  }[] = []
+
+  if (projectAssignments.length > 0) {
+    // ── Multi-Contract SC: calculated per project using that project's monthly salary ──
+
+    // Count SC eligible billable days per project from AttendanceDailyProject
+    const projectScEligMap: Record<string, number> = {}
+    for (const dp of dailyProjects) {
+      if (SC_EARN_STATUSES.has(dp.status)) {
+        projectScEligMap[dp.projectId] = (projectScEligMap[dp.projectId] || 0) + 1
+      }
+    }
+
+    // Count global non-billable SC eligible days (W, H, T, etc. — no project link)
+    const totalBillableScDays = Object.values(projectScEligMap).reduce((s, v) => s + v, 0)
+    const nonBillableScDays = Math.max(0, scEligDays - totalBillableScDays)
+
+    for (const assignment of projectAssignments) {
+      const contractSalary = assignment.salaryAmount || employee.baseSalary
+      const projectBillableScDays = projectScEligMap[assignment.projectId] || 0
+
+      // Distribute non-billable SC days proportionally across projects
+      const projectNonBillableScShare = totalBillableScDays > 0
+        ? (nonBillableScDays * projectBillableScDays) / totalBillableScDays
+        : nonBillableScDays / projectAssignments.length
+
+      const projectScEligDaysVal = projectBillableScDays + projectNonBillableScShare
+      const projectRatio = calendarDays > 0 ? projectScEligDaysVal / calendarDays : 0
+      const projectScBaseVal = roundPKR(contractSalary * projectRatio)
+      const projectSCVal = roundPKR(projectScBaseVal * SC_RATE)
+
+      projectScDetails.push({
+        projectId: assignment.projectId,
+        projectName: assignment.project?.name || 'Unknown',
+        projectScEligDays: Math.round(projectScEligDaysVal),
+        projectRatio: Math.round(projectRatio * 10000) / 10000,
+        projectScBase: projectScBaseVal,
+        projectSC: projectSCVal,
+      })
+
+      finalSC += projectSCVal
+    }
+
+    // Handle orphan projects (attendance with no assignment) for SC
+    const assignedProjectIds = new Set(projectAssignments.map(a => a.projectId))
+    for (const [pId, billableScDays] of Object.entries(projectScEligMap)) {
+      if (!assignedProjectIds.has(pId)) {
+        const fallbackSalary = employee.baseSalary
+        const projectRatio = calendarDays > 0 ? billableScDays / calendarDays : 0
+        const projectScBaseVal = roundPKR(fallbackSalary * projectRatio)
+        const projectSCVal = roundPKR(projectScBaseVal * SC_RATE)
+
+        const proj = await db.project.findUnique({ where: { id: pId }, select: { name: true } })
+
+        projectScDetails.push({
+          projectId: pId,
+          projectName: proj?.name || 'Unknown',
+          projectScEligDays: billableScDays,
+          projectRatio: Math.round(projectRatio * 10000) / 10000,
+          projectScBase: projectScBaseVal,
+          projectSC: projectSCVal,
+        })
+
+        finalSC += projectSCVal
+      }
+    }
+
+    scBase = projectScDetails.reduce((s, p) => s + p.projectScBase, 0)
+
+  } else {
+    // ── Single-Salary SC: global attendance ratio ──
+    scBase = roundPKR(monthlySalary * attendanceRatio)
+    finalSC = roundPKR(scBase * SC_RATE)
+  }
+
+  // SC is NOT deducted from net pay — goes to SC balance ledger
+  const earnedSC = finalSC  // backward compat alias
+  const leaveDeduction = 0  // No longer deducted — leave already excluded from ratio
+  const scBalance = finalSC // Amount added to SC balance ledger this month
+  const workingRatio = attendanceRatio  // backward compat alias
+
+  // SC Components applied to scBase (8.33/8.33/1.67/1.67 = 20% of scBase)
   const scComponents = {
-    otherPayable: roundPKR(finalSC * SC_COMPONENTS.otherPayable),
-    earnedLeave:  roundPKR(finalSC * SC_COMPONENTS.earnedLeave),
-    sickLeave:    roundPKR(finalSC * SC_COMPONENTS.sickLeave),
-    casualLeave:  roundPKR(finalSC * SC_COMPONENTS.casualLeave),
+    otherPayable: roundPKR(scBase * SC_COMPONENTS.otherPayable),
+    earnedLeave:  roundPKR(scBase * SC_COMPONENTS.earnedLeave),
+    sickLeave:    roundPKR(scBase * SC_COMPONENTS.sickLeave),
+    casualLeave:  roundPKR(scBase * SC_COMPONENTS.casualLeave),
   }
 
   // ── 8. Distribute SC across contract earnings ──
-  const totalEarnedForScDist = contractEarnings.reduce((s, c) => s + c.earnedSalary, 0)
+  if (projectScDetails.length > 0) {
+    // Multi-contract: each project has its own SC calculated above
+    // Map project SC details to contract earnings
+    const projectScMap = new Map(projectScDetails.map(p => [p.projectId, p]))
 
-  for (const ce of contractEarnings) {
-    const salaryWeight = totalEarnedForScDist > 0 ? ce.earnedSalary / totalEarnedForScDist : 0
-    ce.scShare = roundPKR(finalSC * salaryWeight)
-    ce.scBalance = roundPKR(scBalance * salaryWeight)
-    ce.scOtherPayable = roundPKR(scComponents.otherPayable * salaryWeight)
-    ce.scEarnedLeave = roundPKR(scComponents.earnedLeave * salaryWeight)
-    ce.scSickLeave = roundPKR(scComponents.sickLeave * salaryWeight)
-    ce.scCasualLeave = roundPKR(scComponents.casualLeave * salaryWeight)
+    for (const ce of contractEarnings) {
+      const psc = projectScMap.get(ce.projectId)
+      if (psc) {
+        // Per-project SC components
+        const pScBase = psc.projectScBase
+        ce.scShare = psc.projectSC
+        ce.scBalance = psc.projectSC   // Added to SC ledger
+        ce.scOtherPayable = roundPKR(pScBase * SC_COMPONENTS.otherPayable)
+        ce.scEarnedLeave = roundPKR(pScBase * SC_COMPONENTS.earnedLeave)
+        ce.scSickLeave = roundPKR(pScBase * SC_COMPONENTS.sickLeave)
+        ce.scCasualLeave = roundPKR(pScBase * SC_COMPONENTS.casualLeave)
+      } else {
+        // Fallback: distribute proportionally
+        const salaryWeight = totalContractEarnings > 0 ? ce.earnedSalary / totalContractEarnings : 0
+        ce.scShare = roundPKR(finalSC * salaryWeight)
+        ce.scBalance = roundPKR(scBalance * salaryWeight)
+        ce.scOtherPayable = roundPKR(scComponents.otherPayable * salaryWeight)
+        ce.scEarnedLeave = roundPKR(scComponents.earnedLeave * salaryWeight)
+        ce.scSickLeave = roundPKR(scComponents.sickLeave * salaryWeight)
+        ce.scCasualLeave = roundPKR(scComponents.casualLeave * salaryWeight)
+      }
+    }
+  } else {
+    // Single-salary: distribute proportionally by earned salary
+    const totalEarnedForScDist = contractEarnings.reduce((s, c) => s + c.earnedSalary, 0)
+    for (const ce of contractEarnings) {
+      const salaryWeight = totalEarnedForScDist > 0 ? ce.earnedSalary / totalEarnedForScDist : 0
+      ce.scShare = roundPKR(finalSC * salaryWeight)
+      ce.scBalance = roundPKR(scBalance * salaryWeight)
+      ce.scOtherPayable = roundPKR(scComponents.otherPayable * salaryWeight)
+      ce.scEarnedLeave = roundPKR(scComponents.earnedLeave * salaryWeight)
+      ce.scSickLeave = roundPKR(scComponents.sickLeave * salaryWeight)
+      ce.scCasualLeave = roundPKR(scComponents.casualLeave * salaryWeight)
+    }
   }
 
   // ── 9. Build projectAllocations (backward compat) from contractEarnings ──
@@ -862,7 +1026,12 @@ export async function calculateMonthlyPayroll(
     leaveDeduction,
     finalSC,
     scBalance,
+    scEligDays,
+    leaveDaysPaid,
+    attendanceRatio,
+    scBase,
     scComponents,
+    projectScDetails,
     projectAllocations,
     totalBillableDays,
     allowances: {
@@ -894,6 +1063,11 @@ export async function calculateMonthlyPayroll(
       earnedSC,
       leaveDeduction,
       finalSC,
+      scEligDays,
+      leaveDaysPaid,
+      attendanceRatio,
+      scBase,
+      projectScDetails,
     },
   }
 }
