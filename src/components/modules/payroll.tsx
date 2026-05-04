@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, Fragment } from 'react'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,7 +16,8 @@ import { Separator } from '@/components/ui/separator'
 import {
   Banknote, ArrowRight, CheckCircle, Plus, Pencil, Trash2, Users,
   ChevronDown, ChevronUp, Play, Send, Shield, BookOpen, Loader2,
-  TrendingDown, TrendingUp, Building2, Receipt, AlertCircle, Eye
+  TrendingDown, TrendingUp, Building2, Receipt, AlertCircle, Eye,
+  FileText
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/lib/store'
@@ -34,6 +36,12 @@ const statusStyles: Record<string, string> = {
   reviewed: 'bg-sky-100 text-sky-800 border-sky-200',
   approved: 'bg-emerald-100 text-emerald-800 border-emerald-200',
   posted: 'bg-purple-100 text-purple-800 border-purple-200',
+  'draft-to-gl': 'bg-violet-100 text-violet-800 border-violet-200',
+}
+
+const lineStatusStyles: Record<string, string> = {
+  draft: 'bg-amber-100 text-amber-800 border-amber-200',
+  approved: 'bg-emerald-100 text-emerald-800 border-emerald-200',
 }
 
 const statusLabels: Record<string, string> = {
@@ -41,10 +49,11 @@ const statusLabels: Record<string, string> = {
   reviewed: 'Reviewed',
   approved: 'Approved',
   posted: 'Posted to GL',
+  'draft-to-gl': 'Draft to GL',
 }
 
 // Workflow steps
-const workflowSteps = ['draft', 'reviewed', 'approved', 'posted']
+const workflowSteps = ['draft', 'reviewed', 'approved', 'draft-to-gl']
 
 // Line form interface
 interface PayrollLineForm {
@@ -144,6 +153,11 @@ export function PayrollIntegration() {
   const [voucherPosted, setVoucherPosted] = useState(false)
   const [showJournalEntries, setShowJournalEntries] = useState(false)
   const [postConfirmOpen, setPostConfirmOpen] = useState(false)
+
+  // Line selection state (Task 4)
+  const [selectedLineIds, setSelectedLineIds] = useState<Set<string>>(new Set())
+  const [draftToGLDialogOpen, setDraftToGLDialogOpen] = useState(false)
+  const [processingAction, setProcessingAction] = useState<string | null>(null)
 
   // Create batch form
   const [batchForm, setBatchForm] = useState({
@@ -361,6 +375,98 @@ export function PayrollIntegration() {
       fetchData()
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Task 4: Line-level approve and Draft to GL handlers
+  // ----------------------------------------------------------
+  const toggleLineSelection = (lineId: string) => {
+    setSelectedLineIds(prev => {
+      const next = new Set(prev)
+      if (next.has(lineId)) next.delete(lineId)
+      else next.add(lineId)
+      return next
+    })
+  }
+
+  const toggleSelectAllLines = (batch: any) => {
+    const lineIds = (batch.lines || []).map((l: any) => l.id)
+    const allSelected = lineIds.length > 0 && lineIds.every((id: string) => selectedLineIds.has(id))
+    if (allSelected) {
+      setSelectedLineIds(new Set())
+    } else {
+      setSelectedLineIds(new Set(lineIds))
+    }
+  }
+
+  const handleApproveSelectedLines = async () => {
+    if (selectedLineIds.size === 0) {
+      toast({ title: 'Error', description: 'No lines selected', variant: 'destructive' })
+      return
+    }
+    setProcessingAction('approve-line')
+    try {
+      const res = await fetch('/api/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve-line', lineIds: Array.from(selectedLineIds) }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Failed')
+      toast({ title: 'Approved', description: `${selectedLineIds.size} line(s) approved` })
+      setSelectedLineIds(new Set())
+      fetchData()
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    } finally {
+      setProcessingAction(null)
+    }
+  }
+
+  const handleApproveAllLines = async (batchId: string) => {
+    setProcessingAction('approve-all-lines')
+    try {
+      const res = await fetch('/api/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve-all-lines', batchId }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Failed')
+      toast({ title: 'Approved', description: result.message || 'All lines approved' })
+      fetchData()
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    } finally {
+      setProcessingAction(null)
+    }
+  }
+
+  const handleDraftToGL = async (lineIds?: string[]) => {
+    setProcessingAction('draft-to-gl')
+    try {
+      const body: any = { action: 'draft-to-gl' }
+      if (selectedBatch) body.batchId = selectedBatch.id
+      if (lineIds && lineIds.length > 0) body.lineIds = lineIds
+      const fy = financialYears.find((f: any) => f.status === 'open')
+      if (fy) body.financialYearId = fy.id
+
+      const res = await fetch('/api/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Failed')
+      toast({ title: 'Draft Voucher Created', description: result.message || 'Approved lines posted to GL as draft voucher' })
+      setDraftToGLDialogOpen(false)
+      setSelectedLineIds(new Set())
+      fetchData()
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    } finally {
+      setProcessingAction(null)
     }
   }
 
@@ -722,11 +828,41 @@ export function PayrollIntegration() {
             <DialogTitle className="text-sm flex items-center gap-2">
               <Eye className="h-4 w-4" />
               {selectedLine.employeeName} — {selectedLine.employeeCode}
+              <Badge className={`text-[9px] border ml-2 ${lineStatusStyles[selectedLine.lineStatus || 'draft']}`}>
+                {selectedLine.lineStatus === 'approved' ? 'Approved' : 'Draft'}
+              </Badge>
             </DialogTitle>
             <DialogDescription className="text-xs">Detailed payroll breakdown</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Line Status & Compliance Indicators */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge className={`text-[10px] border ${lineStatusStyles[selectedLine.lineStatus || 'draft']}`}>
+                Line: {selectedLine.lineStatus === 'approved' ? 'Approved' : 'Draft'}
+              </Badge>
+              {selectedLine.eobiEmployee > 0 && (
+                <Badge className="text-[10px] bg-sky-50 text-sky-700 border border-sky-200">
+                  <Shield className="h-3 w-3 mr-1" />EOBI: Active
+                </Badge>
+              )}
+              {selectedLine.pfEmployee > 0 && (
+                <Badge className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  <Building2 className="h-3 w-3 mr-1" />PF: Active
+                </Badge>
+              )}
+              {selectedLine.incomeTax > 0 && (
+                <Badge className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200">
+                  <Receipt className="h-3 w-3 mr-1" />Income Tax: Deducted
+                </Badge>
+              )}
+              {selectedLine.eobiEmployee === 0 && selectedLine.pfEmployee === 0 && selectedLine.incomeTax === 0 && (
+                <Badge className="text-[10px] bg-muted text-muted-foreground border">
+                  No statutory deductions
+                </Badge>
+              )}
+            </div>
+
             {/* Attendance */}
             <div>
               <p className="text-xs font-semibold mb-2">Attendance</p>
@@ -1536,6 +1672,10 @@ export function PayrollIntegration() {
                       {isRunning ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Play className="h-3 w-3 mr-1" />}
                       {isRunning ? 'Processing...' : 'Run Payroll'}
                     </Button>
+                    <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleApproveAllLines(batch.id)} disabled={processingAction === 'approve-all-lines'}>
+                      {processingAction === 'approve-all-lines' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Shield className="h-3 w-3 mr-1" />}
+                      Approve All
+                    </Button>
                     <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => openAddLineDialog(batch)}>
                       <Plus className="h-3 w-3 mr-1" />Add Line
                     </Button>
@@ -1554,15 +1694,29 @@ export function PayrollIntegration() {
                     <Button size="sm" className="h-7 text-[10px]" onClick={() => handleWorkflowAction('approve', batch.id)}>
                       <Shield className="h-3 w-3 mr-1" />Approve
                     </Button>
+                    <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleApproveAllLines(batch.id)} disabled={processingAction === 'approve-all-lines'}>
+                      {processingAction === 'approve-all-lines' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Shield className="h-3 w-3 mr-1" />}
+                      Approve All Lines
+                    </Button>
                     <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleWorkflowAction('send-back', batch.id)}>
                       <ArrowRight className="h-3 w-3 mr-1 rotate-180" />Send Back
                     </Button>
                   </>
                 )}
                 {batch.status === 'approved' && (
-                  <Button size="sm" className="h-7 text-[10px]" onClick={() => { setSelectedBatch(batch); setPostDialogOpen(true) }}>
-                    <BookOpen className="h-3 w-3 mr-1" />Post to GL
-                  </Button>
+                  <>
+                    <Button size="sm" className="h-7 text-[10px]" onClick={() => { setSelectedBatch(batch); setPostDialogOpen(true) }}>
+                      <BookOpen className="h-3 w-3 mr-1" />Post to GL
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => { setSelectedBatch(batch); setDraftToGLDialogOpen(true) }}>
+                      <FileText className="h-3 w-3 mr-1" />Draft to GL
+                    </Button>
+                  </>
+                )}
+                {batch.status === 'draft-to-gl' && (
+                  <Badge className="text-[10px] bg-violet-100 text-violet-800 border border-violet-200">
+                    <FileText className="h-3 w-3 mr-1" />Draft Voucher Created
+                  </Badge>
                 )}
                 {batch.status === 'posted' && (
                   <Badge className="text-[10px] bg-purple-100 text-purple-800 border border-purple-200">
@@ -1597,13 +1751,67 @@ export function PayrollIntegration() {
 
                 {/* Employee Lines Table */}
                 {batch.lines?.length > 0 ? (
-                  <ScrollArea className="w-full">
-                    <div className="min-w-[1200px]">
+                  <>
+                    {/* Bulk Action Toolbar */}
+                    <div className="flex items-center gap-2 mb-3 p-2 rounded-lg bg-muted/30 border flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={batch.lines.length > 0 && batch.lines.every((l: any) => selectedLineIds.has(l.id))}
+                          onCheckedChange={() => toggleSelectAllLines(batch)}
+                          className="h-4 w-4"
+                        />
+                        <span className="text-[10px] font-medium text-muted-foreground">
+                          {selectedLineIds.size > 0
+                            ? `${selectedLineIds.size} of ${batch.lines.length} selected`
+                            : 'Select All'}
+                        </span>
+                      </div>
+                      {selectedLineIds.size > 0 && (
+                        <>
+                          <Separator orientation="vertical" className="h-5" />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-[10px]"
+                            onClick={handleApproveSelectedLines}
+                            disabled={processingAction === 'approve-line'}
+                          >
+                            {processingAction === 'approve-line' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Shield className="h-3 w-3 mr-1" />}
+                            Approve Selected
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-[10px]"
+                            onClick={() => handleDraftToGL(Array.from(selectedLineIds))}
+                            disabled={processingAction === 'draft-to-gl'}
+                          >
+                            {processingAction === 'draft-to-gl' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <FileText className="h-3 w-3 mr-1" />}
+                            Draft Selected to GL
+                          </Button>
+                        </>
+                      )}
+                      {selectedLineIds.size > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-[10px] text-muted-foreground ml-auto"
+                          onClick={() => setSelectedLineIds(new Set())}
+                        >
+                          Clear Selection
+                        </Button>
+                      )}
+                    </div>
+
+                    <ScrollArea className="w-full">
+                    <div className="min-w-[1300px]">
                       <Table>
                         <TableHeader>
                           <TableRow>
+                            <TableHead className="text-[10px] w-10">Sel.</TableHead>
                             <TableHead className="text-[10px] w-8"></TableHead>
                             <TableHead className="text-[10px]">Employee</TableHead>
+                            <TableHead className="text-[10px]">Status</TableHead>
                             <TableHead className="text-[10px]">Code</TableHead>
                             <TableHead className="text-[10px] text-center">Work</TableHead>
                             <TableHead className="text-[10px] text-center">Elig</TableHead>
@@ -1625,13 +1833,26 @@ export function PayrollIntegration() {
                         <TableBody>
                           {batch.lines.map((line: any) => {
                             const isLineExpanded = expandedLine === line.id
+                            const lineStatus = line.lineStatus || 'draft'
                             return (
                               <Fragment key={line.id}>
-                                <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => setExpandedLine(isLineExpanded ? null : line.id)}>
+                                <TableRow className={`cursor-pointer hover:bg-muted/50 ${selectedLineIds.has(line.id) ? 'bg-primary/5' : ''}`} onClick={() => setExpandedLine(isLineExpanded ? null : line.id)}>
+                                  <TableCell className="py-1.5" onClick={(e) => e.stopPropagation()}>
+                                    <Checkbox
+                                      checked={selectedLineIds.has(line.id)}
+                                      onCheckedChange={() => toggleLineSelection(line.id)}
+                                      className="h-4 w-4"
+                                    />
+                                  </TableCell>
                                   <TableCell className="py-1.5">
                                     {isLineExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
                                   </TableCell>
                                   <TableCell className="text-xs py-1.5 font-medium">{line.employeeName}</TableCell>
+                                  <TableCell className="py-1.5">
+                                    <Badge className={`text-[9px] border px-1.5 py-0 ${lineStatusStyles[lineStatus] || 'bg-muted text-muted-foreground'}`}>
+                                      {lineStatus === 'approved' ? 'Approved' : 'Draft'}
+                                    </Badge>
+                                  </TableCell>
                                   <TableCell className="text-xs py-1.5 text-muted-foreground">{line.employeeCode || '-'}</TableCell>
                                   <TableCell className="text-xs py-1.5 text-center">{line.workingDays}</TableCell>
                                   <TableCell className="text-xs py-1.5 text-center">{line.eligibleDays}</TableCell>
@@ -1663,7 +1884,7 @@ export function PayrollIntegration() {
                                 {/* Expanded Line Detail */}
                                 {isLineExpanded && (
                                   <TableRow>
-                                    <TableCell colSpan={batch.status === 'draft' ? 18 : 17} className="p-0">
+                                    <TableCell colSpan={batch.status === 'draft' ? 21 : 20} className="p-0">
                                       <div className="p-4 bg-muted/20 space-y-3">
                                         {/* Quick Detail Row */}
                                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
@@ -1760,6 +1981,7 @@ export function PayrollIntegration() {
                       </Table>
                     </div>
                   </ScrollArea>
+                  </>
                 ) : (
                   <div className="text-center py-8">
                     <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
@@ -1900,6 +2122,42 @@ export function PayrollIntegration() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmPostVoucher}>Confirm Post</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Draft to GL Confirmation Dialog (Task 4) */}
+      <AlertDialog open={draftToGLDialogOpen} onOpenChange={setDraftToGLDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-sm flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Draft to General Ledger
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs">
+              This will create a <strong>draft voucher</strong> in the General Ledger from the approved lines in batch &ldquo;{selectedBatch?.name || selectedBatch?.batchNumber}&rdquo;. The draft voucher can be reviewed and posted later from the GL module.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {selectedBatch && (
+            <div className="p-3 rounded-lg bg-muted/50 space-y-1 text-xs">
+              <div className="flex justify-between"><span className="text-muted-foreground">Batch:</span><strong>{selectedBatch.name || selectedBatch.batchNumber}</strong></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Period:</span><strong>{selectedBatch.period}</strong></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Total Lines:</span><strong>{selectedBatch.lines?.length || 0}</strong></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Net Pay:</span><strong className="text-green-600">{formatCurrency(selectedBatch.totalNetPay)}</strong></div>
+            </div>
+          )}
+          <div className="flex items-start gap-2 p-2 rounded bg-violet-50 border border-violet-200">
+            <AlertCircle className="h-4 w-4 text-violet-600 shrink-0 mt-0.5" />
+            <p className="text-[10px] text-violet-800">
+              A draft voucher will be created with journal entries for salary expenses, deductions, and employer charges. You can review and finalize it in the General Ledger module.
+            </p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleDraftToGL()} disabled={processingAction === 'draft-to-gl'}>
+              {processingAction === 'draft-to-gl' ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <FileText className="h-3.5 w-3.5 mr-1" />}
+              Create Draft Voucher
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

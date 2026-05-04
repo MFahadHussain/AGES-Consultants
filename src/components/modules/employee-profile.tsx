@@ -21,11 +21,13 @@ import { useAppStore } from '@/lib/store'
 // ── TYPES ───────────────────────────────────────────────────────────────
 
 interface EmployeeData {
-  id: string; name: string; designation: string; department: string
-  joinDate: string; location: string; bank: string; phone: string; email: string
-  contractType: string; monthlySalary: number; workingDays: number
+  id: string; name: string; designation: string | null; department: string | null
+  joinDate: string | null; location: string | null; bank: string | null; phone: string | null; email: string | null
+  contractType: string | null; monthlySalary: number; workingDays: number
   scRate: number; taxRate: number; status: string; projects: string[]
   loanEMI: number; advanceBalance: number
+  eobiEnabled: boolean; pfEnabled: boolean; incomeTaxEnabled: boolean
+  employeeCode: string; baseSalary: number; cnic: string
 }
 
 interface AttEntry { status: string; project: string | null }
@@ -91,110 +93,49 @@ interface PayrollResult {
     scOtherPayable: number; scEarnedLeave: number; scSickLeave: number; scCasualLeave: number
   }[]
   totalBillableDays: number
+  deductions: {
+    incomeTax: number; eobiEmployee: number; eobiEmployer: number
+    pfEmployee: number; pfEmployer: number; loanDeduction: number
+    advanceDeduction: number; otherDeductions: number; totalDeductions: number
+  }
+  grossSalary: number
+  netPay: number
+  gratuity: number
+  allowances: { details: { name: string; amount: number }[]; totalAllowances: number }
+}
+
+// Attendance API response type
+interface AttendanceCalendarEntry {
+  date: string; day: number; dayOfWeek: number
+  record: { id: string; status: string; projectId: string | null } | null
+  dailyProject: { projectId: string; project: { id: string; code: string; name: string }; status: string } | null
+  statusLabel: string | null; scCategory: string | null
+  isBillable: boolean; needsProject: boolean
+}
+
+interface AttendanceMonthlyResponse {
+  employeeId: string; month: string; totalDays: number
+  presentDays: number; absentDays: number; leaveDays: number
+  earnedSC: number; deductedSC: number; netSC: number
+  calendar: AttendanceCalendarEntry[]
 }
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────
-
-const EMPLOYEES: EmployeeData[] = [
-  { id:'EMP-0001', name:'Ahmed Khan', designation:'Senior Accountant', department:'Finance', joinDate:'2021-03-15', location:'Peshawar HQ', bank:'HBL ****4521', phone:'+92-301-1234567', email:'ahmed.khan@acctfin.com', contractType:'Permanent', monthlySalary:85000, workingDays:26, scRate:0.20, taxRate:0.05, status:'Active', projects:['BTHPP','AGES HO'], loanEMI:5556, advanceBalance:5000 },
-  { id:'EMP-0002', name:'Fatima Ali', designation:'HR Manager', department:'HR', joinDate:'2020-07-01', location:'Peshawar HQ', bank:'MCB ****8834', phone:'+92-333-9876543', email:'fatima.ali@acctfin.com', contractType:'Permanent', monthlySalary:95000, workingDays:26, scRate:0.20, taxRate:0.05, status:'Active', projects:['BTHPP'], loanEMI:0, advanceBalance:0 },
-  { id:'EMP-0003', name:'Muhammad Raza', designation:'Junior Accountant', department:'Finance', joinDate:'2023-01-10', location:'Islamabad Office', bank:'UBL ****2210', phone:'+92-300-1122334', email:'m.raza@acctfin.com', contractType:'Contract', monthlySalary:55000, workingDays:26, scRate:0.20, taxRate:0.0, status:'Active', projects:['AGES HO'], loanEMI:0, advanceBalance:10000 },
-  { id:'EMP-0004', name:'Sara Ahmed', designation:'Finance Analyst', department:'Finance', joinDate:'2022-05-20', location:'Peshawar HQ', bank:'Allied ****6678', phone:'+92-321-5544332', email:'sara.ahmed@acctfin.com', contractType:'Permanent', monthlySalary:75000, workingDays:26, scRate:0.20, taxRate:0.05, status:'Active', projects:['BTHPP'], loanEMI:3000, advanceBalance:0 },
-  { id:'EMP-0005', name:'Ali Hassan', designation:'Payroll Officer', department:'HR', joinDate:'2019-11-05', location:'Peshawar HQ', bank:'HBL ****9901', phone:'+92-345-6677889', email:'ali.hassan@acctfin.com', contractType:'Permanent', monthlySalary:70000, workingDays:26, scRate:0.20, taxRate:0.05, status:'Active', projects:['BTHPP','AGES HO','Proj Alpha'], loanEMI:0, advanceBalance:0 },
-]
-
-const ATT_MAY_2026: Record<string, Record<number, AttEntry>> = {
-  'EMP-0001': {
-    1:{status:'P',project:'BTHPP'},2:{status:'W',project:'BTHPP'},3:{status:'W',project:'BTHPP'},
-    4:{status:'P',project:'AGES HO'},5:{status:'P',project:'AGES HO'},6:{status:'P',project:'BTHPP'},
-    7:{status:'P',project:'BTHPP'},8:{status:'P',project:'BTHPP'},9:{status:'SL',project:null},
-    10:{status:'SL',project:null},11:{status:'P',project:'AGES HO'},12:{status:'CL',project:null},
-    13:{status:'P',project:'BTHPP'},14:{status:'P',project:'BTHPP'},15:{status:'P',project:'AGES HO'},
-    16:{status:'W',project:'BTHPP'},17:{status:'W',project:'AGES HO'},18:{status:'P',project:'BTHPP'},
-    19:{status:'P',project:'BTHPP'},20:{status:'A',project:null},21:{status:'P',project:'AGES HO'},
-    22:{status:'P',project:'BTHPP'},23:{status:'W',project:'AGES HO'},24:{status:'W',project:'BTHPP'},
-    25:{status:'P',project:'BTHPP'},26:{status:'P',project:'AGES HO'},27:{status:'P',project:'BTHPP'},
-    28:{status:'P',project:'BTHPP'},29:{status:'EL',project:null},30:{status:'P',project:'BTHPP'},
-    31:{status:'P',project:'BTHPP'}
-  },
-  'EMP-0002': {
-    1:{status:'P',project:'BTHPP'},2:{status:'W',project:'BTHPP'},3:{status:'CO',project:null},
-    4:{status:'P',project:'BTHPP'},5:{status:'P',project:'BTHPP'},6:{status:'P',project:'BTHPP'},
-    7:{status:'P',project:'BTHPP'},8:{status:'P',project:'BTHPP'},9:{status:'W',project:'BTHPP'},10:{status:'CO',project:null},
-    11:{status:'P',project:'BTHPP'},12:{status:'CL',project:null},13:{status:'P',project:'BTHPP'},
-    14:{status:'P',project:'BTHPP'},15:{status:'P',project:'BTHPP'},16:{status:'W',project:'BTHPP'},17:{status:'CO',project:null},
-    18:{status:'P',project:'BTHPP'},19:{status:'P',project:'BTHPP'},20:{status:'P',project:'BTHPP'},
-    21:{status:'P',project:'BTHPP'},22:{status:'P',project:'BTHPP'},23:{status:'CO',project:null},24:{status:'CO',project:null},
-    25:{status:'P',project:'BTHPP'},26:{status:'P',project:'BTHPP'},27:{status:'SL',project:null},
-    28:{status:'P',project:'BTHPP'},29:{status:'P',project:'BTHPP'},30:{status:'W',project:'BTHPP'},31:{status:'CO',project:null}
-  },
-  'EMP-0003': {
-    1:{status:'P',project:'AGES HO'},2:{status:'CO',project:null},3:{status:'CO',project:null},
-    4:{status:'P',project:'AGES HO'},5:{status:'P',project:'AGES HO'},6:{status:'CL',project:null},
-    7:{status:'P',project:'AGES HO'},8:{status:'P',project:'AGES HO'},9:{status:'CO',project:null},10:{status:'CO',project:null},
-    11:{status:'P',project:'AGES HO'},12:{status:'P',project:'AGES HO'},13:{status:'A',project:null},
-    14:{status:'P',project:'AGES HO'},15:{status:'P',project:'AGES HO'},16:{status:'W',project:'AGES HO'},17:{status:'CO',project:null},
-    18:{status:'P',project:'AGES HO'},19:{status:'P',project:'AGES HO'},20:{status:'A',project:null},
-    21:{status:'P',project:'AGES HO'},22:{status:'P',project:'AGES HO'},23:{status:'CO',project:null},24:{status:'CO',project:null},
-    25:{status:'P',project:'AGES HO'},26:{status:'P',project:'AGES HO'},27:{status:'SL',project:null},
-    28:{status:'P',project:'AGES HO'},29:{status:'P',project:'AGES HO'},30:{status:'CO',project:null},31:{status:'CO',project:null}
-  },
-  'EMP-0004': {
-    1:{status:'P',project:'BTHPP'},2:{status:'W',project:'BTHPP'},3:{status:'CO',project:null},
-    4:{status:'P',project:'BTHPP'},5:{status:'P',project:'BTHPP'},6:{status:'P',project:'BTHPP'},
-    7:{status:'P',project:'BTHPP'},8:{status:'P',project:'BTHPP'},9:{status:'SL',project:null},10:{status:'CO',project:null},
-    11:{status:'P',project:'BTHPP'},12:{status:'P',project:'BTHPP'},13:{status:'P',project:'BTHPP'},
-    14:{status:'P',project:'BTHPP'},15:{status:'P',project:'BTHPP'},16:{status:'W',project:'BTHPP'},17:{status:'W',project:'BTHPP'},
-    18:{status:'P',project:'BTHPP'},19:{status:'P',project:'BTHPP'},20:{status:'P',project:'BTHPP'},
-    21:{status:'P',project:'BTHPP'},22:{status:'P',project:'BTHPP'},23:{status:'CO',project:null},24:{status:'CO',project:null},
-    25:{status:'P',project:'BTHPP'},26:{status:'P',project:'BTHPP'},27:{status:'P',project:'BTHPP'},
-    28:{status:'CL',project:null},29:{status:'P',project:'BTHPP'},30:{status:'W',project:'BTHPP'},31:{status:'CO',project:null}
-  },
-  'EMP-0005': {
-    1:{status:'P',project:'BTHPP'},2:{status:'W',project:'AGES HO'},3:{status:'W',project:'BTHPP'},
-    4:{status:'P',project:'Proj Alpha'},5:{status:'P',project:'BTHPP'},6:{status:'P',project:'AGES HO'},
-    7:{status:'P',project:'BTHPP'},8:{status:'P',project:'Proj Alpha'},9:{status:'W',project:'BTHPP'},10:{status:'CO',project:null},
-    11:{status:'P',project:'AGES HO'},12:{status:'P',project:'BTHPP'},13:{status:'P',project:'Proj Alpha'},
-    14:{status:'P',project:'BTHPP'},15:{status:'P',project:'AGES HO'},16:{status:'W',project:'BTHPP'},17:{status:'W',project:'Proj Alpha'},
-    18:{status:'P',project:'BTHPP'},19:{status:'P',project:'AGES HO'},20:{status:'P',project:'BTHPP'},
-    21:{status:'P',project:'Proj Alpha'},22:{status:'P',project:'BTHPP'},23:{status:'W',project:'AGES HO'},24:{status:'W',project:'BTHPP'},
-    25:{status:'P',project:'AGES HO'},26:{status:'P',project:'BTHPP'},27:{status:'P',project:'Proj Alpha'},
-    28:{status:'P',project:'BTHPP'},29:{status:'P',project:'AGES HO'},30:{status:'W',project:'BTHPP'},31:{status:'CO',project:null}
-  },
-}
-
-const DEFAULT_DOCS: DocData[] = [
-  { id:1, name:'CNIC', type:'pdf', uploaded:'2021-03-15', size:'234 KB' },
-  { id:2, name:'Employment Contract', type:'pdf', uploaded:'2021-03-15', size:'412 KB' },
-  { id:3, name:'Offer Letter', type:'pdf', uploaded:'2021-03-14', size:'189 KB' },
-  { id:4, name:'Tax Certificate', type:'pdf', uploaded:'2026-01-10', size:'156 KB' },
-  { id:5, name:'Experience Letter', type:'pdf', uploaded:'2021-03-01', size:'201 KB' },
-  { id:6, name:'Payslips Archive', type:'zip', uploaded:'2026-05-01', size:'1.2 MB' },
-]
-
-const MONTHS = ['2025-12','2026-01','2026-02','2026-03','2026-04','2026-05']
-const WD_PER_MONTH: Record<string,number> = {'2025-12':26,'2026-01':26,'2026-02':24,'2026-03':26,'2026-04':26,'2026-05':26}
-
-const MONTHLY_ATT: Record<string,{present:number;absent:number;leave:number}[]> = {
-  'EMP-0001': [{present:22,absent:2,leave:2},{present:24,absent:0,leave:2},{present:21,absent:2,leave:1},{present:23,absent:1,leave:2},{present:24,absent:0,leave:2}],
-  'EMP-0002': [{present:24,absent:0,leave:2},{present:23,absent:1,leave:2},{present:22,absent:0,leave:2},{present:24,absent:1,leave:1},{present:24,absent:0,leave:2}],
-  'EMP-0003': [{present:22,absent:3,leave:1},{present:23,absent:2,leave:1},{present:20,absent:2,leave:2},{present:22,absent:2,leave:2},{present:23,absent:1,leave:2}],
-  'EMP-0004': [{present:24,absent:1,leave:1},{present:24,absent:0,leave:2},{present:22,absent:1,leave:1},{present:23,absent:1,leave:2},{present:25,absent:0,leave:1}],
-  'EMP-0005': [{present:24,absent:0,leave:2},{present:23,absent:1,leave:2},{present:22,absent:0,leave:2},{present:24,absent:1,leave:1},{present:24,absent:0,leave:2}],
-}
 
 const PROJECT_COLORS = ['bg-blue-50 text-blue-700','bg-emerald-50 text-emerald-700','bg-purple-50 text-purple-700']
 const PROJECT_BAR_COLORS = ['bg-blue-500','bg-emerald-500','bg-purple-500','bg-amber-500','bg-rose-500']
 
 const STATUS_LABELS: Record<string,string> = {
   P:'Present',W:'Weekend Working',H:'Holiday Working',SL:'Sick Leave',
-  CL:'Casual Leave',EL:'Earned Leave',A:'Absent',WH:'Work from Home',CO:'Comp Off'
+  CL:'Casual Leave',EL:'Earned Leave',A:'Absent',WH:'Work from Home',CO:'Comp Off',
+  T:'Tour / Field',WW:'Work on Weekend',CD:'Compensatory Deduction'
 }
 
 const STATUS_COLORS: Record<string,string> = {
   P:'bg-emerald-500 text-white',W:'bg-blue-400 text-white',H:'bg-purple-400 text-white',
   SL:'bg-orange-400 text-white',CL:'bg-yellow-400 text-black',EL:'bg-teal-400 text-white',
-  A:'bg-red-500 text-white',WH:'bg-cyan-400 text-white',CO:'bg-violet-400 text-white'
+  A:'bg-red-500 text-white',WH:'bg-cyan-400 text-white',CO:'bg-violet-400 text-white',
+  T:'bg-pink-400 text-white',WW:'bg-indigo-400 text-white',CD:'bg-gray-400 text-white'
 }
 
 const SC_COMPONENT_COLORS: Record<string,{bg:string;text:string;border:string;icon:string}> = {
@@ -207,7 +148,10 @@ const SC_COMPONENT_COLORS: Record<string,{bg:string;text:string;border:string;ic
 // ── HELPERS ──────────────────────────────────────────────────────────
 
 function formatPKR(n: number): string { return 'PKR ' + n.toLocaleString('en-PK') }
-function formatDate(d: string): string { return new Date(d).toLocaleDateString('en-PK',{year:'numeric',month:'short',day:'numeric'}) }
+function formatDate(d: string | null): string {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('en-PK',{year:'numeric',month:'short',day:'numeric'})
+}
 function fmtMonth(ms: string): string { const [y,m]=ms.split('-').map(Number); return new Date(y,m-1,1).toLocaleDateString('en-US',{year:'numeric',month:'long'}) }
 
 function calcEMI(principal: number, annualRate: number, tenure: number): number {
@@ -217,157 +161,15 @@ function calcEMI(principal: number, annualRate: number, tenure: number): number 
   return Math.round(principal * r * f / (f - 1))
 }
 
-// Local SC calculation using AGES formula (for demo data)
-function computeLocalSC(emp: EmployeeData, month: string) {
-  const [y, m] = month.split('-').map(Number)
-  const daysInMonth = new Date(y, m, 0).getDate()
-  const att = ATT_MAY_2026[emp.id] || {}
-  const eligibleStatuses = ['P','W','H','T','WH','WW','CL','SL','EL']
-  const leaveStatuses = ['CL','SL']
-  const billableStatuses = ['P','W','H','WH','WW','T','CO']
-
-  let eligibleDays = 0; let leaveDays = 0; let absentDays = 0; let totalBillableDays = 0
-  const projectDays: Record<string,number> = {}
-
-  if (month === '2026-05') {
-    Object.values(att).forEach(e => {
-      if (eligibleStatuses.includes(e.status)) eligibleDays++
-      if (leaveStatuses.includes(e.status)) leaveDays++
-      if (e.status === 'A') absentDays++
-      if (billableStatuses.includes(e.status) && e.project) {
-        totalBillableDays++
-        projectDays[e.project] = (projectDays[e.project] || 0) + 1
-      }
-    })
-  } else {
-    // For non-May months, derive from summary data
-    const summaries = MONTHLY_ATT[emp.id] || MONTHLY_ATT['EMP-0001']
-    const mi = MONTHS.indexOf(month)
-    if (mi >= 0 && mi < summaries.length) {
-      const s = summaries[mi]
-      eligibleDays = s.present + s.leave
-      leaveDays = s.leave
-      absentDays = s.absent
-    }
-    // No project breakdown for non-May months in demo data
+/** Generate a list of recent months for dropdowns */
+function getRecentMonths(count: number = 12): string[] {
+  const months: string[] = []
+  const now = new Date()
+  for (let i = 0; i < count; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)
   }
-
-  const dailyRate = emp.monthlySalary / daysInMonth
-  const monthlySC = emp.monthlySalary * 0.20
-  const workingRatio = eligibleDays / daysInMonth
-  const earnedSC = monthlySC * workingRatio
-  const leaveDeduction = dailyRate * leaveDays
-  const finalSC = earnedSC - leaveDeduction
-  const scBalance = leaveDeduction
-
-  const scComponents = {
-    otherPayable: Math.round(finalSC * 0.0833),
-    earnedLeave:  Math.round(finalSC * 0.0833),
-    sickLeave:    Math.round(finalSC * 0.0167),
-    casualLeave:  Math.round(finalSC * 0.0167),
-  }
-
-  const projectAllocations = Object.entries(projectDays).map(([name, days]) => {
-    const weight = totalBillableDays > 0 ? days / totalBillableDays : 0
-    return {
-      projectName: name, projectCode: name, days, weight,
-      weightPct: (weight * 100).toFixed(1) + '%',
-      salaryShare: Math.round(emp.monthlySalary * weight),
-      scShare: Math.round(finalSC * weight),
-      scBalance: Math.round(scBalance * weight),
-      scOtherPayable: Math.round(scComponents.otherPayable * weight),
-      scEarnedLeave: Math.round(scComponents.earnedLeave * weight),
-      scSickLeave: Math.round(scComponents.sickLeave * weight),
-      scCasualLeave: Math.round(scComponents.casualLeave * weight),
-    }
-  })
-
-  return {
-    daysInMonth, eligibleDays, leaveDays, absentDays,
-    monthlySalary: emp.monthlySalary, dailyRate: Math.round(dailyRate),
-    workingRatio: Math.round(workingRatio * 10000) / 10000,
-    monthlySC: Math.round(monthlySC), earnedSC: Math.round(earnedSC),
-    leaveDeduction: Math.round(leaveDeduction), finalSC: Math.round(finalSC),
-    scBalance: Math.round(scBalance), scComponents,
-    projectAllocations, totalBillableDays,
-  }
-}
-
-function buildSalaryHistory(emp: EmployeeData): SalaryRow[] {
-  const dailyRate = emp.monthlySalary / emp.workingDays
-  const att = ATT_MAY_2026[emp.id] || {}
-  const mayPresent = Object.values(att).filter(e=>['P','W','H','WH','CO'].includes(e.status)).length
-  const mayLeave = Object.values(att).filter(e=>['SL','CL','EL'].includes(e.status)).length
-  const mayAbsent = Object.values(att).filter(e=>e.status==='A').length
-
-  const summaries = MONTHLY_ATT[emp.id] || MONTHLY_ATT['EMP-0001']
-
-  return MONTHS.map((month, idx) => {
-    const wd = WD_PER_MONTH[month]
-    let present: number, absent: number, leave: number
-    if (month === '2026-05') {
-      present = mayPresent; absent = mayAbsent; leave = mayLeave
-    } else {
-      const s = summaries[idx]
-      present = s.present; absent = s.absent; leave = s.leave
-    }
-    const effectiveDays = present + leave
-    const earnedSalary = Math.round(effectiveDays * dailyRate)
-    const absentDeduction = Math.round(absent * dailyRate)
-    const taxAmount = Math.round(earnedSalary * emp.taxRate)
-    const loanDeduction = emp.loanEMI
-    const totalDeductions = absentDeduction + taxAmount + loanDeduction
-    const netPaid = earnedSalary - totalDeductions
-    const basic = Math.round(earnedSalary * 0.765)
-    const housing = Math.round(earnedSalary * 0.15)
-    const transport = Math.round(earnedSalary * 0.06)
-    const other = earnedSalary - basic - housing - transport
-    const status: SalaryRow['status'] = idx < 4 ? 'Paid' : idx === 4 ? 'Pending' : 'Draft'
-    return { month, workingDays:wd, present, absent, leave, earnedSalary, absentDeduction, taxAmount, loanDeduction, totalDeductions, netPaid, status, earnings:{basic,housing,transport,other}, deductionBreakdown:{absentDeduction,tax:taxAmount,loanEmi:loanDeduction,scEmployee:0} }
-  })
-}
-
-function buildScLedger(salaryRows: SalaryRow[], scRate: number): ScLedgerEntry[] {
-  let cumOutstanding = 0
-  return salaryRows.map((row, idx) => {
-    const scAmount = Math.round(row.earnedSalary * scRate)
-    cumOutstanding += scAmount
-    let status: ScLedgerEntry['status'] = 'Pending'
-    let paid = 0
-    let paidOn: string | null = null
-    if (idx < 2) { status = 'Remitted'; paid = scAmount; cumOutstanding -= scAmount; paidOn = `${MONTHS[idx+1]}-15` }
-    else if (idx === 2) { status = 'Remitted'; paid = scAmount; cumOutstanding -= scAmount; paidOn = '2026-03-15' }
-    else if (idx === 3) { status = 'Partial'; paid = Math.round(scAmount * 0.5); cumOutstanding -= paid; paidOn = '2026-04-10' }
-    return { month:row.month, grossSalary:row.earnedSalary, scRate, scAmount, paid, outstanding:cumOutstanding, status, paidOn }
-  })
-}
-
-function buildLoans(emp: EmployeeData): LoanData[] {
-  if (emp.loanEMI === 0) return []
-  const principal = emp.id === 'EMP-0001' ? 100000 : emp.id === 'EMP-0004' ? 50000 : 0
-  if (principal === 0) return []
-  const tenure = 18
-  const interestRate = emp.id === 'EMP-0001' ? 12 : 10
-  const emi = emp.loanEMI
-  const totalPaid = emi * (emp.id === 'EMP-0001' ? 10 : 5)
-  const remaining = principal - totalPaid + Math.round(principal * interestRate / 100 / 12 * (emp.id === 'EMP-0001' ? 10 : 5))
-  const monthsLeft = tenure - (emp.id === 'EMP-0001' ? 10 : 5)
-  const r = interestRate / 12 / 100
-  const schedule = []
-  let bal = principal
-  for (let m = 1; m <= tenure; m++) {
-    const intPart = Math.round(bal * r)
-    const prinPart = emi - intPart
-    bal = bal - prinPart
-    schedule.push({ month:m, emi, principal:prinPart, interest:intPart, balance:Math.max(0,bal) })
-  }
-  return [{ id: emp.id === 'EMP-0001' ? 'LN-001' : 'LN-002', loanType: emp.id === 'EMP-0001' ? 'Personal' : 'Emergency', principal, disbursedDate: emp.id === 'EMP-0001' ? '2025-07-01' : '2025-12-01', tenure, emi, interestRate, remaining:Math.max(0,remaining), monthsLeft, status:'Active', schedule }]
-}
-
-function buildAdvances(emp: EmployeeData): AdvanceData[] {
-  if (emp.advanceBalance === 0) return []
-  const amount = emp.advanceBalance * 2
-  return [{ id: emp.id === 'EMP-0001' ? 'ADV-001' : 'ADV-002', date: emp.id === 'EMP-0001' ? '2026-03-15' : '2026-02-01', amount, purpose: emp.id === 'EMP-0001' ? 'Medical Emergency' : 'Relocation', recoveryMode:'Installments', monthlyRecovery:Math.round(amount/6), recovered:amount - emp.advanceBalance, balance:emp.advanceBalance, status:'Recovering' }]
+  return months
 }
 
 // ── BADGE COMPONENTS ───────────────────────────────────────────────
@@ -381,7 +183,7 @@ function ScBadge({status}:{status:string}) {
   return <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${s[status]||s.Pending}`}>{status}</span>
 }
 function LoanBadge({status}:{status:string}) {
-  const s: Record<string,string> = {Active:'bg-emerald-50 text-emerald-700 border-emerald-200',Closed:'bg-slate-100 text-slate-500 border-slate-200',Overdue:'bg-red-50 text-red-700 border-red-200'}
+  const s: Record<string,string> = {Active:'bg-emerald-50 text-emerald-700 border-emerald-200',active:'bg-emerald-50 text-emerald-700 border-emerald-200',Closed:'bg-slate-100 text-slate-500 border-slate-200',closed:'bg-slate-100 text-slate-500 border-slate-200',Overdue:'bg-red-50 text-red-700 border-red-200',written_off:'bg-gray-100 text-gray-500 border-gray-200'}
   return <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${s[status]||s.Active}`}>{status}</span>
 }
 function AdvBadge({status}:{status:string}) {
@@ -398,9 +200,10 @@ export function EmployeeProfile() {
   const isAdmin = authUser?.role === 'admin'
 
   // ---- State ----
-  const [employees, setEmployees] = useState<EmployeeData[]>(EMPLOYEES)
-  const [selectedId, setSelectedId] = useState('EMP-0001')
-  const [loading, setLoading] = useState(false)
+  const [employees, setEmployees] = useState<EmployeeData[]>([])
+  const [selectedId, setSelectedId] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+  const [employeesLoading, setEmployeesLoading] = useState(true)
 
   // Search
   const [searchQ, setSearchQ] = useState('')
@@ -418,28 +221,25 @@ export function EmployeeProfile() {
   // Salary
   const [expandedPayslip, setExpandedPayslip] = useState<string|null>(null)
 
+  // Salary history from API (payroll batch lines)
+  const [salaryHistory, setSalaryHistory] = useState<SalaryRow[]>([])
+  const [salaryHistoryLoading, setSalaryHistoryLoading] = useState(false)
+
   // Payroll calculation
   const [payrollResults, setPayrollResults] = useState<Record<string, PayrollResult>>({})
   const [payrollLoading, setPayrollLoading] = useState(false)
-  const [payrollMonth, setPayrollMonth] = useState('2026-05')
+  const [payrollMonth, setPayrollMonth] = useState('')
 
   // SC
-  const [scLedgers, setScLedgers] = useState<Record<string,ScLedgerEntry[]>>(() => {
-    const m: Record<string,ScLedgerEntry[]> = {}
-    EMPLOYEES.forEach(e => { m[e.id] = buildScLedger(buildSalaryHistory(e), e.scRate) })
-    return m
-  })
+  const [scLedgers, setScLedgers] = useState<Record<string,ScLedgerEntry[]>>({})
   const [showScForm, setShowScForm] = useState(false)
   const [scPayment, setScPayment] = useState({amount:'',date:'',reference:''})
   const [scCoveredMonths, setScCoveredMonths] = useState<string[]>([])
 
   // Loans & Advances
-  const [loansStore, setLoansStore] = useState<Record<string,LoanData[]>>(() => {
-    const m: Record<string,LoanData[]> = {}; EMPLOYEES.forEach(e => { m[e.id] = buildLoans(e) }); return m
-  })
-  const [advStore, setAdvStore] = useState<Record<string,AdvanceData[]>>(() => {
-    const m: Record<string,AdvanceData[]> = {}; EMPLOYEES.forEach(e => { m[e.id] = buildAdvances(e) }); return m
-  })
+  const [loansStore, setLoansStore] = useState<Record<string,LoanData[]>>({})
+  const [advStore, setAdvStore] = useState<Record<string,AdvanceData[]>>({})
+  const [loansLoading, setLoansLoading] = useState(false)
   const [expandedLoan, setExpandedLoan] = useState<string|null>(null)
   const [newLoanOpen, setNewLoanOpen] = useState(false)
   const [newLoanForm, setNewLoanForm] = useState({loanType:'Personal',amount:'',date:'',tenure:'',interestRate:'12'})
@@ -447,28 +247,281 @@ export function EmployeeProfile() {
   const [newAdvForm, setNewAdvForm] = useState({amount:'',purpose:'',recoveryMode:'Installments',monthlyRecovery:''})
 
   // Attendance
-  const [attMonths, setAttMonths] = useState<Record<string,string>>(() => {
-    const m: Record<string,string> = {}; EMPLOYEES.forEach(e => { m[e.id] = '2026-05' }); return m
-  })
+  const [attMonths, setAttMonths] = useState<Record<string,string>>({})
+  const [attData, setAttData] = useState<Record<number, AttEntry>>({})
+  const [attStats, setAttStats] = useState<{presentDays:number;absentDays:number;leaveDays:number;totalDays:number}>({presentDays:0,absentDays:0,leaveDays:0,totalDays:0})
+  const [attLoading, setAttLoading] = useState(false)
 
   // Documents
-  const [docStore, setDocStore] = useState<Record<string,DocData[]>>(() => {
-    const m: Record<string,DocData[]> = {}; EMPLOYEES.forEach(e => { m[e.id] = [...DEFAULT_DOCS] }); return m
-  })
+  const [docStore, setDocStore] = useState<Record<string,DocData[]>>({})
   const [previewDoc, setPreviewDoc] = useState<DocData|null>(null)
   const [replaceDocId, setReplaceDocId] = useState<number|null>(null)
 
+  // Available months for dropdowns
+  const availableMonths = useMemo(() => getRecentMonths(12), [])
+
+  // ---- Fetch Employees on mount ----
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      setEmployeesLoading(true)
+      try {
+        const res = await fetch('/api/employees?pageSize=200')
+        if (res.ok) {
+          const json = await res.json()
+          const rawEmployees = json.data || json.employees || json || []
+          const mapped: EmployeeData[] = rawEmployees.map((e: Record<string, unknown>) => ({
+            id: e.id as string,
+            name: e.name as string,
+            designation: (e.designation as string) || null,
+            department: (e.department as string) || null,
+            joinDate: e.joiningDate ? new Date(e.joiningDate as string).toISOString().split('T')[0] : null,
+            location: (e.presentAddress as string) || (e.permanentAddress as string) || null,
+            bank: e.bankName ? `${e.bankName}${e.bankAccountNumber ? ' ****'+String(e.bankAccountNumber).slice(-4) : ''}` : null,
+            phone: (e.contactNo as string) || null,
+            email: (e.email as string) || null,
+            contractType: (e.employmentType as string) || null,
+            monthlySalary: (e.baseSalary as number) || 0,
+            workingDays: 26,
+            scRate: 0.20,
+            taxRate: e.incomeTaxEnabled ? 0.05 : 0,
+            status: ((e.status as string) || 'active').charAt(0).toUpperCase() + ((e.status as string) || 'active').slice(1),
+            projects: e.defaultProject ? [((e.defaultProject as Record<string, unknown>).code as string || (e.defaultProject as Record<string, unknown>).name as string)] : [],
+            loanEMI: 0,
+            advanceBalance: 0,
+            eobiEnabled: e.eobiEnabled as boolean || false,
+            pfEnabled: e.pfEnabled as boolean || false,
+            incomeTaxEnabled: e.incomeTaxEnabled as boolean !== false,
+            employeeCode: e.employeeCode as string || '',
+            baseSalary: (e.baseSalary as number) || 0,
+            cnic: e.cnic as string || '',
+          }))
+          setEmployees(mapped)
+          if (mapped.length > 0 && !selectedId) {
+            setSelectedId(mapped[0].id)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch employees:', err)
+        toast.error('Failed to load employees')
+      } finally {
+        setEmployeesLoading(false)
+        setLoading(false)
+      }
+    }
+    fetchEmployees()
+  }, [])
+
+  // ---- Fetch employee detail, attendance, loans when selected ----
+  useEffect(() => {
+    if (!selectedId) return
+
+    // Fetch attendance for current month
+    const fetchAttendance = async () => {
+      setAttLoading(true)
+      try {
+        const month = attMonths[selectedId] || new Date().toISOString().slice(0, 7)
+        const res = await fetch(`/api/attendance?view=monthly&employeeId=${selectedId}&month=${month}`)
+        if (res.ok) {
+          const data: AttendanceMonthlyResponse = await res.json()
+          // Convert calendar to our attData format
+          const mapped: Record<number, AttEntry> = {}
+          data.calendar.forEach((entry) => {
+            if (entry.record) {
+              const dayNum = entry.day
+              const projectCode = entry.dailyProject?.project?.code || entry.dailyProject?.project?.name || null
+              mapped[dayNum] = { status: entry.record.status, project: projectCode }
+            }
+          })
+          setAttData(mapped)
+          setAttStats({
+            presentDays: data.presentDays,
+            absentDays: data.absentDays,
+            leaveDays: data.leaveDays,
+            totalDays: data.totalDays,
+          })
+        } else {
+          setAttData({})
+          setAttStats({ presentDays: 0, absentDays: 0, leaveDays: 0, totalDays: 0 })
+        }
+      } catch {
+        setAttData({})
+        setAttStats({ presentDays: 0, absentDays: 0, leaveDays: 0, totalDays: 0 })
+      } finally {
+        setAttLoading(false)
+      }
+    }
+
+    // Fetch loans for this employee
+    const fetchLoans = async () => {
+      setLoansLoading(true)
+      try {
+        const res = await fetch(`/api/loans?employeeId=${selectedId}`)
+        if (res.ok) {
+          const data = await res.json()
+          const apiLoans: LoanData[] = []
+          const apiAdvances: AdvanceData[] = []
+
+          ;(Array.isArray(data) ? data : []).forEach((loan: Record<string, unknown>) => {
+            const installments = (loan.installments as { installmentNo: number; amount: number; principalPart: number; interestPart: number; paidAmount: number; status: string }[]) || []
+            const paidCount = installments.filter(i => i.status === 'paid').length
+            const totalPaid = installments.reduce((s: number, i: { paidAmount: number }) => s + i.paidAmount, 0)
+            const remaining = Math.max(0, (loan.balanceAmount as number) || 0)
+
+            if ((loan.loanType as string) === 'Advance Salary') {
+              apiAdvances.push({
+                id: loan.id as string,
+                date: loan.disbursementDate ? new Date(loan.disbursementDate as string).toISOString().split('T')[0] : '',
+                amount: (loan.principalAmount as number) || 0,
+                purpose: 'Salary Advance',
+                recoveryMode: 'Installments',
+                monthlyRecovery: (loan.monthlyDeduction as number) || 0,
+                recovered: totalPaid,
+                balance: remaining,
+                status: (loan.status as string) === 'active' ? 'Recovering' : 'Cleared',
+              })
+            } else {
+              const schedule = installments.map(inst => ({
+                month: inst.installmentNo,
+                emi: inst.amount,
+                principal: inst.principalPart,
+                interest: inst.interestPart,
+                balance: Math.max(0, (loan.principalAmount as number) - inst.principalPart * inst.installmentNo),
+              }))
+
+              apiLoans.push({
+                id: loan.loanNumber as string || loan.id as string,
+                loanType: (loan.loanType as string) || 'Personal',
+                principal: (loan.principalAmount as number) || 0,
+                disbursedDate: loan.disbursementDate ? new Date(loan.disbursementDate as string).toISOString().split('T')[0] : '',
+                tenure: (loan.tenureMonths as number) || 0,
+                emi: (loan.monthlyDeduction as number) || 0,
+                interestRate: (loan.interestRate as number) || 0,
+                remaining,
+                monthsLeft: Math.max(0, ((loan.tenureMonths as number) || 0) - paidCount),
+                status: (loan.status as string) === 'active' ? 'Active' : (loan.status as string) === 'closed' ? 'Closed' : 'Overdue',
+                schedule,
+              })
+            }
+          })
+
+          setLoansStore(prev => ({ ...prev, [selectedId]: apiLoans }))
+          setAdvStore(prev => ({ ...prev, [selectedId]: apiAdvances }))
+        }
+      } catch {
+        setLoansStore(prev => ({ ...prev, [selectedId]: [] }))
+        setAdvStore(prev => ({ ...prev, [selectedId]: [] }))
+      } finally {
+        setLoansLoading(false)
+      }
+    }
+
+    // Fetch salary history (payroll batch lines for this employee)
+    const fetchSalaryHistory = async () => {
+      setSalaryHistoryLoading(true)
+      try {
+        const res = await fetch(`/api/payroll`)
+        if (res.ok) {
+          const batches = await res.json()
+          const allRows: SalaryRow[] = []
+          const lines: Record<string, unknown>[] = []
+
+          // Extract lines from all batches for this employee
+          for (const batch of Array.isArray(batches) ? batches : []) {
+            const batchLines = ((batch as Record<string, unknown>).lines as Record<string, unknown>[]) || []
+            for (const line of batchLines) {
+              if ((line.employeeId as string) === selectedId) {
+                lines.push({ ...line, period: (batch as Record<string, unknown>).period, batchStatus: (batch as Record<string, unknown>).status })
+              }
+            }
+          }
+
+          for (const line of lines) {
+            const grossSalary = (line.grossSalary as number) || 0
+            const basic = (line.basicSalary as number) || 0
+            const housing = Math.round(grossSalary * 0.15)
+            const transport = Math.round(grossSalary * 0.06)
+            const other = grossSalary - basic - housing - transport
+            const period = (line.period as string) || ''
+            const batchStatus = (line.batchStatus as string) || 'draft'
+
+            allRows.push({
+              month: period,
+              workingDays: (line.workingDays as number) || 0,
+              present: ((line.eligibleDays as number) || 0) - ((line.leaveDays as number) || 0),
+              absent: (line.absentDays as number) || 0,
+              leave: (line.leaveDays as number) || 0,
+              earnedSalary: grossSalary,
+              absentDeduction: Math.round(((line.absentDays as number) || 0) * ((line.dailyRate as number) || 0)),
+              taxAmount: (line.incomeTax as number) || 0,
+              loanDeduction: (line.loanDeduction as number) || 0,
+              totalDeductions: (line.totalDeductions as number) || 0,
+              netPaid: (line.netPay as number) || 0,
+              status: batchStatus === 'posted' ? 'Paid' : batchStatus === 'approved' ? 'Pending' : 'Draft',
+              earnings: { basic, housing, transport, other: Math.max(0, other) },
+              deductionBreakdown: {
+                absentDeduction: Math.round(((line.absentDays as number) || 0) * ((line.dailyRate as number) || 0)),
+                tax: (line.incomeTax as number) || 0,
+                loanEmi: (line.loanDeduction as number) || 0,
+                scEmployee: 0,
+              },
+            })
+          }
+
+          // Sort by month desc
+          allRows.sort((a, b) => b.month.localeCompare(a.month))
+          setSalaryHistory(allRows)
+
+          // Build SC ledger from salary history
+          const scLedger: ScLedgerEntry[] = []
+          let cumOutstanding = 0
+          const sortedAsc = [...allRows].sort((a, b) => a.month.localeCompare(b.month))
+          for (const row of sortedAsc) {
+            const scAmount = Math.round(row.earnedSalary * 0.20)
+            cumOutstanding += scAmount
+            const isPaid = row.status === 'Paid'
+            const paid = isPaid ? scAmount : 0
+            if (isPaid) cumOutstanding -= scAmount
+            scLedger.push({
+              month: row.month,
+              grossSalary: row.earnedSalary,
+              scRate: 0.20,
+              scAmount,
+              paid,
+              outstanding: cumOutstanding,
+              status: isPaid ? 'Remitted' : 'Pending',
+              paidOn: isPaid ? `${row.month}-28` : null,
+            })
+          }
+          setScLedgers(prev => ({ ...prev, [selectedId]: scLedger }))
+        }
+      } catch {
+        setSalaryHistory([])
+      } finally {
+        setSalaryHistoryLoading(false)
+      }
+    }
+
+    fetchAttendance()
+    fetchLoans()
+    fetchSalaryHistory()
+  }, [selectedId, attMonths[selectedId || '']])
+
+  // Set default payroll month
+  useEffect(() => {
+    if (!payrollMonth && availableMonths.length > 0) {
+      setPayrollMonth(availableMonths[0])
+    }
+  }, [availableMonths, payrollMonth])
+
   // ---- Derived ----
   const emp = useMemo(() => employees.find(e => e.id === selectedId) || employees[0], [employees, selectedId])
-  const salaryHistory = useMemo(() => buildSalaryHistory(emp), [emp])
   const scLedger = scLedgers[emp.id] || []
   const loans = loansStore[emp.id] || []
   const advances = advStore[emp.id] || []
   const docs = docStore[emp.id] || []
-  const attMonth = attMonths[emp.id] || '2026-05'
-  const attData = ATT_MAY_2026[emp.id] || {}
+  const attMonth = attMonths[emp.id] || new Date().toISOString().slice(0, 7)
 
-  const initials = emp.name.split(' ').map(w=>w[0]).join('').slice(0,2)
+  const initials = emp?.name?.split(' ').map(w=>w[0]).join('').slice(0,2) || '??'
 
   // Quick stats
   const scOutstanding = useMemo(() => scLedger.reduce((s,r) => s + r.scAmount - r.paid, 0), [scLedger])
@@ -484,11 +537,11 @@ export function EmployeeProfile() {
   const totalScAccrued = scLedger.reduce((s,r)=>s+r.scAmount,0)
   const totalScPaid = scLedger.reduce((s,r)=>s+r.paid,0)
 
-  // Attendance stats
+  // Attendance stats from API data
   const attEntries = Object.entries(attData)
-  const attPresent = attEntries.filter(([,e])=>['P','WH'].includes(e.status)).length
-  const attAbsent = attEntries.filter(([,e])=>e.status==='A').length
-  const attLeave = attEntries.filter(([,e])=>['SL','CL','EL'].includes(e.status)).length
+  const attPresent = attStats.presentDays || attEntries.filter(([,e])=>['P','WH'].includes(e.status)).length
+  const attAbsent = attStats.absentDays || attEntries.filter(([,e])=>e.status==='A').length
+  const attLeave = attStats.leaveDays || attEntries.filter(([,e])=>['SL','CL','EL'].includes(e.status)).length
   const attWeekend = attEntries.filter(([,e])=>e.status==='W').length
   const attHoliday = attEntries.filter(([,e])=>e.status==='H').length
 
@@ -497,22 +550,19 @@ export function EmployeeProfile() {
   const billableDays = attEntries.filter(([,e]) => billableStatuses.includes(e.status) && e.project).length
   const nonBillableDays = attEntries.filter(([,e]) => billableStatuses.includes(e.status) && !e.project).length
 
-  // Project allocation
+  // Project allocation from attendance data
   const projectAlloc = useMemo(() => {
     const map: Record<string,number> = {}
-    Object.values(ATT_MAY_2026[emp.id] || {}).forEach(e=>{ if(e.project) map[e.project]=(map[e.project]||0)+1 })
+    Object.values(attData).forEach(e=>{ if(e.project) map[e.project]=(map[e.project]||0)+1 })
     const total = Object.values(map).reduce((s,v)=>s+v,0)
     return Object.entries(map).map(([name,days])=>({name,days,pct:total>0?Math.round(days/total*100):0})).sort((a,b)=>b.days-a.days)
-  }, [emp.id])
-
-  // Local SC calculation for current payroll month
-  const localScCalc = useMemo(() => computeLocalSC(emp, payrollMonth), [emp, payrollMonth])
+  }, [attData])
 
   // API payroll result key
   const payrollKey = `${emp.id}-${payrollMonth}`
   const apiPayrollResult = payrollResults[payrollKey]
 
-  // Effective payroll result (API if available, else local)
+  // Effective payroll result (API if available)
   const effectivePayroll = apiPayrollResult || null
 
   // Pending SC months
@@ -526,11 +576,13 @@ export function EmployeeProfile() {
     setShowScForm(false)
     setEditMode(false)
     setExpandedLoan(null)
-    setTimeout(() => { setSelectedId(id); setLoading(false) }, 200)
+    setAttData({})
+    setTimeout(() => { setSelectedId(id); setLoading(false) }, 150)
   }, [selectedId])
 
   // Run Payroll Calculation
   const handleRunPayroll = useCallback(async () => {
+    if (!emp?.id) return
     setPayrollLoading(true)
     try {
       const res = await fetch('/api/payroll/calculate', {
@@ -557,7 +609,7 @@ export function EmployeeProfile() {
   const filteredEmployees = useMemo(() => {
     if (!searchQ.trim()) return employees
     const q = searchQ.toLowerCase()
-    return employees.filter(e => e.name.toLowerCase().includes(q) || e.id.toLowerCase().includes(q) || e.department.toLowerCase().includes(q))
+    return employees.filter(e => e.name.toLowerCase().includes(q) || e.id.toLowerCase().includes(q) || (e.department || '').toLowerCase().includes(q) || (e.employeeCode || '').toLowerCase().includes(q))
   }, [employees, searchQ])
 
   const handleSearchKey = useCallback((e: React.KeyboardEvent) => {
@@ -577,11 +629,35 @@ export function EmployeeProfile() {
   // Profile edit
   const startEdit = () => { setEditForm({...emp}); setEditMode(true) }
   const cancelEdit = () => { setEditMode(false); setEditForm({}) }
-  const saveEdit = () => {
-    setEmployees(prev => prev.map(e => e.id === emp.id ? {...e, ...editForm} as EmployeeData : e))
-    setEditMode(false)
-    setEditForm({})
-    toast.success('Profile updated successfully')
+  const saveEdit = async () => {
+    try {
+      const res = await fetch(`/api/employees?id=${emp.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editForm.name,
+          designation: editForm.designation,
+          department: editForm.department,
+          contactNo: editForm.phone,
+          email: editForm.email,
+          presentAddress: editForm.location,
+          employmentType: editForm.contractType,
+          baseSalary: editForm.monthlySalary || editForm.baseSalary,
+        }),
+      })
+      if (res.ok) {
+        // Update local state
+        setEmployees(prev => prev.map(e => e.id === emp.id ? {...e, ...editForm} as EmployeeData : e))
+        setEditMode(false)
+        setEditForm({})
+        toast.success('Profile updated successfully')
+      } else {
+        const err = await res.json()
+        toast.error(err.error || 'Failed to update profile')
+      }
+    } catch {
+      toast.error('Failed to connect to API')
+    }
   }
 
   // SC Payment save
@@ -685,7 +761,7 @@ export function EmployeeProfile() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
         <input
           className="bg-white border border-slate-200 rounded-xl px-4 py-3 pl-10 w-full text-[14px] outline-none focus:ring-2 focus:ring-slate-300 transition-shadow"
-          placeholder="Search employee by name, ID, or department..."
+          placeholder="Search employee by name, code, or department..."
           value={searchQ}
           onChange={e => { setSearchQ(e.target.value); setSearchOpen(true); setHlIdx(-1) }}
           onFocus={() => setSearchOpen(true)}
@@ -707,10 +783,10 @@ export function EmployeeProfile() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-slate-900 truncate">{highlightMatch(e.name, searchQ)}</div>
-                  <div className="text-[11px] text-slate-500">{e.designation}</div>
+                  <div className="text-[11px] text-slate-500">{e.designation || '—'}</div>
                 </div>
-                <span className="bg-slate-100 text-slate-600 text-[10px] rounded px-1.5 py-0.5 font-mono shrink-0">{highlightMatch(e.id, searchQ)}</span>
-                <span className="text-[11px] text-slate-400 shrink-0">{highlightMatch(e.department, searchQ)}</span>
+                <span className="bg-slate-100 text-slate-600 text-[10px] rounded px-1.5 py-0.5 font-mono shrink-0">{highlightMatch(e.employeeCode || e.id, searchQ)}</span>
+                <span className="text-[11px] text-slate-400 shrink-0">{highlightMatch(e.department || '', searchQ)}</span>
               </button>
             ))
           )}
@@ -744,14 +820,14 @@ export function EmployeeProfile() {
             ].map(f => (
               <div key={f.key}>
                 <Label className="text-xs text-slate-500">{f.label}</Label>
-                <Input className="h-8 text-xs mt-0.5" value={(editForm as Record<string,string|number>)[f.key]?.toString()||''}
+                <Input className="h-8 text-xs mt-0.5" value={(editForm as Record<string,string|number|null|undefined>)[f.key]?.toString()||''}
                   onChange={e => setEditForm(prev => ({...prev,[f.key]:e.target.value}))} />
               </div>
             ))}
             <div>
               <Label className="text-xs text-slate-500">Monthly Salary</Label>
-              <Input type="number" className="h-8 text-xs mt-0.5" value={editForm.monthlySalary?.toString()||''}
-                onChange={e => setEditForm(prev => ({...prev,monthlySalary:parseFloat(e.target.value)||0}))} />
+              <Input type="number" className="h-8 text-xs mt-0.5" value={editForm.monthlySalary?.toString()||editForm.baseSalary?.toString()||''}
+                onChange={e => setEditForm(prev => ({...prev,monthlySalary:parseFloat(e.target.value)||0,baseSalary:parseFloat(e.target.value)||0}))} />
             </div>
           </div>
           <Separator className="my-4" />
@@ -770,22 +846,22 @@ export function EmployeeProfile() {
         <div className="flex flex-col items-center text-center">
           <div className="h-16 w-16 bg-slate-900 text-white rounded-2xl flex items-center justify-center text-2xl font-semibold mb-3">{initials}</div>
           <h2 className="text-xl font-semibold text-slate-900">{emp.name}</h2>
-          <div className="mt-1.5"><span className="bg-slate-100 text-slate-500 text-[11px] rounded px-2 py-0.5 font-mono">{emp.id}</span></div>
-          <p className="text-[13px] text-slate-500 mt-2">{emp.designation}</p>
-          <p className="text-[13px] text-slate-500">{emp.department}</p>
+          <div className="mt-1.5"><span className="bg-slate-100 text-slate-500 text-[11px] rounded px-2 py-0.5 font-mono">{emp.employeeCode || emp.id}</span></div>
+          <p className="text-[13px] text-slate-500 mt-2">{emp.designation || '—'}</p>
+          <p className="text-[13px] text-slate-500">{emp.department || '—'}</p>
           <div className="mt-2.5">
-            <span className={`rounded-full text-[11px] px-3 py-1 font-medium border ${emp.status==='Active'?'bg-emerald-50 text-emerald-600 border-emerald-200':'bg-red-50 text-red-600 border-red-200'}`}>{emp.status}</span>
+            <span className={`rounded-full text-[11px] px-3 py-1 font-medium border ${emp.status==='Active'||emp.status==='active'?'bg-emerald-50 text-emerald-600 border-emerald-200':'bg-red-50 text-red-600 border-red-200'}`}>{emp.status}</span>
           </div>
         </div>
         <Separator className="my-4" />
         <div className="space-y-2.5">
           {[
             {icon:Calendar,label:'Join Date',value:formatDate(emp.joinDate)},
-            {icon:MapPin,label:'Location',value:emp.location},
-            {icon:Landmark,label:'Bank Account',value:emp.bank},
-            {icon:Phone,label:'Phone',value:emp.phone},
-            {icon:Mail,label:'Email',value:emp.email},
-            {icon:Briefcase,label:'Contract Type',value:emp.contractType},
+            {icon:MapPin,label:'Location',value:emp.location || '—'},
+            {icon:Landmark,label:'Bank Account',value:emp.bank || '—'},
+            {icon:Phone,label:'Phone',value:emp.phone || '—'},
+            {icon:Mail,label:'Email',value:emp.email || '—'},
+            {icon:Briefcase,label:'Contract Type',value:emp.contractType || '—'},
           ].map(r => (
             <div key={r.label} className="flex items-center gap-2.5 text-[13px]">
               <r.icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
@@ -805,6 +881,22 @@ export function EmployeeProfile() {
             </div>
           </>
         )}
+        {/* EOBI / PF / Income Tax Status Badges */}
+        <Separator className="my-4" />
+        <div className="space-y-2">
+          <p className="text-[11px] text-slate-500 font-medium">Statutory Status</p>
+          <div className="flex flex-wrap gap-2">
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp.eobiEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+              EOBI {emp.eobiEnabled ? '✓' : '✗'}
+            </span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp.pfEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+              PF {emp.pfEnabled ? '✓' : '✗'}
+            </span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp.incomeTaxEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+              Income Tax {emp.incomeTaxEnabled ? '✓' : '✗'}
+            </span>
+          </div>
+        </div>
         {isAdmin && (
           <>
             <Separator className="my-4" />
@@ -824,7 +916,7 @@ export function EmployeeProfile() {
     <div className="grid grid-cols-2 gap-3">
       <div className="bg-white border border-slate-200 rounded-xl p-4">
         <p className="text-[11px] text-slate-500">Monthly Salary</p>
-        <p className="text-[18px] font-semibold text-slate-900">{formatPKR(emp.monthlySalary)}</p>
+        <p className="text-[18px] font-semibold text-slate-900">{formatPKR(emp.monthlySalary || emp.baseSalary)}</p>
       </div>
       <TooltipProvider>
         <Tooltip>
@@ -851,7 +943,7 @@ export function EmployeeProfile() {
   // ========================================================================
   // RENDER: Project Cost Distribution (shared between tabs)
   // ========================================================================
-  const renderProjectCostDistribution = (scCalc: typeof localScCalc, source: string) => {
+  const renderProjectCostDistribution = (scCalc: PayrollResult, source: string) => {
     if (scCalc.projectAllocations.length === 0) {
       return (
         <div className="bg-slate-50 rounded-xl p-4 text-center text-[12px] text-slate-400">
@@ -926,7 +1018,7 @@ export function EmployeeProfile() {
   // ========================================================================
   // RENDER: SC Component Breakdown Cards
   // ========================================================================
-  const renderScComponentCards = (scCalc: typeof localScCalc) => (
+  const renderScComponentCards = (scCalc: PayrollResult) => (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {[
         {key:'otherPayable' as const, label:'Other Payable', rate:'8.33%', value: scCalc.scComponents.otherPayable},
@@ -982,7 +1074,7 @@ export function EmployeeProfile() {
               <Select value={payrollMonth} onValueChange={setPayrollMonth}>
                 <SelectTrigger className="h-7 text-xs w-36"><SelectValue/></SelectTrigger>
                 <SelectContent>
-                  {MONTHS.map(m=><SelectItem key={m} value={m}>{fmtMonth(m)}</SelectItem>)}
+                  {availableMonths.map(m=><SelectItem key={m} value={m}>{fmtMonth(m)}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Button className="h-7 text-[11px] bg-slate-900 text-white hover:bg-slate-800 px-3"
@@ -1012,31 +1104,31 @@ export function EmployeeProfile() {
                   <p className="font-semibold text-amber-600">{formatPKR(apiPayrollResult.scBalance)}</p>
                 </div>
               </div>
+              {/* Deductions summary */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <div className="bg-slate-50 rounded-lg p-2">
+                  <span className="text-slate-500">Gross Salary</span>
+                  <p className="font-semibold text-slate-900">{formatPKR(apiPayrollResult.grossSalary)}</p>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-2">
+                  <span className="text-slate-500">Income Tax</span>
+                  <p className="font-semibold text-red-500">{formatPKR(apiPayrollResult.deductions.incomeTax)}</p>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-2">
+                  <span className="text-slate-500">Loan Deduction</span>
+                  <p className="font-semibold text-red-500">{formatPKR(apiPayrollResult.deductions.loanDeduction)}</p>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-2">
+                  <span className="text-slate-500">Net Pay</span>
+                  <p className="font-semibold text-emerald-600">{formatPKR(apiPayrollResult.netPay)}</p>
+                </div>
+              </div>
               {renderProjectCostDistribution(apiPayrollResult, 'API Calculation')}
             </div>
           )}
           {!apiPayrollResult && (
             <div className="border-t border-slate-100 pt-3">
-              <p className="text-[11px] text-slate-400 mb-2">Local preview (demo data):</p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                <div className="bg-slate-50 rounded-lg p-2">
-                  <span className="text-slate-500">Eligible Days</span>
-                  <p className="font-semibold text-slate-900">{localScCalc.eligibleDays}/{localScCalc.daysInMonth}</p>
-                </div>
-                <div className="bg-slate-50 rounded-lg p-2">
-                  <span className="text-slate-500">Working Ratio</span>
-                  <p className="font-semibold text-slate-900">{(localScCalc.workingRatio * 100).toFixed(2)}%</p>
-                </div>
-                <div className="bg-slate-50 rounded-lg p-2">
-                  <span className="text-slate-500">Final SC Payable</span>
-                  <p className="font-semibold text-emerald-600">{formatPKR(localScCalc.finalSC)}</p>
-                </div>
-                <div className="bg-slate-50 rounded-lg p-2">
-                  <span className="text-slate-500">SC Balance (deferred)</span>
-                  <p className="font-semibold text-amber-600">{formatPKR(localScCalc.scBalance)}</p>
-                </div>
-              </div>
-              {localScCalc.projectAllocations.length > 0 && renderProjectCostDistribution(localScCalc, 'Local Demo')}
+              <p className="text-[11px] text-slate-400 mb-2">Click Calculate to run payroll for {fmtMonth(payrollMonth)}</p>
             </div>
           )}
         </div>
@@ -1045,109 +1137,96 @@ export function EmployeeProfile() {
       {/* Salary table */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/50">
-                <th className="text-left py-2.5 px-3 text-[11px] font-medium text-slate-500">Month</th>
-                <th className="text-center py-2.5 px-3 text-[11px] font-medium text-slate-500">WD</th>
-                <th className="text-center py-2.5 px-3 text-[11px] font-medium text-slate-500">Present</th>
-                <th className="text-center py-2.5 px-3 text-[11px] font-medium text-slate-500">Absent</th>
-                <th className="text-right py-2.5 px-3 text-[11px] font-medium text-slate-500">Earned</th>
-                <th className="text-right py-2.5 px-3 text-[11px] font-medium text-slate-500">Deductions</th>
-                <th className="text-right py-2.5 px-3 text-[11px] font-medium text-slate-500">Net Paid</th>
-                <th className="text-center py-2.5 px-3 text-[11px] font-medium text-slate-500">Status</th>
-                <th className="text-center py-2.5 px-3 text-[11px] font-medium text-slate-500"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {salaryHistory.map(row => {
-                const isExp = expandedPayslip === row.month
-                // Get SC calc for this month
-                const rowScCalc = computeLocalSC(emp, row.month)
-                return (
-                  <React.Fragment key={row.month}>
-                    <tr className={`border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${isExp?'bg-slate-50/50':''}`}>
-                      <td className="py-2.5 px-3 font-medium text-slate-900">{fmtMonth(row.month)}</td>
-                      <td className="py-2.5 px-3 text-center text-slate-600">{row.workingDays}</td>
-                      <td className="py-2.5 px-3 text-center text-slate-600">{row.present}</td>
-                      <td className="py-2.5 px-3 text-center text-slate-600">{row.absent}</td>
-                      <td className="py-2.5 px-3 text-right text-slate-900">{formatPKR(row.earnedSalary)}</td>
-                      <td className="py-2.5 px-3 text-right text-red-500">{formatPKR(row.totalDeductions)}</td>
-                      <td className="py-2.5 px-3 text-right font-medium text-slate-900">{formatPKR(row.netPaid)}</td>
-                      <td className="py-2.5 px-3 text-center"><SalaryBadge status={row.status}/></td>
-                      <td className="py-2.5 px-3 text-center">
-                        <button className="inline-flex items-center justify-center h-6 w-6 rounded hover:bg-slate-100 transition-colors" onClick={()=>setExpandedPayslip(isExp?null:row.month)}>
-                          <Eye className="h-3.5 w-3.5 text-slate-500"/>
-                        </button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td colSpan={9} className="p-0">
-                        <div className="overflow-hidden transition-all duration-200 ease-in-out" style={{maxHeight:isExp?'800px':'0px',opacity:isExp?1:0}}>
-                          <div className="bg-slate-50/70 px-6 py-4 border-b border-slate-100">
-                            <div className="flex justify-between items-center mb-3">
-                              <h4 className="text-xs font-semibold text-slate-700">Payslip — {fmtMonth(row.month)}</h4>
-                              <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={()=>window.print()}><Printer className="h-3 w-3 mr-1"/>Print</Button>
-                            </div>
-                            <div className="grid grid-cols-2 gap-6 max-w-2xl">
-                              <div>
-                                <h5 className="text-[11px] font-semibold text-slate-700 mb-2 uppercase tracking-wider">Earnings</h5>
-                                <div className="space-y-1">
-                                  <div className="flex justify-between text-[12px]"><span className="text-slate-500">Basic</span><span className="text-slate-900">{formatPKR(row.earnings.basic)}</span></div>
-                                  <div className="flex justify-between text-[12px]"><span className="text-slate-500">Housing</span><span className="text-slate-900">{formatPKR(row.earnings.housing)}</span></div>
-                                  <div className="flex justify-between text-[12px]"><span className="text-slate-500">Transport</span><span className="text-slate-900">{formatPKR(row.earnings.transport)}</span></div>
-                                  <div className="flex justify-between text-[12px]"><span className="text-slate-500">Other Allowances</span><span className="text-slate-900">{formatPKR(row.earnings.other)}</span></div>
-                                  <Separator className="my-1"/>
-                                  <div className="flex justify-between text-[12px] font-semibold"><span>Total Earnings</span><span>{formatPKR(row.earnedSalary)}</span></div>
+          {salaryHistoryLoading ? (
+            <div className="p-8 text-center text-sm text-slate-400">
+              <Loader2 className="h-5 w-5 mx-auto mb-2 animate-spin"/>
+              Loading salary history...
+            </div>
+          ) : salaryHistory.length === 0 ? (
+            <div className="p-8 text-center text-sm text-slate-400">
+              No salary history found. Run payroll to generate records.
+            </div>
+          ) : (
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/50">
+                  <th className="text-left py-2.5 px-3 text-[11px] font-medium text-slate-500">Month</th>
+                  <th className="text-center py-2.5 px-3 text-[11px] font-medium text-slate-500">WD</th>
+                  <th className="text-center py-2.5 px-3 text-[11px] font-medium text-slate-500">Present</th>
+                  <th className="text-center py-2.5 px-3 text-[11px] font-medium text-slate-500">Absent</th>
+                  <th className="text-right py-2.5 px-3 text-[11px] font-medium text-slate-500">Earned</th>
+                  <th className="text-right py-2.5 px-3 text-[11px] font-medium text-slate-500">Deductions</th>
+                  <th className="text-right py-2.5 px-3 text-[11px] font-medium text-slate-500">Net Paid</th>
+                  <th className="text-center py-2.5 px-3 text-[11px] font-medium text-slate-500">Status</th>
+                  <th className="text-center py-2.5 px-3 text-[11px] font-medium text-slate-500"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {salaryHistory.map(row => {
+                  const isExp = expandedPayslip === row.month
+                  return (
+                    <React.Fragment key={row.month}>
+                      <tr className={`border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${isExp?'bg-slate-50/50':''}`}>
+                        <td className="py-2.5 px-3 font-medium text-slate-900">{fmtMonth(row.month)}</td>
+                        <td className="py-2.5 px-3 text-center text-slate-600">{row.workingDays}</td>
+                        <td className="py-2.5 px-3 text-center text-slate-600">{row.present}</td>
+                        <td className="py-2.5 px-3 text-center text-slate-600">{row.absent}</td>
+                        <td className="py-2.5 px-3 text-right text-slate-900">{formatPKR(row.earnedSalary)}</td>
+                        <td className="py-2.5 px-3 text-right text-red-500">{formatPKR(row.totalDeductions)}</td>
+                        <td className="py-2.5 px-3 text-right font-medium text-slate-900">{formatPKR(row.netPaid)}</td>
+                        <td className="py-2.5 px-3 text-center"><SalaryBadge status={row.status}/></td>
+                        <td className="py-2.5 px-3 text-center">
+                          <button className="inline-flex items-center justify-center h-6 w-6 rounded hover:bg-slate-100 transition-colors" onClick={()=>setExpandedPayslip(isExp?null:row.month)}>
+                            <Eye className="h-3.5 w-3.5 text-slate-500"/>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colSpan={9} className="p-0">
+                          <div className="overflow-hidden transition-all duration-200 ease-in-out" style={{maxHeight:isExp?'800px':'0px',opacity:isExp?1:0}}>
+                            <div className="bg-slate-50/70 px-6 py-4 border-b border-slate-100">
+                              <div className="flex justify-between items-center mb-3">
+                                <h4 className="text-xs font-semibold text-slate-700">Payslip — {fmtMonth(row.month)}</h4>
+                                <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={()=>window.print()}><Printer className="h-3 w-3 mr-1"/>Print</Button>
+                              </div>
+                              <div className="grid grid-cols-2 gap-6 max-w-2xl">
+                                <div>
+                                  <h5 className="text-[11px] font-semibold text-slate-700 mb-2 uppercase tracking-wider">Earnings</h5>
+                                  <div className="space-y-1">
+                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Basic</span><span className="text-slate-900">{formatPKR(row.earnings.basic)}</span></div>
+                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Housing</span><span className="text-slate-900">{formatPKR(row.earnings.housing)}</span></div>
+                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Transport</span><span className="text-slate-900">{formatPKR(row.earnings.transport)}</span></div>
+                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Other Allowances</span><span className="text-slate-900">{formatPKR(row.earnings.other)}</span></div>
+                                    <Separator className="my-1"/>
+                                    <div className="flex justify-between text-[12px] font-semibold"><span>Total Earnings</span><span>{formatPKR(row.earnedSalary)}</span></div>
+                                  </div>
+                                </div>
+                                <div>
+                                  <h5 className="text-[11px] font-semibold text-slate-700 mb-2 uppercase tracking-wider">Deductions</h5>
+                                  <div className="space-y-1">
+                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Absent Deduction</span><span className="text-red-500">{formatPKR(row.deductionBreakdown.absentDeduction)}</span></div>
+                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Tax</span><span className="text-red-500">{formatPKR(row.deductionBreakdown.tax)}</span></div>
+                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Loan EMI</span><span className="text-red-500">{formatPKR(row.deductionBreakdown.loanEmi)}</span></div>
+                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">SC Employee Share</span><span className="text-red-500">{formatPKR(row.deductionBreakdown.scEmployee)}</span></div>
+                                    <Separator className="my-1"/>
+                                    <div className="flex justify-between text-[12px] font-semibold"><span>Total Deductions</span><span className="text-red-500">{formatPKR(row.totalDeductions)}</span></div>
+                                  </div>
                                 </div>
                               </div>
-                              <div>
-                                <h5 className="text-[11px] font-semibold text-slate-700 mb-2 uppercase tracking-wider">Deductions</h5>
-                                <div className="space-y-1">
-                                  <div className="flex justify-between text-[12px]"><span className="text-slate-500">Absent Deduction</span><span className="text-red-500">{formatPKR(row.deductionBreakdown.absentDeduction)}</span></div>
-                                  <div className="flex justify-between text-[12px]"><span className="text-slate-500">Tax</span><span className="text-red-500">{formatPKR(row.deductionBreakdown.tax)}</span></div>
-                                  <div className="flex justify-between text-[12px]"><span className="text-slate-500">Loan EMI</span><span className="text-red-500">{formatPKR(row.deductionBreakdown.loanEmi)}</span></div>
-                                  <div className="flex justify-between text-[12px]"><span className="text-slate-500">SC Employee Share</span><span className="text-red-500">{formatPKR(row.deductionBreakdown.scEmployee)}</span></div>
-                                  <Separator className="my-1"/>
-                                  <div className="flex justify-between text-[12px] font-semibold"><span>Total Deductions</span><span className="text-red-500">{formatPKR(row.totalDeductions)}</span></div>
-                                </div>
+                              <div className="mt-3 pt-3 border-t border-slate-200 text-right">
+                                <span className="text-[12px] text-slate-500 mr-3">Net Pay:</span>
+                                <span className="text-[14px] font-semibold text-emerald-600">{formatPKR(row.netPaid)}</span>
                               </div>
-                            </div>
-                            {/* SC Breakdown in payslip */}
-                            <div className="mt-3 pt-3 border-t border-slate-200">
-                              <h5 className="text-[11px] font-semibold text-slate-700 mb-2">Social Charges Breakdown (AGES Formula)</h5>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                                <div className="bg-white rounded-lg p-2 border border-slate-100">
-                                  <span className="text-slate-500">Monthly SC (20%)</span>
-                                  <p className="font-semibold text-slate-900">{formatPKR(rowScCalc.monthlySC)}</p>
-                                </div>
-                                <div className="bg-white rounded-lg p-2 border border-slate-100">
-                                  <span className="text-slate-500">Earned SC</span>
-                                  <p className="font-semibold text-emerald-600">{formatPKR(rowScCalc.earnedSC)}</p>
-                                </div>
-                                <div className="bg-white rounded-lg p-2 border border-slate-100">
-                                  <span className="text-slate-500">Leave Deduction</span>
-                                  <p className="font-semibold text-red-500">{formatPKR(rowScCalc.leaveDeduction)}</p>
-                                </div>
-                                <div className="bg-white rounded-lg p-2 border border-slate-100">
-                                  <span className="text-slate-500">Final Payable SC</span>
-                                  <p className="font-semibold text-slate-900">{formatPKR(rowScCalc.finalSC)}</p>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="mt-3 pt-3 border-t border-slate-200 text-right">
-                              <span className="text-[12px] text-slate-500 mr-3">Net Pay:</span>
-                              <span className="text-[14px] font-semibold text-emerald-600">{formatPKR(row.netPaid)}</span>
                             </div>
                           </div>
-                        </div>
-                      </td>
-                    </tr>
-                  </React.Fragment>
-                )
-              })}
-            </tbody>
-          </table>
+                        </td>
+                      </tr>
+                    </React.Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
@@ -1157,8 +1236,7 @@ export function EmployeeProfile() {
   // RENDER: Tab 2 — Social Charges
   // ========================================================================
   const renderSocialCharges = () => {
-    const scCalc = effectivePayroll || localScCalc
-    const scSource = effectivePayroll ? 'API Calculation' : 'Local Demo'
+    const scCalc = effectivePayroll
 
     return (
       <div className="space-y-4">
@@ -1183,58 +1261,66 @@ export function EmployeeProfile() {
         </div>
 
         {/* SC Component Breakdown */}
-        <div>
-          <h3 className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-1.5"><PieChart className="h-3.5 w-3.5"/>SC Component Breakdown — {fmtMonth(payrollMonth)}</h3>
-          {renderScComponentCards(scCalc)}
-        </div>
+        {scCalc && (
+          <div>
+            <h3 className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-1.5"><PieChart className="h-3.5 w-3.5"/>SC Component Breakdown — {fmtMonth(payrollMonth)}</h3>
+            {renderScComponentCards(scCalc)}
+          </div>
+        )}
 
         {/* Project-wise SC Distribution */}
-        {scCalc.projectAllocations.length > 0 && (
+        {scCalc && scCalc.projectAllocations.length > 0 && (
           <div>
             <h3 className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-1.5"><BarChart3 className="h-3.5 w-3.5"/>Project-wise SC Distribution — {fmtMonth(payrollMonth)}</h3>
-            {renderProjectCostDistribution(scCalc, scSource)}
+            {renderProjectCostDistribution(scCalc, 'API Calculation')}
           </div>
         )}
 
         {/* SC Ledger Table */}
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/50">
-                  <th className="text-left py-2.5 px-3 text-[11px] font-medium text-slate-500">Month</th>
-                  <th className="text-right py-2.5 px-3 text-[11px] font-medium text-slate-500">Gross Salary</th>
-                  <th className="text-center py-2.5 px-3 text-[11px] font-medium text-slate-500">SC Rate</th>
-                  <th className="text-right py-2.5 px-3 text-[11px] font-medium text-slate-500">SC Amount</th>
-                  <th className="text-right py-2.5 px-3 text-[11px] font-medium text-slate-500">Paid</th>
-                  <th className="text-right py-2.5 px-3 text-[11px] font-medium text-slate-500">Outstanding</th>
-                  <th className="text-center py-2.5 px-3 text-[11px] font-medium text-slate-500">Status</th>
-                  <th className="text-left py-2.5 px-3 text-[11px] font-medium text-slate-500">Paid On</th>
-                </tr>
-              </thead>
-              <tbody>
-                {scLedger.map(row => (
-                  <tr key={row.month} className={`border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${row.status==='Pending'?'bg-amber-50/40':row.status==='Partial'?'bg-blue-50/30':''}`}>
-                    <td className="py-2.5 px-3 font-medium text-slate-900">{fmtMonth(row.month)}</td>
-                    <td className="py-2.5 px-3 text-right text-slate-600">{formatPKR(row.grossSalary)}</td>
-                    <td className="py-2.5 px-3 text-center text-slate-600">{(row.scRate*100).toFixed(0)}%</td>
-                    <td className="py-2.5 px-3 text-right text-slate-900">{formatPKR(row.scAmount)}</td>
-                    <td className="py-2.5 px-3 text-right text-slate-600">{formatPKR(row.paid)}</td>
-                    <td className="py-2.5 px-3 text-right text-slate-600">{formatPKR(row.outstanding)}</td>
-                    <td className="py-2.5 px-3 text-center"><ScBadge status={row.status}/></td>
-                    <td className="py-2.5 px-3 text-slate-500">{row.paidOn ? formatDate(row.paidOn) : '—'}</td>
+            {scLedger.length === 0 ? (
+              <div className="p-8 text-center text-sm text-slate-400">
+                No SC ledger entries. Run payroll to generate records.
+              </div>
+            ) : (
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/50">
+                    <th className="text-left py-2.5 px-3 text-[11px] font-medium text-slate-500">Month</th>
+                    <th className="text-right py-2.5 px-3 text-[11px] font-medium text-slate-500">Gross Salary</th>
+                    <th className="text-center py-2.5 px-3 text-[11px] font-medium text-slate-500">SC Rate</th>
+                    <th className="text-right py-2.5 px-3 text-[11px] font-medium text-slate-500">SC Amount</th>
+                    <th className="text-right py-2.5 px-3 text-[11px] font-medium text-slate-500">Paid</th>
+                    <th className="text-right py-2.5 px-3 text-[11px] font-medium text-slate-500">Outstanding</th>
+                    <th className="text-center py-2.5 px-3 text-[11px] font-medium text-slate-500">Status</th>
+                    <th className="text-left py-2.5 px-3 text-[11px] font-medium text-slate-500">Paid On</th>
                   </tr>
-                ))}
-                <tr className="border-t-2 border-slate-200 bg-slate-50/50 font-semibold">
-                  <td className="py-2.5 px-3 text-slate-900">Total</td>
-                  <td></td><td></td>
-                  <td className="py-2.5 px-3 text-right text-slate-900">{formatPKR(totalScAccrued)}</td>
-                  <td className="py-2.5 px-3 text-right text-emerald-600">{formatPKR(totalScPaid)}</td>
-                  <td className="py-2.5 px-3 text-right text-amber-600">{formatPKR(scOutstanding)}</td>
-                  <td></td><td></td>
-                </tr>
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {scLedger.map(row => (
+                    <tr key={row.month} className={`border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${row.status==='Pending'?'bg-amber-50/40':row.status==='Partial'?'bg-blue-50/30':''}`}>
+                      <td className="py-2.5 px-3 font-medium text-slate-900">{fmtMonth(row.month)}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-600">{formatPKR(row.grossSalary)}</td>
+                      <td className="py-2.5 px-3 text-center text-slate-600">{(row.scRate*100).toFixed(0)}%</td>
+                      <td className="py-2.5 px-3 text-right text-slate-900">{formatPKR(row.scAmount)}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-600">{formatPKR(row.paid)}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-600">{formatPKR(row.outstanding)}</td>
+                      <td className="py-2.5 px-3 text-center"><ScBadge status={row.status}/></td>
+                      <td className="py-2.5 px-3 text-slate-500">{row.paidOn ? formatDate(row.paidOn) : '—'}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t-2 border-slate-200 bg-slate-50/50 font-semibold">
+                    <td className="py-2.5 px-3 text-slate-900">Total</td>
+                    <td></td><td></td>
+                    <td className="py-2.5 px-3 text-right text-slate-900">{formatPKR(totalScAccrued)}</td>
+                    <td className="py-2.5 px-3 text-right text-emerald-600">{formatPKR(totalScPaid)}</td>
+                    <td className="py-2.5 px-3 text-right text-amber-600">{formatPKR(scOutstanding)}</td>
+                    <td></td><td></td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
@@ -1286,13 +1372,18 @@ export function EmployeeProfile() {
     const totalLiability = loanOutstanding + advBalance
     return (
       <div className="space-y-5">
+        {loansLoading && (
+          <div className="bg-white border border-slate-200 rounded-xl p-6 text-center text-sm text-slate-400">
+            <Loader2 className="h-5 w-5 mx-auto mb-2 animate-spin"/>Loading loans & advances...
+          </div>
+        )}
         {/* Loans */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-slate-900">Active Loans</h3>
             {isAdmin && <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={()=>setNewLoanOpen(true)}><Plus className="h-3 w-3 mr-1"/>New Loan</Button>}
           </div>
-          {loans.length === 0 && <div className="bg-white border border-slate-200 rounded-xl p-6 text-center text-sm text-slate-400">No active loans</div>}
+          {loans.length === 0 && !loansLoading && <div className="bg-white border border-slate-200 rounded-xl p-6 text-center text-sm text-slate-400">No active loans</div>}
           {loans.map(loan => {
             const isExp = expandedLoan === loan.id
             const paidTotal = loan.principal - loan.remaining
@@ -1338,7 +1429,7 @@ export function EmployeeProfile() {
             <h3 className="text-sm font-semibold text-slate-900">Salary Advances</h3>
             {isAdmin && <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={()=>setNewAdvOpen(true)}><Plus className="h-3 w-3 mr-1"/>New Advance</Button>}
           </div>
-          {advances.length === 0 && <div className="bg-white border border-slate-200 rounded-xl p-6 text-center text-sm text-slate-400">No active advances</div>}
+          {advances.length === 0 && !loansLoading && <div className="bg-white border border-slate-200 rounded-xl p-6 text-center text-sm text-slate-400">No active advances</div>}
           {advances.length > 0 && (
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
@@ -1421,14 +1512,19 @@ export function EmployeeProfile() {
         <Select value={attMonth} onValueChange={v=>setAttMonths(p=>({...p,[emp.id]:v}))}>
           <SelectTrigger className="h-8 text-xs w-44"><SelectValue/></SelectTrigger>
           <SelectContent>
-            {MONTHS.map(m=><SelectItem key={m} value={m}>{fmtMonth(m)}</SelectItem>)}
+            {availableMonths.map(m=><SelectItem key={m} value={m}>{fmtMonth(m)}</SelectItem>)}
           </SelectContent>
         </Select>
+        {attLoading && <Loader2 className="h-4 w-4 animate-spin text-slate-400"/>}
       </div>
 
-      {attMonth !== '2026-05' ? (
+      {attLoading ? (
         <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-sm text-slate-400">
-          Detailed attendance data is only available for May 2026.
+          <Loader2 className="h-5 w-5 mx-auto mb-2 animate-spin"/>Loading attendance data...
+        </div>
+      ) : Object.keys(attData).length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-sm text-slate-400">
+          No attendance data found for {fmtMonth(attMonth)}.
         </div>
       ) : (
         <>
@@ -1534,19 +1630,22 @@ export function EmployeeProfile() {
                     </tr>
                   </thead>
                   <tbody>
-                    {projectAlloc.map((p,i) => (
-                      <tr key={p.name} className="border-b border-slate-50">
-                        <td className="py-2 px-3">
-                          <span className="flex items-center gap-1.5">
-                            <span className={`w-2 h-2 rounded-full ${PROJECT_BAR_COLORS[i % PROJECT_BAR_COLORS.length]}`}/>
-                            <span className="font-medium text-slate-900">{p.name}</span>
-                          </span>
-                        </td>
-                        <td className="py-2 px-3 text-center text-slate-600">{p.days}</td>
-                        <td className="py-2 px-3 text-center text-slate-600">{p.pct}%</td>
-                        <td className="py-2 px-3 text-right text-slate-900">{formatPKR(Math.round(emp.monthlySalary * p.days / 31))}</td>
-                      </tr>
-                    ))}
+                    {projectAlloc.map((p,i) => {
+                      const daysInMonth = attStats.totalDays || 30
+                      return (
+                        <tr key={p.name} className="border-b border-slate-50">
+                          <td className="py-2 px-3">
+                            <span className="flex items-center gap-1.5">
+                              <span className={`w-2 h-2 rounded-full ${PROJECT_BAR_COLORS[i % PROJECT_BAR_COLORS.length]}`}/>
+                              <span className="font-medium text-slate-900">{p.name}</span>
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 text-center text-slate-600">{p.days}</td>
+                          <td className="py-2 px-3 text-center text-slate-600">{p.pct}%</td>
+                          <td className="py-2 px-3 text-right text-slate-900">{formatPKR(Math.round((emp.monthlySalary || emp.baseSalary) * p.days / daysInMonth))}</td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1560,89 +1659,121 @@ export function EmployeeProfile() {
   // ========================================================================
   // RENDER: Tab 5 — Documents
   // ========================================================================
-  const renderDocuments = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {docs.map(doc => {
-          const isReplacing = replaceDocId === doc.id
-          const typeColor = doc.type === 'pdf' ? 'bg-red-100 text-red-700' : doc.type === 'zip' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
-          return (
-            <div key={doc.id} className="bg-white border border-slate-200 rounded-xl p-4">
-              <div className="flex items-start gap-3">
-                <div className={`h-9 w-9 rounded-lg flex items-center justify-center text-[10px] font-bold ${typeColor}`}>
-                  {doc.type.toUpperCase()}
+  const renderDocuments = () => {
+    const docsList = docs.length > 0 ? docs : [
+      { id:1, name:'CNIC Copy', type:'pdf', uploaded: emp.joinDate || new Date().toISOString().split('T')[0], size:'—' },
+      { id:2, name:'Employment Contract', type:'pdf', uploaded: emp.joinDate || new Date().toISOString().split('T')[0], size:'—' },
+    ]
+
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {docsList.map(doc => {
+            const isReplacing = replaceDocId === doc.id
+            const typeColor = doc.type === 'pdf' ? 'bg-red-100 text-red-700' : doc.type === 'zip' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+            return (
+              <div key={doc.id} className="bg-white border border-slate-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <div className={`h-9 w-9 rounded-lg flex items-center justify-center text-[10px] font-bold ${typeColor}`}>
+                    {doc.type.toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-medium text-slate-900 truncate">{doc.name}</p>
+                    <p className="text-[11px] text-slate-500">{formatDate(doc.uploaded)} • {doc.size}</p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-slate-900 truncate">{doc.name}</p>
-                  <p className="text-[11px] text-slate-500">{formatDate(doc.uploaded)} • {doc.size}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 mt-3">
-                <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1" onClick={()=>setPreviewDoc(doc)}>
-                  <Eye className="h-3 w-3 mr-1"/>View
-                </Button>
-                {isAdmin && !isReplacing && (
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1" onClick={()=>setReplaceDocId(doc.id)}>
-                    <Edit3 className="h-3 w-3 mr-1"/>Replace
+                <div className="flex items-center gap-2 mt-3">
+                  <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1" onClick={()=>setPreviewDoc(doc)}>
+                    <Eye className="h-3 w-3 mr-1"/>View
                   </Button>
-                )}
-                {isAdmin && isReplacing && (
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1" onClick={()=>setReplaceDocId(null)}>Cancel</Button>
+                  {isAdmin && !isReplacing && (
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1" onClick={()=>setReplaceDocId(doc.id)}>
+                      <Edit3 className="h-3 w-3 mr-1"/>Replace
+                    </Button>
+                  )}
+                  {isAdmin && isReplacing && (
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1" onClick={()=>setReplaceDocId(null)}>Cancel</Button>
+                  )}
+                </div>
+                {isReplacing && (
+                  <div className="mt-2">
+                    <Input type="file" className="h-8 text-xs" onChange={() => { setReplaceDocId(null); toast.success('Document replaced successfully') }} accept=".pdf,.zip,.jpg,.png" />
+                  </div>
                 )}
               </div>
-              {isReplacing && (
-                <div className="mt-2">
-                  <Input type="file" className="h-8 text-xs" onChange={() => { setReplaceDocId(null); toast.success('Document replaced successfully') }} accept=".pdf,.zip,.jpg,.png" />
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-      {isAdmin && (
-        <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-slate-300 transition-colors">
-          <Upload className="h-8 w-8 text-slate-300 mx-auto mb-2"/>
-          <p className="text-sm text-slate-500 mb-1">Upload New Document</p>
-          <p className="text-[11px] text-slate-400 mb-3">PDF, ZIP, or image files</p>
-          <Input type="file" className="max-w-xs mx-auto h-8 text-xs" onChange={() => toast.success('Document uploaded successfully')} accept=".pdf,.zip,.jpg,.png"/>
+            )
+          })}
         </div>
-      )}
-      {/* Document Preview Sheet */}
-      <Sheet open={!!previewDoc} onOpenChange={()=>setPreviewDoc(null)}>
-        <SheetContent className="w-full sm:max-w-lg">
-          {previewDoc && (
-            <>
-              <SheetHeader>
-                <SheetTitle className="text-left">{previewDoc.name}</SheetTitle>
-              </SheetHeader>
-              <div className="mt-6 space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className={`h-12 w-12 rounded-lg flex items-center justify-center text-sm font-bold ${previewDoc.type==='pdf'?'bg-red-100 text-red-700':previewDoc.type==='zip'?'bg-amber-100 text-amber-700':'bg-blue-100 text-blue-700'}`}>
-                    {previewDoc.type.toUpperCase()}
+        {isAdmin && (
+          <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-slate-300 transition-colors">
+            <Upload className="h-8 w-8 text-slate-300 mx-auto mb-2"/>
+            <p className="text-sm text-slate-500 mb-1">Upload New Document</p>
+            <p className="text-[11px] text-slate-400 mb-3">PDF, ZIP, or image files</p>
+            <Input type="file" className="max-w-xs mx-auto h-8 text-xs" onChange={() => toast.success('Document uploaded successfully')} accept=".pdf,.zip,.jpg,.png"/>
+          </div>
+        )}
+        {/* Document Preview Sheet */}
+        <Sheet open={!!previewDoc} onOpenChange={()=>setPreviewDoc(null)}>
+          <SheetContent className="w-full sm:max-w-lg">
+            {previewDoc && (
+              <>
+                <SheetHeader>
+                  <SheetTitle className="text-left">{previewDoc.name}</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-12 w-12 rounded-lg flex items-center justify-center text-sm font-bold ${previewDoc.type==='pdf'?'bg-red-100 text-red-700':previewDoc.type==='zip'?'bg-amber-100 text-amber-700':'bg-blue-100 text-blue-700'}`}>
+                      {previewDoc.type.toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-900">{previewDoc.name}</p>
+                      <p className="text-[12px] text-slate-500">Uploaded: {formatDate(previewDoc.uploaded)}</p>
+                      <p className="text-[12px] text-slate-500">Size: {previewDoc.size}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-slate-900">{previewDoc.name}</p>
-                    <p className="text-[12px] text-slate-500">Uploaded: {formatDate(previewDoc.uploaded)}</p>
-                    <p className="text-[12px] text-slate-500">Size: {previewDoc.size}</p>
+                  <Separator />
+                  <div className="bg-slate-50 rounded-xl p-8 text-center">
+                    <FileText className="h-12 w-12 text-slate-300 mx-auto mb-2"/>
+                    <p className="text-sm text-slate-500">Document preview</p>
+                    <p className="text-[11px] text-slate-400 mt-1">File: {previewDoc.name}.{previewDoc.type}</p>
                   </div>
                 </div>
-                <Separator />
-                <div className="bg-slate-50 rounded-xl p-8 text-center">
-                  <FileText className="h-12 w-12 text-slate-300 mx-auto mb-2"/>
-                  <p className="text-sm text-slate-500">Document preview</p>
-                  <p className="text-[11px] text-slate-400 mt-1">File: {previewDoc.name}.{previewDoc.type}</p>
-                </div>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
-    </div>
-  )
+              </>
+            )}
+          </SheetContent>
+        </Sheet>
+      </div>
+    )
+  }
 
   // ========================================================================
   // RENDER: Main Layout
   // ========================================================================
+  if (employeesLoading) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="h-12 bg-slate-100 rounded-xl"/>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="space-y-4">
+            <div className="h-64 bg-slate-100 rounded-xl"/>
+            <div className="h-24 bg-slate-100 rounded-xl"/>
+          </div>
+          <div className="lg:col-span-2 h-96 bg-slate-100 rounded-xl"/>
+        </div>
+      </div>
+    )
+  }
+
+  if (employees.length === 0) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
+        <Info className="h-10 w-10 text-slate-300 mx-auto mb-3"/>
+        <h3 className="text-lg font-semibold text-slate-700 mb-1">No Employees Found</h3>
+        <p className="text-sm text-slate-400">There are no employees in the system. Add employees first to view their profiles.</p>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="space-y-4 animate-pulse">

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, getSystemUserId } from '@/lib/db'
 import { calculateMonthlyPayroll } from '@/lib/payroll/calculateMonthlyPayroll'
 import { findAccountByRole, findFirstBankAccount } from '@/lib/account-roles'
 
@@ -23,9 +23,14 @@ function getPeriodDates(period: string): { startDate: Date; endDate: Date } {
   return { startDate, endDate }
 }
 
-// Helper: recalculate batch totals from all lines
+// Helper: recalculate batch totals from lines
+// When batch status is "approved" or "posted", only include lines with lineStatus = "approved"
 async function recalcBatchTotals(batchId: string) {
-  const lines = await db.payrollBatchLine.findMany({ where: { batchId } })
+  const batch = await db.payrollBatch.findUnique({ where: { id: batchId } })
+  const filterApproved = batch && (batch.status === 'approved' || batch.status === 'posted')
+  const lines = await db.payrollBatchLine.findMany({
+    where: { batchId, ...(filterApproved ? { lineStatus: 'approved' } : {}) },
+  })
 
   const totals = lines.reduce(
     (acc, l) => ({
@@ -217,6 +222,7 @@ export async function POST(request: Request) {
             taxBreakdown: JSON.stringify(result.taxBreakdown),
             projectId: primaryProject?.projectId || emp.defaultProjectId || null,
             department: emp.department,
+            lineStatus: 'draft',
           })
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err)
@@ -463,6 +469,278 @@ export async function POST(request: Request) {
     }
 
     // ----------------------------------------------------------
+    // 9a. APPROVE LINE — Approve individual line(s)
+    // ----------------------------------------------------------
+    if (action === 'approve-line') {
+      const { lineId, lineIds } = data
+      const ids: string[] = lineIds || (lineId ? [lineId] : [])
+      if (ids.length === 0) return NextResponse.json({ error: 'lineId or lineIds required' }, { status: 400 })
+
+      // Verify all lines exist and belong to batches with valid status
+      const lines = await db.payrollBatchLine.findMany({ where: { id: { in: ids } } })
+      if (lines.length === 0) return NextResponse.json({ error: 'No lines found' }, { status: 404 })
+
+      const batchIds = [...new Set(lines.map(l => l.batchId))]
+      const batches = await db.payrollBatch.findMany({ where: { id: { in: batchIds } } })
+      for (const b of batches) {
+        if (b.status !== 'reviewed' && b.status !== 'approved') {
+          return NextResponse.json({ error: `Batch ${b.batchNumber} status is '${b.status}', must be 'reviewed' or 'approved' to approve lines` }, { status: 400 })
+        }
+      }
+
+      await db.payrollBatchLine.updateMany({
+        where: { id: { in: ids } },
+        data: { lineStatus: 'approved' },
+      })
+
+      // Recalc totals for affected batches
+      for (const bid of batchIds) {
+        await recalcBatchTotals(bid)
+      }
+
+      return NextResponse.json({ message: `${ids.length} line(s) approved`, approvedIds: ids })
+    }
+
+    // ----------------------------------------------------------
+    // 9b. APPROVE ALL LINES — Approve all lines in a batch
+    // ----------------------------------------------------------
+    if (action === 'approve-all-lines') {
+      const { batchId } = data
+      if (!batchId) return NextResponse.json({ error: 'Batch ID required' }, { status: 400 })
+
+      const batch = await db.payrollBatch.findUnique({ where: { id: batchId } })
+      if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
+      if (batch.status !== 'reviewed' && batch.status !== 'approved') {
+        return NextResponse.json({ error: 'Batch status must be reviewed or approved to approve lines' }, { status: 400 })
+      }
+
+      const result = await db.payrollBatchLine.updateMany({
+        where: { batchId },
+        data: { lineStatus: 'approved' },
+      })
+
+      await recalcBatchTotals(batchId)
+
+      return NextResponse.json({ message: `All lines approved`, count: result.count })
+    }
+
+    // ----------------------------------------------------------
+    // 9c. DRAFT TO GL — Post only approved lines to GL (creates a draft voucher)
+    // ----------------------------------------------------------
+    if (action === 'draft-to-gl') {
+      const { batchId, financialYearId, lineIds } = data
+      if (!batchId) return NextResponse.json({ error: 'Batch ID required' }, { status: 400 })
+      if (!financialYearId) return NextResponse.json({ error: 'Financial Year ID required' }, { status: 400 })
+
+      const batch = await db.payrollBatch.findUnique({ where: { id: batchId } })
+      if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
+      if (batch.postedToGL) return NextResponse.json({ error: 'Already posted to GL' }, { status: 400 })
+
+      // Determine which lines to include
+      const lineFilter: any = lineIds?.length > 0
+        ? { id: { in: lineIds }, lineStatus: 'approved' }
+        : { lineStatus: 'approved' }
+      lineFilter.batchId = batchId
+
+      const approvedLines = await db.payrollBatchLine.findMany({ where: lineFilter })
+      if (approvedLines.length === 0) {
+        return NextResponse.json({ error: 'No approved lines found to post' }, { status: 400 })
+      }
+
+      // Calculate totals from approved lines only
+      const totals = approvedLines.reduce(
+        (acc, l) => ({
+          totalBasicSalary: acc.totalBasicSalary + l.basicSalary,
+          totalAllowances: acc.totalAllowances + l.allowances,
+          totalGross: acc.totalGross + l.grossSalary,
+          totalIncomeTax: acc.totalIncomeTax + l.incomeTax,
+          totalEobiEmployee: acc.totalEobiEmployee + l.eobiEmployee,
+          totalEobiEmployer: acc.totalEobiEmployer + l.eobiEmployer,
+          totalPfEmployee: acc.totalPfEmployee + l.pfEmployee,
+          totalPfEmployer: acc.totalPfEmployer + l.pfEmployer,
+          totalLoanDeduction: acc.totalLoanDeduction + l.loanDeduction,
+          totalAdvanceDeduction: acc.totalAdvanceDeduction + l.advanceDeduction,
+          totalOtherDeductions: acc.totalOtherDeductions + l.otherDeductions,
+          totalDeductions: acc.totalDeductions + l.totalDeductions,
+          totalNetPay: acc.totalNetPay + l.netPay,
+          totalSocialCharges: acc.totalSocialCharges + l.socialCharges,
+          totalGratuity: acc.totalGratuity + l.gratuity,
+          totalEmployerCharges: acc.totalEmployerCharges + l.eobiEmployer + l.pfEmployer + l.socialCharges + l.gratuity,
+        }),
+        {
+          totalBasicSalary: 0, totalAllowances: 0, totalGross: 0, totalIncomeTax: 0,
+          totalEobiEmployee: 0, totalEobiEmployer: 0, totalPfEmployee: 0, totalPfEmployer: 0,
+          totalLoanDeduction: 0, totalAdvanceDeduction: 0, totalOtherDeductions: 0, totalDeductions: 0,
+          totalNetPay: 0, totalSocialCharges: 0, totalGratuity: 0, totalEmployerCharges: 0,
+        }
+      )
+
+      // Use PayrollAccountMapping table to find GL accounts
+      const mappings = await db.payrollAccountMapping.findMany({ where: { isActive: true } })
+      const getMappedAccounts = (componentType: string) => {
+        const mapping = mappings.find(m => m.componentType === componentType)
+        return { debitAccountId: mapping?.debitAccountId, creditAccountId: mapping?.creditAccountId }
+      }
+
+      const salaryExpenseAccount = await findAccountByRole('SALARY_EXPENSE')
+      const salaryPayableAccount = await findAccountByRole('SALARY_PAYABLE')
+      const bankAccount = await findFirstBankAccount()
+      const incomeTaxPayableAccount = await findAccountByRole('INCOME_TAX_PAYABLE')
+      const eobiPayableAccount = await findAccountByRole('EOBI_PAYABLE')
+      const pfPayableAccount = await findAccountByRole('PROVIDENT_FUND_PAYABLE')
+      const socialChargesAccount = await findAccountByRole('SOCIAL_CHARGES')
+      const socialChargesPayableAccount = await findAccountByRole('SOCIAL_CHARGES_PAYABLE')
+
+      const getDebitAccount = (componentType: string, fallback: any) => {
+        const mapped = getMappedAccounts(componentType)
+        return mapped.debitAccountId || fallback?.id
+      }
+      const getCreditAccount = (componentType: string, fallback: any) => {
+        const mapped = getMappedAccounts(componentType)
+        return mapped.creditAccountId || fallback?.id
+      }
+
+      const entries: any[] = []
+      let lineNumber = 0
+
+      const addEntry = (accountId: string | null | undefined, debit: number, credit: number, description: string) => {
+        if (!accountId || (debit === 0 && credit === 0)) return
+        lineNumber++
+        entries.push({
+          lineNumber,
+          accountId,
+          debit: Math.round(debit * 100) / 100,
+          credit: Math.round(credit * 100) / 100,
+          description,
+          payrollRef: batch.batchNumber,
+        })
+      }
+
+      // 1. Dr Salary Expense / Cr Salary Payable
+      addEntry(getDebitAccount('SALARY_EXPENSE', salaryExpenseAccount), totals.totalBasicSalary, 0, 'Basic salary expense')
+      addEntry(getCreditAccount('SALARY_EXPENSE', salaryPayableAccount), 0, totals.totalBasicSalary, 'Basic salary payable')
+
+      // 2. Dr Allowance Expense / Cr Allowance Payable
+      if (totals.totalAllowances > 0) {
+        addEntry(getDebitAccount('ALLOWANCE_EXPENSE', salaryExpenseAccount), totals.totalAllowances, 0, 'Allowances expense')
+        addEntry(getCreditAccount('ALLOWANCE_EXPENSE', salaryPayableAccount), 0, totals.totalAllowances, 'Allowances payable')
+      }
+
+      // 3. Dr Social Charges Expense / Cr Social Charges Payable
+      if (totals.totalSocialCharges > 0) {
+        addEntry(getDebitAccount('SOCIAL_CHARGES', socialChargesAccount), totals.totalSocialCharges, 0, 'Social charges expense')
+        addEntry(getCreditAccount('SOCIAL_CHARGES', socialChargesPayableAccount || eobiPayableAccount), 0, totals.totalSocialCharges, 'Social charges payable')
+      }
+
+      // 4. Dr Salary Payable / Cr Income Tax Payable
+      if (totals.totalIncomeTax > 0) {
+        addEntry(getDebitAccount('INCOME_TAX_PAYABLE', salaryPayableAccount), totals.totalIncomeTax, 0, 'Income tax deduction from salary')
+        addEntry(getCreditAccount('INCOME_TAX_PAYABLE', incomeTaxPayableAccount), 0, totals.totalIncomeTax, 'Income tax payable')
+      }
+
+      // 5. Dr Salary Payable / Cr EOBI Payable (employee)
+      if (totals.totalEobiEmployee > 0) {
+        addEntry(getDebitAccount('EOBI_EMPLOYEE', salaryPayableAccount), totals.totalEobiEmployee, 0, 'EOBI employee deduction from salary')
+        addEntry(getCreditAccount('EOBI_EMPLOYEE', eobiPayableAccount), 0, totals.totalEobiEmployee, 'EOBI payable (employee)')
+      }
+
+      // 6. Dr Salary Payable / Cr PF Payable (employee)
+      if (totals.totalPfEmployee > 0) {
+        addEntry(getDebitAccount('PF_EMPLOYEE', salaryPayableAccount), totals.totalPfEmployee, 0, 'PF employee deduction from salary')
+        addEntry(getCreditAccount('PF_EMPLOYEE', pfPayableAccount), 0, totals.totalPfEmployee, 'Provident fund payable (employee)')
+      }
+
+      // 7. Dr Salary Payable / Cr Bank (for net pay)
+      if (totals.totalNetPay > 0) {
+        addEntry(salaryPayableAccount?.id || bankAccount?.id, totals.totalNetPay, 0, 'Net salary payable via bank')
+        addEntry(bankAccount?.id, 0, totals.totalNetPay, 'Net pay bank transfer')
+      }
+
+      // 8. Employer EOBI
+      if (totals.totalEobiEmployer > 0) {
+        addEntry(getDebitAccount('EOBI_EMPLOYER', socialChargesAccount), totals.totalEobiEmployer, 0, 'Employer EOBI contribution expense')
+        addEntry(getCreditAccount('EOBI_EMPLOYER', eobiPayableAccount), 0, totals.totalEobiEmployer, 'Employer EOBI payable')
+      }
+
+      // 9. Employer PF
+      if (totals.totalPfEmployer > 0) {
+        addEntry(getDebitAccount('PF_EMPLOYER', socialChargesAccount), totals.totalPfEmployer, 0, 'Employer PF contribution expense')
+        addEntry(getCreditAccount('PF_EMPLOYER', pfPayableAccount), 0, totals.totalPfEmployer, 'Employer PF payable')
+      }
+
+      // Loan deductions
+      if (totals.totalLoanDeduction > 0) {
+        addEntry(salaryPayableAccount?.id, totals.totalLoanDeduction, 0, 'Loan deduction from salary')
+        addEntry(getCreditAccount('LOAN_DEDUCTION', salaryPayableAccount), 0, totals.totalLoanDeduction, 'Loan recovery payable')
+      }
+
+      // Advance deductions
+      if (totals.totalAdvanceDeduction > 0) {
+        addEntry(salaryPayableAccount?.id, totals.totalAdvanceDeduction, 0, 'Advance deduction from salary')
+        addEntry(getCreditAccount('ADVANCE_DEDUCTION', salaryPayableAccount), 0, totals.totalAdvanceDeduction, 'Advance recovery payable')
+      }
+
+      if (entries.length === 0) {
+        return NextResponse.json({ error: 'No journal entries could be created. Check GL account mappings.' }, { status: 400 })
+      }
+
+      const totalDebit = entries.reduce((s, e) => s + e.debit, 0)
+      const totalCredit = entries.reduce((s, e) => s + e.credit, 0)
+
+      // Create a DRAFT voucher (not posted)
+      const voucher = await db.voucher.create({
+        data: {
+          voucherNumber: `JV-PAYROLL-${batch.batchNumber}`,
+          voucherType: 'JV',
+          voucherTypeName: 'Journal Voucher',
+          date: new Date(),
+          narration: `Payroll draft posting for batch ${batch.batchNumber} - ${batch.name} (approved lines only)`,
+          status: 'draft',
+          financialYearId,
+          projectId: batch.projectId,
+          isPayrollPosted: true,
+          totalDebit,
+          totalCredit,
+          createdBy: 'system',
+          entries: { create: entries },
+        },
+      })
+
+      // Audit cross-charging for approved lines
+      for (const line of approvedLines) {
+        if (line.projectId && line.projectId !== batch.projectId) {
+          await db.auditLog.create({
+            data: {
+              userId: await getSystemUserId(),
+              action: 'CREATE',
+              entity: 'VoucherEntry',
+              entityId: voucher.id,
+              details: `Cross-charged salary to project ${line.projectId}: ${line.grossSalary}`,
+            },
+          })
+        }
+      }
+
+      // Mark batch as posted
+      await db.payrollBatch.update({
+        where: { id: batchId },
+        data: {
+          postedToGL: true, postedVoucherId: voucher.id, status: 'posted', postedBy: 'system',
+        },
+      })
+
+      return NextResponse.json({
+        message: 'Payroll draft posted to GL (approved lines only)',
+        voucherId: voucher.id,
+        voucherNumber: voucher.voucherNumber,
+        voucherStatus: 'draft',
+        totalDebit, totalCredit,
+        entryCount: entries.length,
+        approvedLineCount: approvedLines.length,
+      })
+    }
+
+    // ----------------------------------------------------------
     // 9. POST TO GL — Post approved batch to GL (creates voucher)
     // ----------------------------------------------------------
     if (action === 'post-to-gl') {
@@ -476,6 +754,12 @@ export async function POST(request: Request) {
       if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
       if (batch.status !== 'approved') return NextResponse.json({ error: 'Only approved batches can be posted to GL' }, { status: 400 })
       if (batch.postedToGL) return NextResponse.json({ error: 'Already posted to GL' }, { status: 400 })
+
+      // Check that all lines have lineStatus = 'approved'
+      const unapprovedLines = batch.lines.filter(l => l.lineStatus !== 'approved')
+      if (unapprovedLines.length > 0) {
+        return NextResponse.json({ error: `All lines must be approved before posting to GL. ${unapprovedLines.length} line(s) still in '${unapprovedLines[0].lineStatus}' status` }, { status: 400 })
+      }
 
       if (!financialYearId) {
         return NextResponse.json({ error: 'Financial Year ID required' }, { status: 400 })
@@ -713,7 +997,7 @@ export async function POST(request: Request) {
         if (line.projectId && line.projectId !== batch.projectId) {
           await db.auditLog.create({
             data: {
-              userId: 'system',
+              userId: await getSystemUserId(),
               action: 'CREATE',
               entity: 'VoucherEntry',
               entityId: voucher.id,
@@ -743,6 +1027,10 @@ export async function POST(request: Request) {
         entryCount: entries.length,
       })
     }
+
+    // ----------------------------------------------------------
+    // 10. DRAFT TO GL — Alias handled above (kept for completeness)
+    // ----------------------------------------------------------
 
     // Unknown action
     return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })

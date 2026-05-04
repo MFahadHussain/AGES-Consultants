@@ -698,6 +698,7 @@ model Employee {
   socialSecurityNo  String?
   eobiEnabled       Boolean  @default(false) // Whether EOBI deduction applies
   pfEnabled         Boolean  @default(false) // Whether Provident Fund deduction applies
+  incomeTaxEnabled  Boolean  @default(true)  // Whether Income Tax deduction applies
 
   // Qualification
   qualification1    String?
@@ -1048,6 +1049,7 @@ model PayrollBatchLine {
 
   // SC Calculation breakdown
   scBreakdown     String?     // JSON: {monthlySC, workingRatio, earnedSC, leaveDeduction, finalSC}
+  lineStatus      String      @default("draft") // draft, approved — individual line approval for Draft to GL
 
   // Project & Cost Center
   projectId       String?

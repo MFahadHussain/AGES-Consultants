@@ -461,14 +461,22 @@ export async function calculateMonthlyPayroll(
   const grossSalary = round2(monthlySalary + totalAllowances)
 
   // ── 12. EOBI ──
-  const EOBI_MIN_WAGE_CAP = 32000
-  const eobiBase = Math.min(monthlySalary, EOBI_MIN_WAGE_CAP)
-  const eobiEmployee = round2(eobiBase * 0.01)
-  const eobiEmployer = round2(eobiBase * 0.05)
+  let eobiEmployee = 0
+  let eobiEmployer = 0
+  if (employee.eobiEnabled === true) {
+    const EOBI_MIN_WAGE_CAP = 32000
+    const eobiBase = Math.min(monthlySalary, EOBI_MIN_WAGE_CAP)
+    eobiEmployee = round2(eobiBase * 0.01)
+    eobiEmployer = round2(eobiBase * 0.05)
+  }
 
   // ── 13. Provident Fund ──
-  const pfEmployee = round2(monthlySalary * 0.0833)
-  const pfEmployer = round2(monthlySalary * 0.0833)
+  let pfEmployee = 0
+  let pfEmployer = 0
+  if (employee.pfEnabled === true) {
+    pfEmployee = round2(monthlySalary * 0.0833)
+    pfEmployer = round2(monthlySalary * 0.0833)
+  }
 
   // ── 14. Income Tax ──
   const taxSlabs = await db.taxSlab.findMany({
@@ -485,7 +493,7 @@ export async function calculateMonthlyPayroll(
     monthlyTax: 0,
   }
 
-  if (taxSlabs.length > 0 && grossSalary > 0) {
+  if (taxSlabs.length > 0 && grossSalary > 0 && employee.incomeTaxEnabled !== false) {
     const annualTaxableIncome = (grossSalary - taxFreeAllowances) * 12
     taxBreakdown.taxableIncome = annualTaxableIncome
 

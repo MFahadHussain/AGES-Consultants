@@ -18,8 +18,9 @@ const ASSAD_DATA = {
   category: 'Consultant',
   status: 'active',
   paymentType: 'monthly',
-  eobiEnabled: false,
+  eobiEnabled: true,
   pfEnabled: true,
+  incomeTaxEnabled: true,
   joiningDate: '2023-01-01',
   projectAssignments: [
     { designation: 'Environmentalist', salary: 265000, projectName: 'AGES HO', projectCode: 'AGES-HO' },
@@ -195,6 +196,7 @@ export async function POST() {
         paymentType: ASSAD_DATA.paymentType,
         eobiEnabled: ASSAD_DATA.eobiEnabled,
         pfEnabled: ASSAD_DATA.pfEnabled,
+        incomeTaxEnabled: ASSAD_DATA.incomeTaxEnabled,
         joiningDate: new Date(ASSAD_DATA.joiningDate),
         baseSalary: totalSalary,
         designation: ASSAD_DATA.projectAssignments[0].designation,
