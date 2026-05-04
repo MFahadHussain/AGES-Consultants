@@ -60,6 +60,14 @@ interface DocData {
   id: number; name: string; type: string; uploaded: string; size: string
 }
 
+interface ContractEarningRow {
+  assignmentId: string; projectId: string; projectName: string; projectCode: string
+  contractSalary: number; dailyRate: number; daysWorked: number; earnedSalary: number
+  absentDays: number; designation: string | null
+  scShare: number; scBalance: number
+  scOtherPayable: number; scEarnedLeave: number; scSickLeave: number; scCasualLeave: number
+}
+
 interface SalaryRow {
   month: string; workingDays: number; present: number; absent: number; leave: number
   earnedSalary: number; absentDeduction: number; taxAmount: number
@@ -68,13 +76,15 @@ interface SalaryRow {
   earnings: { basic: number; housing: number; transport: number; other: number }
   deductionBreakdown: { absentDeduction: number; tax: number; loanEmi: number; scEmployee: number }
   taxBreakdown?: { ytdIncome?: number; projectedAnnualIncome?: number; taxSlab?: string; taxPaidYtd?: number } | null
-  projectAllocations?: { projectId: string; projectName: string; projectCode: string; days: number; weight: number; weightPct: string; salaryShare: number; scShare: number }[] | null
+  projectAllocations?: { projectId: string; projectName: string; projectCode: string; days: number; weight: number; weightPct: string; salaryShare: number; scShare: number; projectDailyRate?: number; projectSalary?: number; designation?: string | null }[] | null
+  contractEarnings?: ContractEarningRow[] | null
 }
 
 // Payroll API result type
 interface PayrollResult {
   employee: { id: string; name: string; employeeCode: string; baseSalary: number }
   month: string
+  calendarDays: number
   daysInMonth: number
   eligibleDays: number
   leaveDays: number
@@ -87,6 +97,8 @@ interface PayrollResult {
   leaveDeduction: number
   finalSC: number
   scBalance: number
+  contractEarnings?: ContractEarningRow[]
+  totalContractEarnings?: number
   scComponents: {
     otherPayable: number
     earnedLeave: number
@@ -479,6 +491,7 @@ export function EmployeeProfile() {
               },
               taxBreakdown: line.taxBreakdown ? JSON.parse(line.taxBreakdown as string) : null,
               projectAllocations: line.projectAllocations ? JSON.parse(line.projectAllocations as string) : null,
+              contractEarnings: (line as Record<string, unknown>).contractEarnings ? JSON.parse((line as Record<string, unknown>).contractEarnings as string) : null,
             })
           }
 
@@ -642,7 +655,7 @@ export function EmployeeProfile() {
   }, [])
 
   // Profile edit
-  const startEdit = () => { if (emp) setEditForm({...emp}); setEditMode(true) }
+  const startEdit = () => { if (emp) { setEditForm({...emp}); setEditMode(true) } }
   const cancelEdit = () => { setEditMode(false); setEditForm({}) }
   const saveEdit = async () => {
     try {
@@ -896,26 +909,48 @@ export function EmployeeProfile() {
             </div>
           </>
         )}
-        {/* EOBI / PF / Income Tax / ESSI / Gratuity / Tax Filing Status Badges */}
+        {/* EOBI / PF / Income Tax / ESSI / Gratuity / Tax Filing Status - Interactive Toggles */}
         <Separator className="my-4" />
         <div className="space-y-2">
-          <p className="text-[11px] text-slate-500 font-medium">Statutory Status</p>
+          <p className="text-[11px] text-slate-500 font-medium">Statutory Status {isAdmin && <span className="text-[10px] text-slate-400">(click to toggle)</span>}</p>
           <div className="flex flex-wrap gap-2">
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp?.eobiEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-              EOBI {emp?.eobiEnabled ? '✓' : '✗'}
-            </span>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp?.pfEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-              PF {emp?.pfEnabled ? '✓' : '✗'}
-            </span>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp?.incomeTaxEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-              Income Tax {emp?.incomeTaxEnabled ? '✓' : '✗'}
-            </span>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp?.essiEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-              ESSI {emp?.essiEnabled ? '✓' : '✗'}
-            </span>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp?.gratuityEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-              Gratuity {emp?.gratuityEnabled ? '✓' : '✗'}
-            </span>
+            {[
+              { key: 'eobiEnabled', label: 'EOBI', val: emp?.eobiEnabled, desc: 'Employee Rs 370 / Employer Rs 870' },
+              { key: 'pfEnabled', label: 'PF', val: emp?.pfEnabled, desc: '8.33% Employee + 8.33% Employer' },
+              { key: 'incomeTaxEnabled', label: 'Income Tax', val: emp?.incomeTaxEnabled, desc: 'FBR YTD + Rolling Projection' },
+              { key: 'essiEnabled', label: 'ESSI', val: emp?.essiEnabled, desc: 'Employer 6% of earned salary' },
+              { key: 'gratuityEnabled', label: 'Gratuity', val: emp?.gratuityEnabled, desc: 'Basic Salary ÷ 12 monthly provision' },
+            ].map(item => (
+              <TooltipProvider key={item.key}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className={`text-[11px] px-2 py-0.5 rounded-full font-medium border transition-colors cursor-pointer ${item.val ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'}`}
+                      onClick={isAdmin && empId ? async () => {
+                        try {
+                          const res = await fetch(`/api/employees?id=${empId}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ [item.key]: !item.val }),
+                          })
+                          if (res.ok) {
+                            setEmployees(prev => prev.map(e => e.id === empId ? { ...e, [item.key]: !item.val } as EmployeeData : e))
+                            toast.success(`${item.label} ${!item.val ? 'enabled' : 'disabled'}`)
+                          } else {
+                            toast.error('Failed to update')
+                          }
+                        } catch { toast.error('Failed to update') }
+                      } : undefined}
+                    >
+                      {item.label} {item.val ? '✓' : '✗'}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-[10px]">
+                    <p>{item.desc}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ))}
             <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp?.taxFilingStatus === 'filer' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : emp?.taxFilingStatus === 'non-filer' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
               {emp?.taxFilingStatus === 'filer' ? 'Filer' : emp?.taxFilingStatus === 'non-filer' ? 'Non-Filer' : 'Tax —'}
             </span>
@@ -971,7 +1006,11 @@ export function EmployeeProfile() {
   // RENDER: Project Cost Distribution (shared between tabs)
   // ========================================================================
   const renderProjectCostDistribution = (scCalc: PayrollResult, source: string) => {
-    if (scCalc.projectAllocations.length === 0) {
+    // Prefer multi-contract earnings view if available
+    const contractEarnings = (scCalc as any).contractEarnings as ContractEarningRow[] | undefined
+    const hasContracts = contractEarnings && contractEarnings.length > 0
+
+    if (scCalc.projectAllocations.length === 0 && !hasContracts) {
       return (
         <div className="bg-slate-50 rounded-xl p-4 text-center text-[12px] text-slate-400">
           No project allocations for this period
@@ -981,63 +1020,131 @@ export function EmployeeProfile() {
 
     return (
       <div className="space-y-4">
-        {/* Stacked bar visualization */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs font-semibold text-slate-700">Project Weight Distribution</h4>
-            <span className="text-[10px] text-slate-400">{source}</span>
+        {/* Multi-Contract Earnings Summary */}
+        {hasContracts && (
+          <div className="bg-white border border-slate-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-xs font-semibold text-slate-700">Multi-Contract Earnings</h4>
+              <span className="text-[10px] text-slate-400">{source}</span>
+            </div>
+            {/* Visual bar showing contract earnings distribution */}
+            <div className="flex h-8 rounded-lg overflow-hidden bg-slate-100 mb-3">
+              {contractEarnings!.map((ce, i) => {
+                const totalEarned = contractEarnings!.reduce((s, c) => s + c.earnedSalary, 0)
+                const pct = totalEarned > 0 ? (ce.earnedSalary / totalEarned) * 100 : 0
+                return (
+                  <div key={ce.projectId} className={`${PROJECT_BAR_COLORS[i % PROJECT_BAR_COLORS.length]} transition-all duration-500 flex items-center justify-center`}
+                    style={{width: `${Math.max(pct, 3)}%`}}>
+                    <span className="text-[9px] text-white font-semibold truncate px-1">{pct.toFixed(1)}%</span>
+                  </div>
+                )
+              })}
+            </div>
+            {/* Contract details table */}
+            <div className="overflow-hidden rounded-lg border border-slate-200">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/50">
+                    <th className="text-left py-2 px-2 text-[10px] font-medium text-slate-500">Contract</th>
+                    <th className="text-right py-2 px-2 text-[10px] font-medium text-slate-500">Monthly Salary</th>
+                    <th className="text-right py-2 px-2 text-[10px] font-medium text-slate-500">Daily Rate</th>
+                    <th className="text-center py-2 px-2 text-[10px] font-medium text-slate-500">Days</th>
+                    <th className="text-center py-2 px-2 text-[10px] font-medium text-slate-500">Abs</th>
+                    <th className="text-right py-2 px-2 text-[10px] font-medium text-slate-500">Earned</th>
+                    <th className="text-right py-2 px-2 text-[10px] font-medium text-slate-500">SC</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {contractEarnings!.map((ce, i) => (
+                    <tr key={ce.projectId} className="border-b border-slate-50 hover:bg-slate-50/50">
+                      <td className="py-1.5 px-2">
+                        <span className="flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${PROJECT_BAR_COLORS[i % PROJECT_BAR_COLORS.length]}`}/>
+                          <span className="font-medium text-slate-900">{ce.projectName}</span>
+                        </span>
+                      </td>
+                      <td className="py-1.5 px-2 text-right text-slate-600">{formatPKR(ce.contractSalary)}</td>
+                      <td className="py-1.5 px-2 text-right text-slate-600">{formatPKR(ce.dailyRate)}</td>
+                      <td className="py-1.5 px-2 text-center text-slate-600">{ce.daysWorked}</td>
+                      <td className="py-1.5 px-2 text-center text-red-500">{ce.absentDays}</td>
+                      <td className="py-1.5 px-2 text-right font-medium text-slate-900">{formatPKR(ce.earnedSalary)}</td>
+                      <td className="py-1.5 px-2 text-right text-slate-900">{formatPKR(ce.scShare)}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-slate-50/80 border-t border-slate-200">
+                    <td colSpan={5} className="py-1.5 px-2 text-right font-semibold text-slate-700">Total Combined</td>
+                    <td className="py-1.5 px-2 text-right font-bold text-emerald-700">{formatPKR(contractEarnings!.reduce((s,c) => s + c.earnedSalary, 0))}</td>
+                    <td className="py-1.5 px-2 text-right font-semibold text-slate-700">{formatPKR(contractEarnings!.reduce((s,c) => s + c.scShare, 0))}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-2 p-2 bg-emerald-50 border border-emerald-100 rounded-lg text-[10px] text-emerald-700">
+              <strong>Multi-Contract Payroll:</strong> Each contract has its own salary. Earned = (Contract Salary ÷ {scCalc.calendarDays || scCalc.daysInMonth} days) × Days Worked.
+              All incomes combined before tax.
+            </div>
           </div>
-          <div className="flex h-6 rounded-full overflow-hidden bg-slate-100 mb-3">
-            {scCalc.projectAllocations.map((p, i) => (
-              <div key={p.projectName} className={`${PROJECT_BAR_COLORS[i % PROJECT_BAR_COLORS.length]} transition-all duration-500 flex items-center justify-center`}
-                style={{width: `${Math.max(p.weight * 100, 3)}%`}}>
-                <span className="text-[9px] text-white font-semibold truncate px-1">{p.weightPct}</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {scCalc.projectAllocations.map((p, i) => (
-              <span key={p.projectName} className="flex items-center gap-1 text-[10px]">
-                <span className={`w-2.5 h-2.5 rounded-full ${PROJECT_BAR_COLORS[i % PROJECT_BAR_COLORS.length]}`}/>
-                <span className="text-slate-700 font-medium">{p.projectName}</span>
-                <span className="text-slate-400">({p.days}d)</span>
-              </span>
-            ))}
-          </div>
-        </div>
+        )}
 
-        {/* Per-project cost table */}
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/50">
-                <th className="text-left py-2 px-3 text-[11px] font-medium text-slate-500">Project</th>
-                <th className="text-center py-2 px-3 text-[11px] font-medium text-slate-500">Days</th>
-                <th className="text-center py-2 px-3 text-[11px] font-medium text-slate-500">Weight</th>
-                <th className="text-right py-2 px-3 text-[11px] font-medium text-slate-500">Salary Share</th>
-                <th className="text-right py-2 px-3 text-[11px] font-medium text-slate-500">SC Share</th>
-                <th className="text-right py-2 px-3 text-[11px] font-medium text-slate-500">SC Balance</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scCalc.projectAllocations.map((p, i) => (
-                <tr key={p.projectName} className="border-b border-slate-50 hover:bg-slate-50/50">
-                  <td className="py-2 px-3">
-                    <span className="flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full ${PROJECT_BAR_COLORS[i % PROJECT_BAR_COLORS.length]}`}/>
-                      <span className="font-medium text-slate-900">{p.projectName}</span>
-                    </span>
-                  </td>
-                  <td className="py-2 px-3 text-center text-slate-600">{p.days}</td>
-                  <td className="py-2 px-3 text-center text-slate-600">{p.weightPct}</td>
-                  <td className="py-2 px-3 text-right text-slate-900">{formatPKR(p.salaryShare)}</td>
-                  <td className="py-2 px-3 text-right text-slate-900">{formatPKR(p.scShare)}</td>
-                  <td className="py-2 px-3 text-right text-amber-600">{formatPKR(p.scBalance)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {/* Fallback: Weight-based allocation view */}
+        {!hasContracts && scCalc.projectAllocations.length > 0 && (
+          <>
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-semibold text-slate-700">Project Weight Distribution</h4>
+                <span className="text-[10px] text-slate-400">{source}</span>
+              </div>
+              <div className="flex h-6 rounded-full overflow-hidden bg-slate-100 mb-3">
+                {scCalc.projectAllocations.map((p, i) => (
+                  <div key={p.projectName} className={`${PROJECT_BAR_COLORS[i % PROJECT_BAR_COLORS.length]} transition-all duration-500 flex items-center justify-center`}
+                    style={{width: `${Math.max(p.weight * 100, 3)}%`}}>
+                    <span className="text-[9px] text-white font-semibold truncate px-1">{p.weightPct}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {scCalc.projectAllocations.map((p, i) => (
+                  <span key={p.projectName} className="flex items-center gap-1 text-[10px]">
+                    <span className={`w-2.5 h-2.5 rounded-full ${PROJECT_BAR_COLORS[i % PROJECT_BAR_COLORS.length]}`}/>
+                    <span className="text-slate-700 font-medium">{p.projectName}</span>
+                    <span className="text-slate-400">({p.days}d)</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/50">
+                    <th className="text-left py-2 px-3 text-[11px] font-medium text-slate-500">Project</th>
+                    <th className="text-center py-2 px-3 text-[11px] font-medium text-slate-500">Days</th>
+                    <th className="text-center py-2 px-3 text-[11px] font-medium text-slate-500">Weight</th>
+                    <th className="text-right py-2 px-3 text-[11px] font-medium text-slate-500">Salary Share</th>
+                    <th className="text-right py-2 px-3 text-[11px] font-medium text-slate-500">SC Share</th>
+                    <th className="text-right py-2 px-3 text-[11px] font-medium text-slate-500">SC Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scCalc.projectAllocations.map((p, i) => (
+                    <tr key={p.projectName} className="border-b border-slate-50 hover:bg-slate-50/50">
+                      <td className="py-2 px-3">
+                        <span className="flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${PROJECT_BAR_COLORS[i % PROJECT_BAR_COLORS.length]}`}/>
+                          <span className="font-medium text-slate-900">{p.projectName}</span>
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-center text-slate-600">{p.days}</td>
+                      <td className="py-2 px-3 text-center text-slate-600">{p.weightPct}</td>
+                      <td className="py-2 px-3 text-right text-slate-900">{formatPKR(p.salaryShare)}</td>
+                      <td className="py-2 px-3 text-right text-slate-900">{formatPKR(p.scShare)}</td>
+                      <td className="py-2 px-3 text-right text-amber-600">{formatPKR(p.scBalance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
     )
   }
@@ -1276,8 +1383,54 @@ export function EmployeeProfile() {
                                   </div>
                                 </div>
                               )}
-                              {/* Project Allocation Breakdown */}
-                              {row.projectAllocations && row.projectAllocations.length > 0 && (
+                              {/* Multi-Contract Earnings Breakdown */}
+                              {row.contractEarnings && row.contractEarnings.length > 0 ? (
+                                <div className="mt-3 pt-3 border-t border-slate-200">
+                                  <h5 className="text-[11px] font-semibold text-slate-700 mb-2 uppercase tracking-wider">Multi-Contract Earnings</h5>
+                                  <div className="overflow-hidden rounded-lg border border-slate-200">
+                                    <table className="w-full text-xs">
+                                      <thead>
+                                        <tr className="border-b border-slate-100 bg-slate-50/50">
+                                          <th className="text-left py-1.5 px-2 text-[10px] font-medium text-slate-500">Contract / Project</th>
+                                          <th className="text-right py-1.5 px-2 text-[10px] font-medium text-slate-500">Contract Salary</th>
+                                          <th className="text-right py-1.5 px-2 text-[10px] font-medium text-slate-500">Daily Rate</th>
+                                          <th className="text-center py-1.5 px-2 text-[10px] font-medium text-slate-500">Days Worked</th>
+                                          <th className="text-center py-1.5 px-2 text-[10px] font-medium text-slate-500">Absents</th>
+                                          <th className="text-right py-1.5 px-2 text-[10px] font-medium text-slate-500">Earned Salary</th>
+                                          <th className="text-right py-1.5 px-2 text-[10px] font-medium text-slate-500">SC Share</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {row.contractEarnings.map((ce, i) => (
+                                          <tr key={ce.projectId || i} className="border-b border-slate-50 last:border-0">
+                                            <td className="py-1.5 px-2">
+                                              <span className="flex items-center gap-1.5">
+                                                <span className={`w-2 h-2 rounded-full ${PROJECT_BAR_COLORS[i % PROJECT_BAR_COLORS.length]}`}/>
+                                                <span className="font-medium text-slate-900">{ce.projectName}</span>
+                                                {ce.designation && <span className="text-[10px] text-slate-400 ml-1">({ce.designation})</span>}
+                                              </span>
+                                            </td>
+                                            <td className="py-1.5 px-2 text-right text-slate-600">{formatPKR(ce.contractSalary)}</td>
+                                            <td className="py-1.5 px-2 text-right text-slate-600">{formatPKR(ce.dailyRate)}</td>
+                                            <td className="py-1.5 px-2 text-center text-slate-600">{ce.daysWorked}</td>
+                                            <td className="py-1.5 px-2 text-center text-red-500">{ce.absentDays}</td>
+                                            <td className="py-1.5 px-2 text-right font-medium text-slate-900">{formatPKR(ce.earnedSalary)}</td>
+                                            <td className="py-1.5 px-2 text-right text-slate-900">{formatPKR(ce.scShare)}</td>
+                                          </tr>
+                                        ))}
+                                        <tr className="bg-slate-50/80 border-t border-slate-200">
+                                          <td colSpan={5} className="py-1.5 px-2 text-right font-semibold text-slate-700">Total</td>
+                                          <td className="py-1.5 px-2 text-right font-semibold text-emerald-700">{formatPKR(row.contractEarnings.reduce((s,c) => s + c.earnedSalary, 0))}</td>
+                                          <td className="py-1.5 px-2 text-right font-semibold text-slate-700">{formatPKR(row.contractEarnings.reduce((s,c) => s + c.scShare, 0))}</td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                  <div className="mt-2 text-[10px] text-slate-400 italic">
+                                    Multi-contract payroll: Each contract has its own salary. Earned = (Contract Salary ÷ Calendar Days) × Days Worked. Tax applied on combined total.
+                                  </div>
+                                </div>
+                              ) : row.projectAllocations && row.projectAllocations.length > 0 ? (
                                 <div className="mt-3 pt-3 border-t border-slate-200">
                                   <h5 className="text-[11px] font-semibold text-slate-700 mb-2 uppercase tracking-wider">Project Allocation</h5>
                                   <div className="overflow-hidden rounded-lg border border-slate-200">
@@ -1310,7 +1463,7 @@ export function EmployeeProfile() {
                                     </table>
                                   </div>
                                 </div>
-                              )}
+                              ) : null}
                             </div>
                           </div>
                         </td>

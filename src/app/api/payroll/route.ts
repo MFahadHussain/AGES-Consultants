@@ -207,7 +207,32 @@ export async function POST(request: Request) {
             weightPct: pa.weightPct,
             salaryShare: pa.salaryShare,
             scShare: pa.scShare,
+            projectDailyRate: pa.projectDailyRate,
+            projectSalary: pa.projectSalary,
+            designation: pa.designation,
           }))
+
+          // Build contract earnings JSON for storage (multi-contract breakdown)
+          const contractEarningsJson = (result as any).contractEarnings
+            ? (result as any).contractEarnings.map((ce: any) => ({
+                assignmentId: ce.assignmentId,
+                projectId: ce.projectId,
+                projectName: ce.projectName,
+                projectCode: ce.projectCode,
+                contractSalary: ce.contractSalary,
+                dailyRate: ce.dailyRate,
+                daysWorked: ce.daysWorked,
+                earnedSalary: ce.earnedSalary,
+                absentDays: ce.absentDays,
+                designation: ce.designation,
+                scShare: ce.scShare,
+                scBalance: ce.scBalance,
+                scOtherPayable: ce.scOtherPayable,
+                scEarnedLeave: ce.scEarnedLeave,
+                scSickLeave: ce.scSickLeave,
+                scCasualLeave: ce.scCasualLeave,
+              }))
+            : []
 
           linesData.push({
             batchId,
@@ -242,6 +267,7 @@ export async function POST(request: Request) {
             scBreakdown: JSON.stringify(result.scBreakdown),
             taxBreakdown: JSON.stringify(result.taxBreakdown),
             projectAllocations: JSON.stringify(projectAllocationsJson),
+            contractEarnings: JSON.stringify(contractEarningsJson),
             projectId: primaryProject?.projectId || emp.defaultProjectId || null,
             department: emp.department,
             lineStatus: 'draft',
@@ -896,7 +922,32 @@ export async function POST(request: Request) {
             weightPct: pa.weightPct,
             salaryShare: pa.salaryShare,
             scShare: pa.scShare,
+            projectDailyRate: pa.projectDailyRate,
+            projectSalary: pa.projectSalary,
+            designation: pa.designation,
           }))
+
+          // Build contract earnings JSON
+          const contractEarningsJson = (result as any).contractEarnings
+            ? (result as any).contractEarnings.map((ce: any) => ({
+                assignmentId: ce.assignmentId,
+                projectId: ce.projectId,
+                projectName: ce.projectName,
+                projectCode: ce.projectCode,
+                contractSalary: ce.contractSalary,
+                dailyRate: ce.dailyRate,
+                daysWorked: ce.daysWorked,
+                earnedSalary: ce.earnedSalary,
+                absentDays: ce.absentDays,
+                designation: ce.designation,
+                scShare: ce.scShare,
+                scBalance: ce.scBalance,
+                scOtherPayable: ce.scOtherPayable,
+                scEarnedLeave: ce.scEarnedLeave,
+                scSickLeave: ce.scSickLeave,
+                scCasualLeave: ce.scCasualLeave,
+              }))
+            : []
 
           // Determine primary project
           const primaryProject = result.projectAllocations.length > 0
@@ -934,6 +985,7 @@ export async function POST(request: Request) {
               scBreakdown: JSON.stringify(result.scBreakdown),
               taxBreakdown: JSON.stringify(result.taxBreakdown),
               projectAllocations: JSON.stringify(projectAllocationsJson),
+              contractEarnings: JSON.stringify(contractEarningsJson),
               projectId: primaryProject?.projectId || existingLine.projectId,
             },
           })

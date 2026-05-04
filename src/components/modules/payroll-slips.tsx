@@ -32,6 +32,7 @@ interface PayrollLine {
   loanDeduction: number; advanceDeduction: number; otherDeductions: number; totalDeductions: number
   netPay: number; socialCharges: number; gratuity: number
   allowanceDetails: string | null; taxBreakdown: string | null; projectAllocations: string | null
+  contractEarnings: string | null
   lineStatus: string
 }
 
@@ -362,6 +363,7 @@ export function PayrollSlips() {
     const allowances = parseJSON<Array<{name: string; amount: number}>>(line.allowanceDetails, [])
     const taxInfo = parseJSON<Record<string, number>>(line.taxBreakdown, {})
     const projectAllocs = parseJSON<Array<{projectName: string; projectCode: string; days: number; weightPct: string; salaryShare: number; scShare: number}>>(line.projectAllocations, [])
+    const contractEarnings = parseJSON<Array<{projectName: string; projectCode: string; contractSalary: number; dailyRate: number; daysWorked: number; earnedSalary: number; absentDays: number; designation: string | null}>>(line.contractEarnings, [])
 
     return (
       <div key={line.id} className="slip-container" style={{
@@ -494,8 +496,49 @@ export function PayrollSlips() {
           NET PAY: PKR {fmtPKRNum(line.netPay)}
         </div>
 
-        {/* Project Allocation */}
-        {projectAllocs.length > 0 && (
+        {/* Multi-Contract Earnings */}
+        {contractEarnings.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
+              background: '#ecfdf5', padding: '6px 10px', borderLeft: '3px solid #10b981', marginBottom: 8 }}>
+              Multi-Contract Earnings
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'left', fontSize: 9 }}>Contract / Project</th>
+                  <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'right', fontSize: 9 }}>Monthly Salary</th>
+                  <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'right', fontSize: 9 }}>Daily Rate</th>
+                  <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'center', fontSize: 9 }}>Days Worked</th>
+                  <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'center', fontSize: 9 }}>Abs</th>
+                  <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'right', fontSize: 9 }}>Earned Salary</th>
+                </tr>
+              </thead>
+              <tbody>
+                {contractEarnings.map((ce, i) => (
+                  <tr key={i}>
+                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #e2e8f0', fontSize: 9 }}>{ce.projectName || ce.projectCode}{ce.designation ? ` (${ce.designation})` : ''}</td>
+                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 9 }}>{fmtPKRNum(ce.contractSalary)}</td>
+                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 9 }}>{fmtPKRNum(ce.dailyRate)}</td>
+                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #e2e8f0', textAlign: 'center', fontSize: 9 }}>{ce.daysWorked}</td>
+                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #e2e8f0', textAlign: 'center', fontSize: 9, color: '#dc2626' }}>{ce.absentDays}</td>
+                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 9, fontWeight: 600 }}>{fmtPKRNum(ce.earnedSalary)}</td>
+                  </tr>
+                ))}
+                <tr style={{ background: '#ecfdf5', fontWeight: 700 }}>
+                  <td colSpan={5} style={{ padding: '6px 8px', borderTop: '2px solid #10b981', fontSize: 9, textAlign: 'right' }}>Total Combined Earnings</td>
+                  <td style={{ padding: '6px 8px', borderTop: '2px solid #10b981', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 9 }}>{fmtPKRNum(contractEarnings.reduce((s,c) => s + c.earnedSalary, 0))}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div style={{ fontSize: 8, color: '#64748b', marginTop: 4, fontStyle: 'italic' }}>
+              Multi-Contract Payroll: Earned = (Contract Salary ÷ {line.calendarDays || 30} calendar days) × Days Worked. All incomes combined before tax.
+            </div>
+          </div>
+        )}
+
+        {/* Project Allocation (fallback when no contract earnings) */}
+        {!contractEarnings.length && projectAllocs.length > 0 && (
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
               background: '#f1f5f9', padding: '6px 10px', borderLeft: '3px solid #1e293b', marginBottom: 8 }}>

@@ -1080,8 +1080,54 @@ export function PayrollIntegration() {
               </div>
             )}
 
-            {/* Project Allocation */}
-            {selectedLine.projectAllocations && (() => {
+            {/* Multi-Contract Earnings */}
+            {selectedLine.contractEarnings && (() => {
+              let ce: any[] = []
+              try { ce = JSON.parse(selectedLine.contractEarnings) } catch {}
+              if (!ce.length) return null
+              return (
+                <div>
+                  <p className="text-xs font-semibold mb-2">Multi-Contract Earnings</p>
+                  <div className="rounded border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-[10px]">Contract / Project</TableHead>
+                          <TableHead className="text-[10px] text-right">Contract Salary</TableHead>
+                          <TableHead className="text-[10px] text-right">Daily Rate</TableHead>
+                          <TableHead className="text-[10px] text-center">Days Worked</TableHead>
+                          <TableHead className="text-[10px] text-center">Abs</TableHead>
+                          <TableHead className="text-[10px] text-right">Earned Salary</TableHead>
+                          <TableHead className="text-[10px] text-right">SC Share</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {ce.map((contract: any, idx: number) => (
+                          <TableRow key={idx}>
+                            <TableCell className="text-xs py-1 font-medium">{contract.projectCode} — {contract.projectName}</TableCell>
+                            <TableCell className="text-xs py-1 text-right">{formatCurrency(contract.contractSalary)}</TableCell>
+                            <TableCell className="text-xs py-1 text-right">{formatCurrency(contract.dailyRate)}</TableCell>
+                            <TableCell className="text-xs py-1 text-center">{contract.daysWorked}</TableCell>
+                            <TableCell className="text-xs py-1 text-center text-red-500">{contract.absentDays}</TableCell>
+                            <TableCell className="text-xs py-1 text-right font-medium">{formatCurrency(contract.earnedSalary)}</TableCell>
+                            <TableCell className="text-xs py-1 text-right text-orange-600">{formatCurrency(contract.scShare)}</TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="bg-slate-50">
+                          <TableCell colSpan={5} className="text-xs py-1 text-right font-bold">Total Combined</TableCell>
+                          <TableCell className="text-xs py-1 text-right font-bold text-emerald-700">{formatCurrency(ce.reduce((s: number, c: any) => s + c.earnedSalary, 0))}</TableCell>
+                          <TableCell className="text-xs py-1 text-right font-bold">{formatCurrency(ce.reduce((s: number, c: any) => s + c.scShare, 0))}</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1 italic">Multi-contract: Each contract has its own salary. Earned = (Contract Salary ÷ Calendar Days) × Days Worked. Tax on combined total.</p>
+                </div>
+              )
+            })()}
+
+            {/* Project Allocation (fallback when no contract earnings) */}
+            {!selectedLine.contractEarnings && selectedLine.projectAllocations && (() => {
               let pa: any[] = []
               try { pa = JSON.parse(selectedLine.projectAllocations) } catch {}
               if (!pa.length) return null

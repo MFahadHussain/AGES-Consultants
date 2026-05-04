@@ -1078,6 +1078,7 @@ model PayrollBatchLine {
 
   // Project allocation details
   projectAllocations String?  // JSON: [{projectId, projectName, projectCode, days, weight, weightPct, salaryShare, scShare}]
+  contractEarnings   String?  // JSON: [{assignmentId, projectId, projectName, projectCode, contractSalary, dailyRate, daysWorked, earnedSalary, absentDays, designation, scShare, ...}]
 
   // Relations
   employee        Employee  @relation(fields: [employeeId], references: [id])
