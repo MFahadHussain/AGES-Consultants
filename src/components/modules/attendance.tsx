@@ -8,18 +8,24 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { CalendarCheck, Users, AlertTriangle, Clock, Save, RotateCcw, Check } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { CalendarCheck, Users, AlertTriangle, Clock, Save, RotateCcw, Check, Layers, Loader2, Eye, Play } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 // ── Constants ──────────────────────────────────────────────
-const VALID_STATUSES = ['P', 'W', 'H', 'CL', 'SL', 'EL', 'CO', 'T', 'WH', 'CD', 'A'] as const
+const VALID_STATUSES = ['P', 'W', 'WW', 'H', 'CL', 'SL', 'EL', 'CO', 'T', 'WH', 'CD', 'A'] as const
 type AttendanceStatus = (typeof VALID_STATUSES)[number]
 
-const WORKING_STATUSES = new Set(['P', 'W', 'H', 'WH', 'T', 'CO'])
+/** Billable statuses — require a projectId */
+const BILLABLE_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO'])
+
+/** Alias kept for backward compat in grid rendering */
+const WORKING_STATUSES = BILLABLE_STATUSES
 
 const STATUS_LABELS: Record<string, string> = {
   P: 'Present',
   W: 'Weekend Working',
+  WW: 'Work on Weekend',
   H: 'Holiday Working',
   CL: 'Casual Leave',
   SL: 'Sick Leave',
@@ -31,7 +37,7 @@ const STATUS_LABELS: Record<string, string> = {
   A: 'Absent',
 }
 
-const SC_EARN_STATUSES = new Set(['P', 'W', 'H', 'T', 'WH'])
+const SC_EARN_STATUSES = new Set(['P', 'W', 'WW', 'H', 'T', 'WH'])
 const SC_DEDUCT_STATUSES = new Set(['CL', 'SL', 'EL', 'CO'])
 const SC_NO_IMPACT_STATUSES = new Set(['A', 'CD'])
 
@@ -45,6 +51,7 @@ function getScCategory(status: string): 'earn' | 'deduct' | 'none' {
 const STATUS_COLORS: Record<string, string> = {
   P: 'bg-green-100 text-green-800 border-green-200',
   W: 'bg-blue-100 text-blue-800 border-blue-200',
+  WW: 'bg-sky-200 text-sky-900 border-sky-300',
   H: 'bg-cyan-100 text-cyan-800 border-cyan-200',
   CL: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   SL: 'bg-orange-100 text-orange-800 border-orange-200',
@@ -57,7 +64,7 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 // Status cycle order for click-to-cycle
-const STATUS_CYCLE: AttendanceStatus[] = ['P', 'WH', 'W', 'H', 'CL', 'SL', 'EL', 'CO', 'T', 'CD', 'A']
+const STATUS_CYCLE: AttendanceStatus[] = ['P', 'WH', 'W', 'WW', 'H', 'CL', 'SL', 'EL', 'CO', 'T', 'CD', 'A']
 
 // Default project list (fallback if API fails)
 const DEFAULT_PROJECTS = ['Unallocated', 'Proj Alpha', 'Proj Beta', 'Proj Gamma', 'Proj Delta']
@@ -93,8 +100,24 @@ interface AttendanceRecord {
 interface DayData {
   status: AttendanceStatus | ''
   project: string | null
+  projectId: string | null
   recordId: string | null
   changed: boolean
+  autoAssigned?: boolean
+  manuallyOverridden?: boolean
+}
+
+interface ProjectAssignment {
+  id: string
+  employeeId: string
+  projectId: string
+  project: { id: string; code: string; name: string }
+  employee: { id: string; name: string; employeeCode: string }
+  isActive: boolean
+  startDate: string
+  endDate: string | null
+  allocationType: string
+  allocationValue: number
 }
 
 // ── Helpers ────────────────────────────────────────────────
@@ -123,11 +146,8 @@ function getCurrentMonth(): string {
 /** Get a short display name for a project (e.g. "Proj Alpha" → "Alpha") */
 function getShortProjectName(name: string): string {
   if (name === 'Unallocated') return 'Unalloc'
-  // If name starts with "Proj ", strip it
   if (name.startsWith('Proj ')) return name.slice(5)
-  // If name has a hyphen code prefix like "HO - Head Office", take short code
   if (name.includes(' - ')) return name.split(' - ')[0].trim()
-  // Otherwise truncate to 8 chars
   return name.length > 8 ? name.slice(0, 8) : name
 }
 
@@ -155,6 +175,26 @@ export function AttendanceModule() {
   const [popoverProject, setPopoverProject] = useState<string>('Unallocated')
   const popoverRef = useRef<HTMLDivElement>(null)
 
+  // Project assignments from API
+  const [projectAssignments, setProjectAssignments] = useState<ProjectAssignment[]>([])
+
+  // Quick-fill project picker state
+  const [quickFillProjectPicker, setQuickFillProjectPicker] = useState<{
+    employeeId: string
+    status: AttendanceStatus
+    filledCount: number
+  } | null>(null)
+  const [quickFillSelectedProject, setQuickFillSelectedProject] = useState<string>('')
+
+  // Bulk Fill state
+  const [bulkFillOpen, setBulkFillOpen] = useState(false)
+  const [bulkFillStartDate, setBulkFillStartDate] = useState<string>('')
+  const [bulkFillEndDate, setBulkFillEndDate] = useState<string>('')
+  const [bulkFillProjectId, setBulkFillProjectId] = useState<string>('')
+  const [bulkFillPreview, setBulkFillPreview] = useState<{ unassignedDays: number; totalBillableDays: number; alreadyAssignedDays: number } | null>(null)
+  const [bulkFillLoading, setBulkFillLoading] = useState(false)
+  const [bulkFillApplying, setBulkFillApplying] = useState(false)
+
   // Stats from API (single employee view)
   const [summaryStats, setSummaryStats] = useState<{
     presentDays: number
@@ -180,6 +220,18 @@ export function AttendanceModule() {
     return proj ? proj.name : null
   }, [projects])
 
+  /** Map a project name to a projectId */
+  const projectNameToId = useCallback((projectName: string | null | undefined): string | null => {
+    if (!projectName || projectName === 'Unallocated') return null
+    const proj = projects.find(p => p.name === projectName)
+    return proj ? proj.id : null
+  }, [projects])
+
+  /** Get employee's active project assignments */
+  const getEmployeeProjects = useCallback((empId: string) => {
+    return projectAssignments.filter(a => a.employeeId === empId && a.isActive === true)
+  }, [projectAssignments])
+
   // ── Click outside to close popover ─────────────────────
   useEffect(() => {
     if (!popoverCell) return
@@ -188,7 +240,6 @@ export function AttendanceModule() {
         setPopoverCell(null)
       }
     }
-    // Use a small delay so the click that opened the popover doesn't immediately close it
     const timer = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside)
     }, 0)
@@ -197,6 +248,18 @@ export function AttendanceModule() {
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [popoverCell])
+
+  // ── Bulk Fill: set default date range when dialog opens ──
+  useEffect(() => {
+    if (bulkFillOpen && selectedMonth) {
+      const [y, m] = selectedMonth.split('-').map(Number)
+      const lastDay = getDaysInMonth(selectedMonth)
+      setBulkFillStartDate(`${y}-${String(m).padStart(2, '0')}-01`)
+      setBulkFillEndDate(`${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`)
+      setBulkFillPreview(null)
+      setBulkFillProjectId('')
+    }
+  }, [bulkFillOpen, selectedMonth])
 
   // ── Fetches ────────────────────────────────────────────
   const fetchEmployees = useCallback(async () => {
@@ -218,6 +281,16 @@ export function AttendanceModule() {
     } catch { /* ignore */ }
   }, [])
 
+  const fetchProjectAssignments = useCallback(async () => {
+    try {
+      const res = await fetch('/api/project-assignments?currentActive=true')
+      const data = await res.json()
+      if (Array.isArray(data)) {
+        setProjectAssignments(data)
+      }
+    } catch { /* ignore */ }
+  }, [])
+
   const fetchAttendanceData = useCallback(async () => {
     if (!selectedMonth) return
     setLoading(true)
@@ -231,12 +304,15 @@ export function AttendanceModule() {
           const dayMap: Record<number, DayData> = {}
           for (const day of data.calendar) {
             const recStatus = day.record?.status || ''
-            const isWorking = WORKING_STATUSES.has(recStatus)
-            const projName = day.record?.projectId ? projectIdToName(day.record.projectId) : null
+            const isBillable = BILLABLE_STATUSES.has(recStatus)
+            // Use dailyProject data if available, else fall back to record.projectId
+            const dpProjectId = day.dailyProject?.projectId || day.record?.projectId || null
+            const projName = dpProjectId ? projectIdToName(dpProjectId) : null
 
             dayMap[day.day] = {
               status: recStatus,
-              project: isWorking ? (projName || 'Unallocated') : null,
+              project: isBillable ? (projName || 'Unallocated') : null,
+              projectId: isBillable ? (dpProjectId || null) : null,
               recordId: day.record?.id || null,
               changed: false,
             }
@@ -265,12 +341,18 @@ export function AttendanceModule() {
         for (const rec of recs) {
           const day = new Date(rec.date).getUTCDate()
           if (!newGrid[rec.employeeId]) newGrid[rec.employeeId] = {}
-          const isWorking = WORKING_STATUSES.has(rec.status)
+          const isBillable = BILLABLE_STATUSES.has(rec.status)
           const projName = rec.projectId ? projectIdToName(rec.projectId) : null
+
+          // Check if API provided dailyProject data
+          const dpData = (rec as any).dailyProject
+          const dpProjectId = dpData?.projectId || rec.projectId || null
+          const dpProjName = dpProjectId ? projectIdToName(dpProjectId) : projName
 
           newGrid[rec.employeeId][day] = {
             status: rec.status as AttendanceStatus,
-            project: isWorking ? (projName || 'Unallocated') : null,
+            project: isBillable ? (dpProjName || 'Unallocated') : null,
+            projectId: isBillable ? (dpProjectId || null) : null,
             recordId: rec.id,
             changed: false,
           }
@@ -299,6 +381,10 @@ export function AttendanceModule() {
   }, [fetchProjects])
 
   useEffect(() => {
+    queueMicrotask(() => { fetchProjectAssignments() })
+  }, [fetchProjectAssignments])
+
+  useEffect(() => {
     if (employees.length > 0 || selectedEmployeeId) {
       fetchAttendanceData()
     }
@@ -312,50 +398,110 @@ export function AttendanceModule() {
   }, [employees.length, selectedMonth, fetchAttendanceData])
 
   // ── Grid interaction ───────────────────────────────────
-  /** Handle cell click - cycles status, and opens popover for working statuses */
+  /** Handle cell click - cycles status, auto-assigns project or opens popover */
   const handleCellClick = (employeeId: string, day: number) => {
     const empGrid = gridData[employeeId] || {}
     const currentStatus = empGrid[day]?.status || ''
     const currentIndex = STATUS_CYCLE.indexOf(currentStatus as AttendanceStatus)
     const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length]
-    const isNextWorking = WORKING_STATUSES.has(nextStatus)
+    const isNextBillable = BILLABLE_STATUSES.has(nextStatus)
+
+    // Determine project for billable statuses
+    let projectValue: string | null = null
+    let projectIdValue: string | null = null
+    let autoAssigned = false
+    let manuallyOverridden = false
+    const existingDayData = empGrid[day]
+
+    if (isNextBillable) {
+      const employeeProjects = getEmployeeProjects(employeeId)
+      const existingProject = existingDayData?.project
+
+      if (employeeProjects.length === 1) {
+        // AUTO-ASSIGN — no popover shown
+        projectValue = employeeProjects[0].project.name
+        projectIdValue = employeeProjects[0].projectId
+        autoAssigned = true
+        toast({ title: 'Auto-assigned', description: `Auto-assigned to ${employeeProjects[0].project.name}` })
+      } else if (employeeProjects.length > 1) {
+        // Will show popover — pre-filtered to only this employee's projects
+        projectValue = existingProject && existingProject !== 'Unallocated'
+          ? existingProject
+          : employeeProjects[0].project.name
+        projectIdValue = existingDayData?.projectId || employeeProjects[0].projectId
+      } else {
+        // NO PROJECT ASSIGNED — default to "Unallocated"
+        projectValue = 'Unallocated'
+        projectIdValue = null
+        toast({ title: 'Warning', description: 'No active project assignment found', variant: 'destructive' })
+      }
+    } else {
+      // Non-billable statuses: project should be null
+      projectValue = null
+      projectIdValue = null
+    }
 
     // Cycle the status
     setGridData(prev => {
       const empGrid = { ...(prev[employeeId] || {}) }
-      const existingProject = empGrid[day]?.project
-
       empGrid[day] = {
         status: nextStatus,
-        project: isNextWorking ? (existingProject || 'Unallocated') : null,
+        project: projectValue,
+        projectId: projectIdValue,
         recordId: empGrid[day]?.recordId || null,
         changed: true,
+        autoAssigned,
+        manuallyOverridden,
       }
       return { ...prev, [employeeId]: empGrid }
     })
     setHasChanges(true)
 
-    // Open popover for working statuses
-    if (isNextWorking) {
-      const existingProject = empGrid[day]?.project || 'Unallocated'
-      setPopoverProject(existingProject)
-      setPopoverCell({ empId: employeeId, day })
+    // Open popover only for multi-project employees with billable status
+    if (isNextBillable) {
+      const employeeProjects = getEmployeeProjects(employeeId)
+      if (employeeProjects.length > 1) {
+        setPopoverProject(projectValue || employeeProjects[0].project.name)
+        setPopoverCell({ empId: employeeId, day })
+      } else {
+        setPopoverCell(null)
+      }
     } else {
       setPopoverCell(null)
     }
+  }
+
+  /** Handle click on project chip for auto-assigned cell — allows manual override */
+  const handleProjectChipClick = (e: React.MouseEvent, employeeId: string, day: number) => {
+    e.stopPropagation()
+    const dayData = gridData[employeeId]?.[day]
+    if (!dayData || !BILLABLE_STATUSES.has(dayData.status)) return
+
+    const employeeProjects = getEmployeeProjects(employeeId)
+    // Always allow override by showing popover with assigned projects
+    setPopoverProject(dayData.project || 'Unallocated')
+    setPopoverCell({ empId: employeeId, day })
   }
 
   /** Confirm project selection in popover */
   const confirmPopoverProject = () => {
     if (!popoverCell) return
     const { empId, day } = popoverCell
+    const resolvedProjectId = projectNameToId(popoverProject)
     setGridData(prev => {
       const empGrid = { ...(prev[empId] || {}) }
+      const existingDay = empGrid[day]
+      const wasAutoAssigned = existingDay?.autoAssigned === true
+      const projectChanged = existingDay?.project !== popoverProject
+
       empGrid[day] = {
         ...empGrid[day],
         status: empGrid[day]?.status || 'P',
         project: popoverProject,
+        projectId: resolvedProjectId,
         changed: true,
+        autoAssigned: wasAutoAssigned && !projectChanged ? true : false,
+        manuallyOverridden: wasAutoAssigned && projectChanged ? true : (existingDay?.manuallyOverridden || false),
       }
       return { ...prev, [empId]: empGrid }
     })
@@ -363,19 +509,82 @@ export function AttendanceModule() {
     setPopoverCell(null)
   }
 
-  /** Update project from popover select without closing */
-  const handlePopoverProjectChange = (value: string) => {
-    setPopoverProject(value)
-  }
+  /** Get filtered project names for an employee's popover */
+  const getFilteredProjectNames = useCallback((empId: string) => {
+    const employeeProjects = getEmployeeProjects(empId)
+    if (employeeProjects.length > 0) {
+      return ['Unallocated', ...employeeProjects.map(a => a.project.name)]
+    }
+    return projectNames
+  }, [getEmployeeProjects, projectNames])
 
   const resetChanges = () => {
     setPopoverCell(null)
     fetchAttendanceData()
   }
 
+  // ── Bulk Fill Handlers ──────────────────────────────────
+  const handleBulkFillPreview = async () => {
+    if (!selectedEmployeeId || !bulkFillStartDate || !bulkFillEndDate) return
+    setBulkFillLoading(true)
+    try {
+      const res = await fetch('/api/attendance/bulk-fill/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: selectedEmployeeId,
+          startDate: bulkFillStartDate,
+          endDate: bulkFillEndDate,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Preview failed')
+      setBulkFillPreview({
+        unassignedDays: data.unassignedDays || 0,
+        totalBillableDays: data.totalBillableDays || 0,
+        alreadyAssignedDays: data.alreadyAssignedDays || 0,
+      })
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    } finally {
+      setBulkFillLoading(false)
+    }
+  }
+
+  const handleBulkFillApply = async () => {
+    if (!selectedEmployeeId || !bulkFillStartDate || !bulkFillEndDate || !bulkFillProjectId) return
+    setBulkFillApplying(true)
+    try {
+      const res = await fetch('/api/attendance/bulk-fill/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: selectedEmployeeId,
+          startDate: bulkFillStartDate,
+          endDate: bulkFillEndDate,
+          projectId: bulkFillProjectId,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Apply failed')
+      toast({
+        title: 'Bulk Fill Applied',
+        description: `Assigned project to ${data.filled || 0} unassigned billable days`,
+      })
+      setBulkFillOpen(false)
+      setBulkFillPreview(null)
+      // Refresh data
+      fetchAttendanceData()
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    } finally {
+      setBulkFillApplying(false)
+    }
+  }
+
   // ── Bulk Save ──────────────────────────────────────────
   const handleBulkSave = async () => {
-    const bulkRecords: { employeeId: string; date: string; status: string; project?: string | null }[] = []
+    const bulkRecords: { employeeId: string; date: string; status: string; projectId?: string | null }[] = []
     const daysInMonth = getDaysInMonth(selectedMonth)
     const [year, month] = selectedMonth.split('-').map(Number)
 
@@ -384,11 +593,20 @@ export function AttendanceModule() {
         const dayData = dayMap[day]
         if (dayData?.changed && dayData.status) {
           const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+          const isBillable = BILLABLE_STATUSES.has(dayData.status)
+
+          // Resolve projectId: prefer stored projectId, else resolve from name
+          let resolvedProjectId: string | null = dayData.projectId || null
+          if (!resolvedProjectId && isBillable && dayData.project && dayData.project !== 'Unallocated') {
+            resolvedProjectId = projectNameToId(dayData.project)
+          }
+
+          // Billable statuses require projectId; non-billable should clear it
           bulkRecords.push({
             employeeId,
             date: dateStr,
             status: dayData.status,
-            project: dayData.project || null,
+            projectId: isBillable ? resolvedProjectId : null,
           })
         }
       }
@@ -486,6 +704,12 @@ export function AttendanceModule() {
     setSelectedMonth(next)
   }
 
+  // ── Bulk Fill: employee assigned projects for dropdown ──
+  const bulkFillEmployeeProjects = useMemo(() => {
+    if (!selectedEmployeeId) return []
+    return getEmployeeProjects(selectedEmployeeId)
+  }, [selectedEmployeeId, getEmployeeProjects])
+
   // ── Render ────────────────────────────────────────────
   return (
     <div className="space-y-4">
@@ -568,6 +792,16 @@ export function AttendanceModule() {
           </SelectContent>
         </Select>
         <div className="flex items-center gap-2 ml-auto">
+          {/* Bulk Fill Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            disabled={!selectedEmployeeId}
+            onClick={() => setBulkFillOpen(true)}
+          >
+            <Layers className="h-3.5 w-3.5 mr-1" />Bulk Fill
+          </Button>
           {hasChanges && (
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={resetChanges}>
               <RotateCcw className="h-3.5 w-3.5 mr-1" />Reset
@@ -642,7 +876,7 @@ export function AttendanceModule() {
 
                         // Count projects
                         const proj = empGrid[day]?.project
-                        if (proj && WORKING_STATUSES.has(s)) {
+                        if (proj && BILLABLE_STATUSES.has(s)) {
                           projectCounts[proj] = (projectCounts[proj] || 0) + 1
                         }
                       }
@@ -675,7 +909,7 @@ export function AttendanceModule() {
                           const changed = dayData?.changed || false
                           const project = dayData?.project
                           const colorClass = status ? (STATUS_COLORS[status] || 'bg-gray-50 text-gray-800') : ''
-                          const isWorking = WORKING_STATUSES.has(status)
+                          const isBillable = BILLABLE_STATUSES.has(status)
                           const isPopoverOpen = popoverCell?.empId === emp.id && popoverCell?.day === day
 
                           return (
@@ -683,13 +917,13 @@ export function AttendanceModule() {
                               key={day}
                               className={`p-0 text-center cursor-pointer select-none relative ${isWeekend ? 'bg-orange-50/30' : ''}`}
                               onClick={() => handleCellClick(emp.id, day)}
-                              title={status ? `${STATUS_LABELS[status]} (${status})${project && isWorking ? ` - ${project}` : ''}${changed ? ' - Modified' : ''}` : 'Click to set status'}
+                              title={status ? `${STATUS_LABELS[status]} (${status})${project && isBillable ? ` - ${project}` : ''}${changed ? ' - Modified' : ''}` : 'Click to set status'}
                             >
                               <div
                                 className={`flex flex-col items-center justify-center mx-0.5 my-0.5 transition-colors rounded-sm
                                   ${changed ? 'ring-2 ring-primary/40' : ''}
                                 `}
-                                style={{ minHeight: isWorking && project && project !== 'Unallocated' ? '40px' : '32px' }}
+                                style={{ minHeight: isBillable && project && project !== 'Unallocated' ? '40px' : '32px' }}
                               >
                                 <div
                                   className={`text-[10px] font-bold leading-tight
@@ -699,11 +933,38 @@ export function AttendanceModule() {
                                 >
                                   {status || '·'}
                                 </div>
-                                {isWorking && project && project !== 'Unallocated' && (
-                                  <div className="text-[9px] bg-slate-100 text-slate-500 rounded px-1 truncate max-w-[52px] leading-tight">
-                                    {getShortProjectName(project)}
-                                  </div>
-                                )}
+                                {isBillable && project && (() => {
+                                  const shortName = getShortProjectName(project)
+                                  const isAuto = dayData?.autoAssigned === true
+                                  const isOverridden = dayData?.manuallyOverridden === true
+                                  const isUnalloc = project === 'Unallocated'
+
+                                  let chipClass = 'bg-slate-100 text-slate-500'
+                                  if (isAuto) chipClass = 'bg-slate-50 text-slate-600 italic'
+                                  else if (isOverridden) chipClass = 'bg-amber-50 text-slate-600'
+                                  else if (isUnalloc) chipClass = 'bg-slate-50 text-slate-400 italic'
+
+                                  let chipTitle = project
+                                  if (isAuto) chipTitle = `${project} (auto-assigned, click to override)`
+                                  else if (isOverridden) chipTitle = `${project} (manually overridden)`
+
+                                  return (
+                                    <div
+                                      className={`text-[8px] rounded px-1 truncate max-w-[64px] leading-tight cursor-pointer hover:bg-slate-200 transition-colors ${chipClass}`}
+                                      onClick={(e) => handleProjectChipClick(e, emp.id, day)}
+                                      title={chipTitle}
+                                    >
+                                      {isUnalloc
+                                        ? 'Unalloc'
+                                        : isAuto
+                                          ? `${shortName} •auto`
+                                          : isOverridden
+                                            ? `${shortName} ✎`
+                                            : shortName
+                                      }
+                                    </div>
+                                  )
+                                })()}
                               </div>
 
                               {/* Project Popover */}
@@ -717,9 +978,9 @@ export function AttendanceModule() {
                                   <select
                                     className="w-full h-7 text-[11px] border border-slate-200 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-slate-400"
                                     value={popoverProject}
-                                    onChange={(e) => handlePopoverProjectChange(e.target.value)}
+                                    onChange={(e) => setPopoverProject(e.target.value)}
                                   >
-                                    {projectNames.map(name => (
+                                    {getFilteredProjectNames(popoverCell.empId).map(name => (
                                       <option key={name} value={name}>{name}</option>
                                     ))}
                                   </select>
@@ -784,11 +1045,13 @@ export function AttendanceModule() {
               const cat = getScCategory(s)
               const scLabel = cat === 'earn' ? 'SC ✓' : cat === 'deduct' ? 'SC ✗' : 'SC —'
               const scColor = cat === 'earn' ? 'text-green-600' : cat === 'deduct' ? 'text-orange-600' : 'text-gray-400'
+              const isBillable = BILLABLE_STATUSES.has(s)
               return (
                 <div key={s} className="flex items-center gap-1">
                   <Badge className={`text-[9px] h-5 px-1.5 ${STATUS_COLORS[s] || ''}`}>{s}</Badge>
                   <span className="text-[9px] text-muted-foreground">{STATUS_LABELS[s]}</span>
                   <span className={`text-[8px] font-medium ${scColor}`}>{scLabel}</span>
+                  {isBillable && <span className="text-[7px] text-blue-500">Proj</span>}
                 </div>
               )
             })}
@@ -796,7 +1059,7 @@ export function AttendanceModule() {
           {/* Quick-fill toolbar */}
           <div className="flex items-center gap-2 mt-3 pt-3 border-t">
             <span className="text-[10px] text-muted-foreground">Quick fill selected employee:</span>
-            {(['P', 'WH', 'A', 'CL', 'SL', 'H'] as AttendanceStatus[]).map(s => (
+            {(['P', 'WH', 'W', 'WW', 'A', 'CL', 'SL', 'H'] as AttendanceStatus[]).map(s => (
               <Button
                 key={s}
                 variant="outline"
@@ -805,30 +1068,241 @@ export function AttendanceModule() {
                 disabled={!selectedEmployeeId}
                 onClick={() => {
                   if (!selectedEmployeeId) return
-                  const isWorking = WORKING_STATUSES.has(s)
+                  const isBillable = BILLABLE_STATUSES.has(s)
+                  const employeeProjects = getEmployeeProjects(selectedEmployeeId)
+
+                  if (isBillable && employeeProjects.length > 1) {
+                    // Multi-project: show picker instead of immediately filling
+                    setQuickFillProjectPicker({
+                      employeeId: selectedEmployeeId,
+                      status: s,
+                      filledCount: daysInMonth,
+                    })
+                    setQuickFillSelectedProject(employeeProjects[0].project.name)
+                    return
+                  }
+
                   setGridData(prev => {
                     const newGrid = { ...prev }
                     const empGrid = { ...(newGrid[selectedEmployeeId] || {}) }
                     for (let day = 1; day <= daysInMonth; day++) {
+                      let projectValue: string | null = null
+                      let projectIdValue: string | null = null
+                      let autoAssigned = false
+                      if (isBillable) {
+                        if (employeeProjects.length === 1) {
+                          projectValue = employeeProjects[0].project.name
+                          projectIdValue = employeeProjects[0].projectId
+                          autoAssigned = true
+                        } else {
+                          projectValue = 'Unallocated'
+                          projectIdValue = null
+                        }
+                      }
                       empGrid[day] = {
                         status: s,
-                        project: isWorking ? 'Unallocated' : null,
+                        project: projectValue,
+                        projectId: projectIdValue,
                         recordId: empGrid[day]?.recordId || null,
                         changed: true,
+                        autoAssigned,
+                        manuallyOverridden: false,
                       }
                     }
                     newGrid[selectedEmployeeId] = empGrid
                     return newGrid
                   })
                   setHasChanges(true)
+                  if (isBillable && employeeProjects.length === 1) {
+                    toast({ title: 'Auto-assigned', description: `Auto-assigned to ${employeeProjects[0].project.name}` })
+                  } else if (isBillable && employeeProjects.length === 0) {
+                    toast({ title: 'Warning', description: 'No active project assignment found', variant: 'destructive' })
+                  }
                 }}
               >
                 Fill {s} ({STATUS_LABELS[s]})
               </Button>
             ))}
           </div>
+          {/* Quick-fill project picker for multi-project employees */}
+          {quickFillProjectPicker && (
+            <div className="flex items-center gap-2 mt-2 p-2 bg-amber-50 rounded-lg">
+              <span className="text-[10px] text-amber-700">
+                Select project for all {quickFillProjectPicker.filledCount} filled days:
+              </span>
+              <select
+                className="h-6 text-[10px] border rounded px-1 bg-white"
+                value={quickFillSelectedProject}
+                onChange={(e) => setQuickFillSelectedProject(e.target.value)}
+              >
+                {getEmployeeProjects(quickFillProjectPicker.employeeId).map(p => (
+                  <option key={p.project.id} value={p.project.name}>{p.project.name}</option>
+                ))}
+              </select>
+              <button
+                className="bg-slate-900 text-white rounded px-2 py-0.5 text-[10px] hover:bg-slate-700 transition-colors"
+                onClick={() => {
+                  if (!quickFillProjectPicker) return
+                  const { employeeId, status } = quickFillProjectPicker
+                  const resolvedProjectId = projectNameToId(quickFillSelectedProject)
+                  setGridData(prev => {
+                    const newGrid = { ...prev }
+                    const empGrid = { ...(newGrid[employeeId] || {}) }
+                    for (let day = 1; day <= daysInMonth; day++) {
+                      empGrid[day] = {
+                        status,
+                        project: quickFillSelectedProject,
+                        projectId: resolvedProjectId,
+                        recordId: empGrid[day]?.recordId || null,
+                        changed: true,
+                        autoAssigned: false,
+                        manuallyOverridden: false,
+                      }
+                    }
+                    newGrid[employeeId] = empGrid
+                    return newGrid
+                  })
+                  setHasChanges(true)
+                  setQuickFillProjectPicker(null)
+                  toast({ title: 'Applied', description: `Project "${quickFillSelectedProject}" applied to all filled days` })
+                }}
+              >Apply</button>
+              <button
+                className="text-[10px] text-slate-500 hover:text-slate-700 transition-colors"
+                onClick={() => setQuickFillProjectPicker(null)}
+              >Cancel</button>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Bulk Fill Dialog */}
+      <Dialog open={bulkFillOpen} onOpenChange={setBulkFillOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Layers className="h-4 w-4" />
+              Bulk Project Fill
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {!selectedEmployeeId && (
+              <p className="text-xs text-muted-foreground">Select a single employee first to use bulk fill.</p>
+            )}
+            {selectedEmployeeId && (
+              <>
+                {/* Employee Info */}
+                <div className="text-xs text-muted-foreground">
+                  Employee: <span className="font-medium text-foreground">
+                    {employees.find(e => e.id === selectedEmployeeId)?.name || selectedEmployeeId}
+                  </span>
+                </div>
+
+                {/* Date Range */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-muted-foreground font-medium">Start Date</label>
+                    <Input
+                      type="date"
+                      className="h-8 text-xs mt-1"
+                      value={bulkFillStartDate}
+                      onChange={e => { setBulkFillStartDate(e.target.value); setBulkFillPreview(null) }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground font-medium">End Date</label>
+                    <Input
+                      type="date"
+                      className="h-8 text-xs mt-1"
+                      value={bulkFillEndDate}
+                      onChange={e => { setBulkFillEndDate(e.target.value); setBulkFillPreview(null) }}
+                    />
+                  </div>
+                </div>
+
+                {/* Project Selector */}
+                <div>
+                  <label className="text-[10px] text-muted-foreground font-medium">Assign Project</label>
+                  <Select value={bulkFillProjectId} onValueChange={setBulkFillProjectId}>
+                    <SelectTrigger className="h-8 text-xs mt-1">
+                      <SelectValue placeholder="Select a project..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bulkFillEmployeeProjects.length > 0 ? (
+                        bulkFillEmployeeProjects.map(pa => (
+                          <SelectItem key={pa.projectId} value={pa.projectId}>
+                            {pa.project.name} ({pa.project.code})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        projects.map(p => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name} ({p.code})
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Preview Result */}
+                {bulkFillPreview && (
+                  <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+                    <div className="text-[10px] font-medium text-muted-foreground">Preview Results</div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-orange-600">{bulkFillPreview.unassignedDays}</div>
+                        <div className="text-[9px] text-muted-foreground">Unassigned</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-green-600">{bulkFillPreview.alreadyAssignedDays}</div>
+                        <div className="text-[9px] text-muted-foreground">Assigned</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-blue-600">{bulkFillPreview.totalBillableDays}</div>
+                        <div className="text-[9px] text-muted-foreground">Total Billable</div>
+                      </div>
+                    </div>
+                    {bulkFillPreview.unassignedDays === 0 && (
+                      <div className="text-[10px] text-center text-muted-foreground py-1">
+                        No unassigned billable days found in this range.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <DialogFooter className="flex-row gap-2 sm:justify-between">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              disabled={!selectedEmployeeId || !bulkFillStartDate || !bulkFillEndDate || bulkFillLoading}
+              onClick={handleBulkFillPreview}
+            >
+              {bulkFillLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Eye className="h-3.5 w-3.5 mr-1" />}
+              Preview
+            </Button>
+            <Button
+              size="sm"
+              className="h-8 text-xs"
+              disabled={
+                !selectedEmployeeId ||
+                !bulkFillStartDate ||
+                !bulkFillEndDate ||
+                !bulkFillProjectId ||
+                bulkFillApplying ||
+                (bulkFillPreview !== null && bulkFillPreview.unassignedDays === 0)
+              }
+              onClick={handleBulkFillApply}
+            >
+              {bulkFillApplying ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Play className="h-3.5 w-3.5 mr-1" />}
+              Apply
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

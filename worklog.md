@@ -1005,3 +1005,184 @@ Stage Summary:
 - EOBI/PF toggle switches added to employee form
 - employee-profile module registered in store, page, sidebar
 - All changes pass lint with 0 errors
+
+---
+Task ID: 2
+Agent: attendance-auto-project
+Task: Implement auto-project selection in Attendance Module
+
+Work Log:
+- Read worklog.md for context from previous agents (fixed assets, reports, COA, payroll, budget, taxation, import/export)
+- Read current attendance.tsx (835 lines) to understand existing structure: click-to-cycle status, project popover, DayData shape, quick-fill toolbar, projects summary column
+- Verified project-assignments API already exists at /api/project-assignments with currentActive=true support
+- Read Prisma schema to confirm EmployeeProjectAssignment model structure
+- Added ProjectAssignment interface and projectAssignments state with fetchProjectAssignments() calling GET /api/project-assignments?currentActive=true
+- Added getEmployeeProjects(empId) helper that filters projectAssignments by employeeId and isActive
+- Updated DayData type with autoAssigned?: boolean and manuallyOverridden?: boolean fields
+- Rewrote handleCellClick with auto-project selection logic:
+  - Single project employee → auto-assign project silently, set autoAssigned=true, no popover
+  - Multi-project employee → set first project as default, auto-open popover filtered to employee's projects
+  - No project assignment → default to "Unallocated", no popover
+  - Non-working status → project=null, no popover
+- Added handleProjectChipClick for clicking on auto-assigned project chips to open popover for manual override
+- Updated confirmPopoverProject to track autoAssigned/manuallyOverridden flags:
+  - If was auto-assigned and project changed → autoAssigned=false, manuallyOverridden=true
+  - If was auto-assigned and project unchanged → keep autoAssigned=true
+- Added getFilteredProjectNames(empId) that returns only employee's assigned projects (with Unallocated option)
+- Updated popover dropdown to use getFilteredProjectNames instead of all projectNames
+- Updated project chip visual indicators using IIFE pattern (avoiding JSX parsing issues with ternary + elements):
+  - Auto-assigned: shows "BTHPP •auto" in italic bg-slate-50 text-slate-600
+  - Multi-project (manual pick): shows just project name in bg-slate-100 text-slate-500
+  - Unallocated (no assignment): shows "Unalloc" in italic bg-slate-50 text-slate-400
+  - Overridden (was auto, manually changed): shows "BTHPP ✎" in bg-amber-50 text-slate-600
+- Updated quick-fill toolbar:
+  - Single project: auto-assign project silently with autoAssigned=true
+  - No assignments: fills with 'Unallocated'
+  - Multi-project: shows quickFillProjectPicker with amber-50 dropdown to select project for all filled days, with Apply/Cancel buttons
+- Fixed JSX parsing error: replaced inline ternary with Pencil component → used IIFE pattern returning div with ✎ unicode character
+- Fixed missing closing brace in quick-fill project picker section (})→)})
+- Removed unused Pencil import from lucide-react
+- Lint passes with 0 errors (only pre-existing FAMS warnings)
+
+Stage Summary:
+- Auto-project selection fully implemented: single-project employees get silent auto-assign, multi-project employees get filtered popover
+- Visual indicators distinguish auto (•auto), manual, unallocated (Unalloc italic), and overridden (✎) project assignments
+- Quick-fill toolbar supports multi-project employees with project picker overlay
+- Popover dropdown now filters to only show employee's assigned projects
+- Project chip is clickable on auto-assigned cells to allow manual override
+- confirmPopoverProject properly tracks autoAssigned and manuallyOverridden flags
+
+---
+Task ID: 3
+Agent: employee-profile-rebuild
+Task: Rebuild Employee Profile page with search, 5 tabs, full reactive state
+
+Work Log:
+- Read worklog.md and existing employee-profile.tsx (760+ lines, single hardcoded employee)
+- Completely rewrote employee-profile.tsx with comprehensive Employee Profile module:
+  - Added 5 employees (EMP-0001 through EMP-0005) with full master data as specified
+  - Added May 2026 attendance data for all 5 employees with varied status codes (P, W, H, SL, CL, EL, A, WH, CO)
+  - EMP-0001 attendance uses exact data from spec
+  - Built employee search bar with keyboard navigation (↑↓ to move, Enter to select, Escape to close)
+  - Search highlights matching text with <mark> tags, shows avatar initials + name + ID badge + department
+  - Added profile card with large initials avatar, status pill, metadata rows with icons, project pills
+  - Added inline edit mode for admin users (all fields become inputs, Save/Cancel buttons)
+  - Added Quick Stats grid (2x2) with Monthly Salary, SC Balance, Loan Outstanding, Advance Balance — all live-calculated
+  - Built 5 fully functional tabs:
+    1. Salary History: 6 months (Dec 2025–May 2026) calculated from attendance, YTD summary bar, expandable payslip with earnings/deductions breakdown, Print button
+    2. Social Charges: 3 summary cards (accrued/paid/outstanding), SC ledger table with row highlighting (Pending=amber, Partial=blue), Record SC Payment form for admin that updates ledger state
+    3. Loans & Advances: Loan cards with progress bars and collapsible repayment schedules, advances table with progress bars, New Loan modal with auto-EMI calculation, New Advance modal, Total Liability footer
+    4. Attendance Summary: Month selector, calendar heatmap with color-coded status cells, hover tooltips, stats pills, project allocation bars
+    5. Documents: 6 default documents in grid, View (slide-in Sheet), Replace (admin inline file input), Upload zone (admin)
+  - All calculations are real (salary from attendance, SC from salary, quick stats from state)
+  - SC payment save actually updates ledger entries to Remitted status with recalculation
+  - New Loan/Advance actually adds to state with full data
+  - Tab state persists across employee switches
+  - Attendance month persists per employee
+  - 200ms loading skeleton on employee switch
+  - Role guards: admin-only for Edit Profile, Record SC Payment, New Loan, New Advance, Replace doc, Upload zone
+  - formatPKR and formatDate used throughout
+  - Responsive design (mobile-first with lg: breakpoints)
+- Fixed React Compiler lint errors:
+  - Changed projectAlloc useMemo dependency from [attData] to [emp.id]
+  - Moved hlIdx reset from useEffect to onChange handler
+- Lint passes with 0 errors
+
+Stage Summary:
+- Complete Employee Profile module with 5 employees, search, profile card with edit, 5 tabs, full reactive state
+- All buttons functional, all calculations real, SC payment/loan/advance mutations update state
+- Professional styling matching existing ERP aesthetic with responsive design
+- Tab state and attendance month persist across employee switches
+- Role-based access control for admin-only features
+---
+Task ID: 2
+Agent: attendance-auto-project
+Task: Implement auto-project selection in Attendance Module
+
+Work Log:
+- Added projectAssignments state and fetchProjectAssignments() to load from /api/project-assignments?currentActive=true
+- Added getEmployeeProjects(empId) helper to filter assignments by employeeId and isActive
+- Updated DayData type with autoAssigned and manuallyOverridden boolean fields
+- Implemented auto-project selection in handleCellClick:
+  - Single project: auto-assigns silently, no popover
+  - Multi-project: shows popover pre-filtered to employee's projects only
+  - No assignment: defaults to "Unallocated"
+  - Non-working statuses: project = null, no popover
+- Added visual indicators in grid cells:
+  - Auto-assigned: "BTHPP •auto" with italic slate text
+  - Manual pick: just project name
+  - Unallocated: "Unalloc" in italic muted text
+  - Overridden: "BTHPP ✎" with amber tint
+- Added project chip click handler for overriding auto-assigned cells
+- Implemented Quick Fill project picker for multi-project employees
+- Updated popover filtering to only show employee's assigned projects
+- Lint passes with 0 errors
+
+Stage Summary:
+- Auto-project selection fully functional for all 3 scenarios (single/multi/no project)
+- Visual indicators distinguish auto, manual, unallocated, and overridden assignments
+- Quick Fill shows project picker for multi-project employees
+- Popover pre-filters to employee's assigned projects only
+
+---
+Task ID: 3
+Agent: employee-profile-rebuild
+Task: Rebuild Employee Profile page with search, 5 tabs, full reactive state
+
+Work Log:
+- Complete rewrite of employee-profile.tsx (1258 lines)
+- Implemented employee search bar with keyboard navigation and text highlighting
+- Built profile card with inline edit mode (admin only)
+- Built quick stats 2×2 grid with live calculations
+- Tab 1 (Salary History): 6 months calculated from attendance, YTD summary, expandable payslips
+- Tab 2 (Social Charges): SC balance summary, ledger table, Record SC Payment form
+- Tab 3 (Loans & Advances): Loan cards with progress bars, repayment schedules, New Loan/Advance modals
+- Tab 4 (Attendance Summary): Calendar heatmap, stats pills, project allocation bars
+- Tab 5 (Documents): Grid layout, view/replace/upload functionality
+- All tabs fully reactive with real state management
+- Tab persistence across employee switches
+- Role guards for admin-only features
+- Lint passes with 0 errors
+
+Stage Summary:
+- Complete Employee Profile page with 5-employee search and selection
+- All 5 tabs fully functional with reactive state
+- SC payment save updates ledger state
+- New Loan/Advance modals add to state
+- Document upload/replace/view working
+- Calendar heatmap with 9 status colors and tooltips
+
+---
+Task ID: 6
+Agent: full-stack-developer
+Task: Update Attendance Module UI with project selection modal and bulk fill
+
+Work Log:
+- Added "WW" (Work on Weekend) status to VALID_STATUSES, STATUS_LABELS, STATUS_COLORS (bg-sky-200 text-sky-900), STATUS_CYCLE, SC_EARN_STATUSES
+- Added BILLABLE_STATUSES constant (P, W, H, WH, WW, T, CO) replacing WORKING_STATUSES for clarity; kept WORKING_STATUSES as alias
+- Added projectId field to DayData interface alongside project (name) for proper API integration
+- Added projectNameToId helper to resolve project names to project IDs for bulk save
+- Updated fetchAttendanceData to use dailyProject data from monthly API response, falling back to record.projectId
+- Updated handleCellClick: when cycling to a billable status, shows toast "Auto-assigned to {projectName}" for single-project employees, and toast "Warning: No active project assignment found" for employees with no projects
+- Updated handleCellClick to store projectId alongside project name in grid data
+- Updated handleProjectChipClick to always allow override by opening popover for any billable cell
+- Updated confirmPopoverProject to resolve projectId from selected project name
+- Updated handleBulkSave to resolve project names to projectIds and send projectId for billable statuses, null for non-billable
+- Added "Proj" label in status legend next to billable status codes
+- Added "WW" to quick-fill toolbar buttons
+- Added quick-fill toast notifications for auto-assign and no-project cases
+- Added Bulk Fill feature: Dialog with date range (defaults to current month), project selector (filtered to employee's assigned projects), Preview button (calls /api/attendance/bulk-fill/preview), Apply button (calls /api/attendance/bulk-fill/apply)
+- Added Bulk Fill button in toolbar area (disabled when no single employee selected)
+- Added visual project chip indicators as specified: auto-assigned (italic, •auto), manually selected (normal), manually overridden (amber tint, ✎), Unalloc (gray, italic)
+- Updated DayData to include projectId for proper backend integration
+- File size kept at 1308 lines (under 1500 target)
+- Lint passes with 0 errors
+
+Stage Summary:
+- WW status added with distinct sky-blue color coding and SC earning
+- Auto-project selection with toast notifications (single project → auto-assign, no project → warning)
+- Bulk Fill dialog with preview/apply workflow using new API endpoints
+- Project chip indicators show auto-assigned, manual, overridden, and unallocated states
+- Bulk save now resolves and sends projectId for billable statuses
+- Monthly view uses dailyProject API data for accurate project display
+- All existing functionality preserved (month navigation, employee filter, KPI cards, legend, quick-fill)

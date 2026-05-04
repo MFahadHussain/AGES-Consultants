@@ -119,6 +119,8 @@ model Project {
   budgets     Budget[]
   employeeAssignments EmployeeProjectAssignment[]
   defaultEmployees    Employee[] // Employees with this as default project
+  dailyProjectRecords AttendanceDailyProject[]
+  costLedgerEntries  ProjectCostLedger[]
 }
 
 model FinancialReportConfig {
@@ -730,6 +732,8 @@ model Employee {
   projectAssignments EmployeeProjectAssignment[]
   allowances        EmployeeAllowance[]
   attendanceRecords Attendance[]
+  dailyProjectRecords AttendanceDailyProject[]
+  costLedgerEntries ProjectCostLedger[]
   loanRecords       Loan[]
   payrollLines      PayrollBatchLine[]
   finalSettlement   FinalSettlement?
@@ -804,8 +808,8 @@ model Attendance {
   employeeId      String
   employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   date            DateTime // The date of attendance
-  status          String   @default("P") // P, W, H, CL, SL, EL, CO, T, WH, CD, A
-  projectId       String?  // Which project the employee worked on that day
+  status          String   @default("P") // P, W, H, CL, SL, EL, CO, T, WH, WW, CD, A
+  projectId       String?  // Which project the employee worked on that day (deprecated — use AttendanceDailyProject)
   checkInTime     String?  // HH:mm format
   checkOutTime    String?  // HH:mm format
   overtimeHours   Float    @default(0)
@@ -814,7 +818,55 @@ model Attendance {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  dailyProject    AttendanceDailyProject?
+
   @@unique([employeeId, date])
+}
+
+// --- Attendance Daily Project (attendance-based project allocation) ---
+// Central join table linking each calendar day to a project for an employee.
+// Created only when attendance status is billable (P, W, H, WH, WW, T, CO).
+model AttendanceDailyProject {
+  id         String   @id @default(cuid())
+  employeeId String
+  date       DateTime // The calendar date
+  projectId  String
+  status     String   // The attendance status that triggered this allocation
+
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  project    Project  @relation(fields: [projectId], references: [id])
+  attendance Attendance @relation(fields: [employeeId, date], references: [employeeId, date], onDelete: Cascade)
+
+  @@unique([employeeId, date])
+  // One project per employee per day — no hour-splitting
+}
+
+// --- Project Cost Ledger ---
+// Stores the output of each monthly payroll run. Written once per payroll run
+// and treated as immutable after approval.
+model ProjectCostLedger {
+  id           String   @id @default(cuid())
+  employeeId   String
+  projectId    String
+  month        DateTime // Always the 1st of the month
+
+  totalDays    Int      // Days worked on this project in the month
+  salaryShare  Float    // Salary attributed to this project
+  scShare      Float    // Final payable SC attributed
+  scBalance    Float    // Deferred SC (leave component)
+
+  // SC component breakdown
+  scOtherPayable Float  // 8.33% of scShare (relative to 20%)
+  scEarnedLeave  Float  // 8.33% of scShare
+  scSickLeave    Float  // 1.67% of scShare
+  scCasualLeave  Float  // 1.67% of scShare
+
+  createdAt    DateTime @default(now())
+
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  project      Project  @relation(fields: [projectId], references: [id])
+
+  @@unique([employeeId, projectId, month])
 }
 
 // --- Loans & Advances ---
