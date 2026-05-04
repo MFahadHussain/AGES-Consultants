@@ -699,6 +699,16 @@ model Employee {
   eobiEnabled       Boolean  @default(false) // Whether EOBI deduction applies
   pfEnabled         Boolean  @default(false) // Whether Provident Fund deduction applies
   incomeTaxEnabled  Boolean  @default(true)  // Whether Income Tax deduction applies
+  essiEnabled       Boolean  @default(false) // Whether ESSI (Employees Social Security Institution) deduction applies
+  gratuityEnabled   Boolean  @default(false) // Whether Gratuity provision applies
+
+  // Allocation Settings
+  applyToAllProjects Boolean  @default(false) // Whether employee works on all assigned projects
+  defaultAllocationMethod String @default("days") // days, percentage — default method for project cost allocation
+
+  // Tax Profile
+  taxFilingStatus   String?  // filer, non-filer — FBR Pakistan tax status
+  taxCity           String?  // City for FBR PSID report
 
   // Qualification
   qualification1    String?
@@ -930,7 +940,7 @@ model TaxSlab {
 // --- Payroll Account Mapping (GL Integration) ---
 model PayrollAccountMapping {
   id              String   @id @default(cuid())
-  componentType   String   @unique // SALARY_EXPENSE, ALLOWANCE_EXPENSE, INCOME_TAX_PAYABLE, EOBI_EMPLOYEE, EOBI_EMPLOYER, PF_EMPLOYEE, PF_EMPLOYER, SOCIAL_CHARGES, SALARY_PAYABLE, GRATUITY, LOAN_DEDUCTION, ADVANCE_DEDUCTION
+  componentType   String   @unique // SALARY_EXPENSE, ALLOWANCE_EXPENSE, INCOME_TAX_PAYABLE, EOBI_EMPLOYEE, EOBI_EMPLOYER, PF_EMPLOYEE, PF_EMPLOYER, ESSI_EMPLOYEE, ESSI_EMPLOYER, SOCIAL_CHARGES, SALARY_PAYABLE, GRATUITY, LOAN_DEDUCTION, ADVANCE_DEDUCTION
   debitAccountId  String?  // GL account to debit
   creditAccountId String?  // GL account to credit
   description     String?
@@ -991,6 +1001,8 @@ model PayrollBatch {
   totalEmployerCharges  Float    @default(0)
   totalSocialCharges    Float    @default(0)
   totalGratuity         Float    @default(0)
+  totalEssiEmployee     Float    @default(0)
+  totalEssiEmployer     Float    @default(0)
 
   // Workflow
   status          String   @default("draft") // draft, reviewed, approved, posted
@@ -1043,9 +1055,15 @@ model PayrollBatchLine {
   // Net
   netPay          Float       @default(0)
 
+  // Calendar & Attendance
+  calendarDays    Int         @default(0) // Total calendar days in month (28-31)
+  payableDays     Int         @default(0) // Calendar Days - Absents
+
   // Social Charges (Employer)
   socialCharges   Float       @default(0)
   gratuity        Float       @default(0)
+  essiEmployee    Float       @default(0) // ESSI employee contribution
+  essiEmployer    Float       @default(0) // ESSI employer contribution
 
   // SC Calculation breakdown
   scBreakdown     String?     // JSON: {monthlySC, workingRatio, earnedSC, leaveDeduction, finalSC}
@@ -1055,8 +1073,11 @@ model PayrollBatchLine {
   projectId       String?
   department      String?
 
-  // Tax calculation breakdown
-  taxBreakdown    String?     // JSON: {taxableIncome, taxSlab, fixedTax, variableTax}
+  // Tax calculation breakdown (YTD + Rolling Projection)
+  taxBreakdown    String?     // JSON: {taxableIncome, ytdIncome, projectedAnnualIncome, monthsWorkedYtd, taxSlab, fixedTax, variableTax, taxPaidYtd}
+
+  // Project allocation details
+  projectAllocations String?  // JSON: [{projectId, projectName, projectCode, days, weight, weightPct, salaryShare, scShare}]
 
   // Relations
   employee        Employee  @relation(fields: [employeeId], references: [id])

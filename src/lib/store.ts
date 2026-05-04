@@ -32,6 +32,8 @@ export type ModuleKey =
   | 'payroll-gl-mapping'
   | 'final-settlement'
   | 'employee-profile'
+  | 'payroll-reports'
+  | 'payroll-slips'
 
 export interface AuthUser {
   id: string

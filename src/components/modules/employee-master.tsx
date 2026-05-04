@@ -129,6 +129,12 @@ const emptyForm = {
   paymentType: 'monthly',
   eobiEnabled: false,
   pfEnabled: false,
+  essiEnabled: false,
+  gratuityEnabled: false,
+  applyToAllProjects: false,
+  defaultAllocationMethod: 'days',
+  taxFilingStatus: '',
+  taxCity: '',
 }
 
 // ---------------------------------------------------------------------------
@@ -317,6 +323,12 @@ export function EmployeeMaster() {
       paymentType: emp.paymentType || 'monthly',
       eobiEnabled: emp.eobiEnabled || false,
       pfEnabled: emp.pfEnabled || false,
+      essiEnabled: emp.essiEnabled || false,
+      gratuityEnabled: emp.gratuityEnabled || false,
+      applyToAllProjects: emp.applyToAllProjects || false,
+      defaultAllocationMethod: emp.defaultAllocationMethod || 'days',
+      taxFilingStatus: emp.taxFilingStatus || '',
+      taxCity: emp.taxCity || '',
     })
   }
 
@@ -708,6 +720,62 @@ export function EmployeeMaster() {
             </div>
           </div>
         </div>
+        <Separator className="my-3" />
+        <div>
+          <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><Shield className="h-3.5 w-3.5" />Statutory & Settings</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-slate-200">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!!form.essiEnabled}
+                onClick={() => setForm(prev => ({ ...prev, essiEnabled: !prev.essiEnabled }))}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${form.essiEnabled ? 'bg-slate-900' : 'bg-slate-200'}`}
+              >
+                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${form.essiEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+              </button>
+              <div>
+                <p className="text-xs font-medium">Apply ESSI</p>
+                <p className="text-[10px] text-muted-foreground">Enable ESSI deduction</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-slate-200">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!!form.gratuityEnabled}
+                onClick={() => setForm(prev => ({ ...prev, gratuityEnabled: !prev.gratuityEnabled }))}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${form.gratuityEnabled ? 'bg-slate-900' : 'bg-slate-200'}`}
+              >
+                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${form.gratuityEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+              </button>
+              <div>
+                <p className="text-xs font-medium">Apply Gratuity</p>
+                <p className="text-[10px] text-muted-foreground">Enable gratuity provision</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-slate-200">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!!form.applyToAllProjects}
+                onClick={() => setForm(prev => ({ ...prev, applyToAllProjects: !prev.applyToAllProjects }))}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${form.applyToAllProjects ? 'bg-slate-900' : 'bg-slate-200'}`}
+              >
+                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${form.applyToAllProjects ? 'translate-x-4' : 'translate-x-0'}`} />
+              </button>
+              <div>
+                <p className="text-xs font-medium">Apply to All Projects</p>
+                <p className="text-[10px] text-muted-foreground">Allocate across all assigned projects</p>
+              </div>
+            </div>
+            <FormSelect label="Default Allocation Method" field="defaultAllocationMethod" options={[{ value: 'days', label: 'Days-based' }, { value: 'percentage', label: 'Percentage' }]} placeholder="Select method" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+            <FormSelect label="Tax Filing Status" field="taxFilingStatus" options={[{ value: 'filer', label: 'Filer' }, { value: 'non-filer', label: 'Non-Filer' }]} placeholder="Select status" />
+            <FormField label="Tax City (FBR PSID)" field="taxCity" placeholder="e.g. Islamabad, Karachi" />
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -812,6 +880,28 @@ export function EmployeeMaster() {
               <DetailRow icon={DollarSign} label="Payment Type" value={emp.paymentType || '—'} />
               <DetailRow icon={Shield} label="EOBI Number" value={emp.eobiNumber} />
               <DetailRow icon={Shield} label="Social Security No" value={emp.socialSecurityNo} />
+            </div>
+            <Separator className="my-3" />
+            <div className="space-y-2">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Statutory & Settings</p>
+              <div className="flex flex-wrap gap-1.5">
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.eobiEnabled ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>EOBI {emp.eobiEnabled ? '✓' : '✗'}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.essiEnabled ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>ESSI {emp.essiEnabled ? '✓' : '✗'}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.gratuityEnabled ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>Gratuity {emp.gratuityEnabled ? '✓' : '✗'}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.pfEnabled ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>PF {emp.pfEnabled ? '✓' : '✗'}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.applyToAllProjects ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>All Projects {emp.applyToAllProjects ? '✓' : '✗'}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-medium border bg-blue-50 text-blue-700 border-blue-200">
+                  {emp.defaultAllocationMethod === 'percentage' ? 'Pct' : 'Days'}
+                </span>
+                {emp.taxFilingStatus && (
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.taxFilingStatus === 'filer' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                    {emp.taxFilingStatus === 'filer' ? 'Filer' : 'Non-Filer'}
+                  </span>
+                )}
+                {emp.taxCity && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-medium border bg-slate-50 text-slate-600 border-slate-200">{emp.taxCity}</span>
+                )}
+              </div>
             </div>
           </TabsContent>
 
@@ -986,13 +1076,14 @@ export function EmployeeMaster() {
                   <TableHead className="text-[10px]">Designation</TableHead>
                   <TableHead className="text-[10px] text-right">Base Salary</TableHead>
                   <TableHead className="text-[10px]">Status</TableHead>
+                  <TableHead className="text-[10px]">Statutory</TableHead>
                   <TableHead className="text-[10px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center">
+                    <TableCell colSpan={8} className="h-32 text-center">
                       <div className="flex items-center justify-center gap-2 text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         <span className="text-xs">Loading employees...</span>
@@ -1001,7 +1092,7 @@ export function EmployeeMaster() {
                   </TableRow>
                 ) : employees.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center">
+                    <TableCell colSpan={8} className="h-32 text-center">
                       <div className="text-xs text-muted-foreground">
                         <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground/30" />
                         No employees found. {search || statusFilter !== 'all' || departmentFilter !== 'all' ? 'Try adjusting your filters.' : 'Click "Add Employee" to create one.'}
@@ -1025,6 +1116,14 @@ export function EmployeeMaster() {
                         <TableCell className="text-xs text-right font-medium">{emp.baseSalary ? formatCurrency(emp.baseSalary) : '—'}</TableCell>
                         <TableCell>
                           <Badge className={`text-[9px] ${sc.color}`}>{sc.label}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-0.5">
+                            <span className={`text-[9px] px-1 py-0.5 rounded border ${emp.eobiEnabled ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>EOBI {emp.eobiEnabled ? '✓' : '✗'}</span>
+                            <span className={`text-[9px] px-1 py-0.5 rounded border ${emp.essiEnabled ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>ESSI {emp.essiEnabled ? '✓' : '✗'}</span>
+                            <span className={`text-[9px] px-1 py-0.5 rounded border ${emp.gratuityEnabled ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>Grat {emp.gratuityEnabled ? '✓' : '✗'}</span>
+                            <span className={`text-[9px] px-1 py-0.5 rounded border ${emp.pfEnabled ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>PF {emp.pfEnabled ? '✓' : '✗'}</span>
+                          </div>
                         </TableCell>
                         <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                           <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

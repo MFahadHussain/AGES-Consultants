@@ -1,12 +1,15 @@
 // ============================================================================
-// Payroll Calculation Engine — Attendance-Based Project Cost Distribution
+// Payroll Calculation Engine v2.0 — YTD Tax + Multi-Project Allocation
 // ============================================================================
-// Core Business Rule: A project allocation only exists if attendance exists.
-// No attendance record = no project cost = no SC allocation.
-//
-// Supports project-specific salaries from EmployeeProjectAssignment.
-// If an assignment has a salaryAmount, that rate is used for that project.
-// Otherwise, the employee's baseSalary is distributed by weight.
+// CRITICAL RULES:
+//   1. Earned Salary = (Monthly Base Salary / Calendar Days) × Payable Days
+//      Payable Days = Calendar Days − Absent Days
+//   2. Multi-project allocation: total MUST equal Earned Salary — NO duplication
+//      Projects are cost centers only, NOT salary sources
+//   3. Tax Engine uses YTD + Rolling Projection (Pakistan FBR 2024-25)
+//   4. Social contributions (EOBI, ESSI, Gratuity, PF) are conditional on flags
+//   5. Fiscal year runs July to June (Pakistan)
+//   6. All PKR amounts must be integers (Math.round)
 // ============================================================================
 
 import { db } from '@/lib/db'
@@ -33,10 +36,28 @@ const SC_COMPONENTS = {
   casualLeave:  0.0167,
 }
 
-// ── Helper ─────────────────────────────────────────────────────────────────
+// ── Pakistan FBR Tax Slabs 2024-25 (Salaried Persons) ──────────────────────
 
-function round2(n: number): number {
-  return Math.round(n * 100) / 100
+interface TaxSlabEntry {
+  min: number
+  max: number | null // null = no upper limit
+  fixedTax: number
+  rate: number // percentage on amount exceeding min
+}
+
+const FBR_TAX_SLABS_2024_25: TaxSlabEntry[] = [
+  { min: 0,      max: 600000,   fixedTax: 0,      rate: 0   },
+  { min: 600001, max: 1200000,  fixedTax: 0,      rate: 5   },
+  { min: 1200001, max: 2200000, fixedTax: 60000,  rate: 15  },
+  { min: 2200001, max: 3200000, fixedTax: 210000, rate: 25  },
+  { min: 3200001, max: 4100000, fixedTax: 460000, rate: 30  },
+  { min: 4100001, max: null,    fixedTax: 730000, rate: 35  },
+]
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function roundPKR(n: number): number {
+  return Math.round(n)
 }
 
 /** Get the number of calendar days in a month */
@@ -44,7 +65,55 @@ function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate()
 }
 
-// ── Main Calculation ───────────────────────────────────────────────────────
+/**
+ * Get Pakistan fiscal year boundaries for a given date.
+ * Pakistan FY runs July to June: FY 2024-25 = Jul 2024 to Jun 2025.
+ */
+function getFiscalYear(date: Date): { fyStart: Date; fyEnd: Date; fyLabel: string } {
+  const year = date.getUTCFullYear()
+  const month = date.getUTCMonth() + 1 // 1-indexed
+
+  // If month is July (7) or later, FY starts this year; otherwise previous year
+  const fyStartYear = month >= 7 ? year : year - 1
+  const fyStart = new Date(Date.UTC(fyStartYear, 6, 1)) // July 1
+  const fyEnd = new Date(Date.UTC(fyStartYear + 1, 5, 30, 23, 59, 59, 999)) // June 30
+
+  return {
+    fyStart,
+    fyEnd,
+    fyLabel: `${fyStartYear}-${String(fyStartYear + 1).slice(2)}`,
+  }
+}
+
+/**
+ * Calculate annual tax using Pakistan FBR slabs.
+ */
+function calculateFbrTax(annualIncome: number): { annualTax: number; slab: TaxSlabEntry; variableTax: number } {
+  let applicableSlab = FBR_TAX_SLABS_2024_25[0]
+  for (const slab of FBR_TAX_SLABS_2024_25) {
+    if (annualIncome >= slab.min && (slab.max === null || annualIncome <= slab.max)) {
+      applicableSlab = slab
+      break
+    }
+  }
+
+  const excessAmount = annualIncome - applicableSlab.min
+  const variableTax = (excessAmount * applicableSlab.rate) / 100
+  const annualTax = applicableSlab.fixedTax + variableTax
+
+  return { annualTax, slab: applicableSlab, variableTax }
+}
+
+/**
+ * Format tax slab description for display.
+ */
+function formatTaxSlab(slab: TaxSlabEntry): string {
+  const min = `PKR ${slab.min.toLocaleString()}`
+  const max = slab.max ? `PKR ${slab.max.toLocaleString()}` : 'Above'
+  return `${min} - ${max}`
+}
+
+// ── Interfaces ─────────────────────────────────────────────────────────────
 
 export interface ProjectAllocation {
   projectId: string
@@ -75,12 +144,13 @@ export interface PayrollResult {
     baseSalary: number
   }
   month: string          // YYYY-MM
-  daysInMonth: number
+  calendarDays: number   // 28-31
+  payableDays: number    // Calendar Days - Absent Days
   eligibleDays: number
   leaveDays: number
   absentDays: number
-  monthlySalary: number  // Total effective salary (may differ from baseSalary)
-  dailyRate: number      // Weighted average daily rate
+  monthlySalary: number  // Earned salary = (base / calendarDays) × payableDays
+  dailyRate: number      // baseSalary / calendarDays
   workingRatio: number
   monthlySC: number
   earnedSC: number
@@ -106,6 +176,8 @@ export interface PayrollResult {
     incomeTax: number
     eobiEmployee: number
     eobiEmployer: number
+    essiEmployee: number
+    essiEmployer: number
     pfEmployee: number
     pfEmployer: number
     loanDeduction: number
@@ -116,12 +188,16 @@ export interface PayrollResult {
   grossSalary: number
   netPay: number
   gratuity: number
+  employerCost: number
   taxBreakdown: {
     taxableIncome: number
+    ytdIncome: number
+    projectedAnnualIncome: number
+    monthsWorkedYtd: number
     taxSlab: string
     fixedTax: number
     variableTax: number
-    monthlyTax: number
+    taxPaidYtd: number
   }
   scBreakdown: {
     monthlySC: number
@@ -132,29 +208,40 @@ export interface PayrollResult {
   }
 }
 
+// ── Main Calculation ───────────────────────────────────────────────────────
+
 /**
  * Calculate the full monthly payroll for a single employee.
  *
- * Formulas (AGES Consultants methodology):
- *   Daily Salary Rate  = Monthly Salary ÷ Days in Month
- *   Monthly SC         = Monthly Salary × 20%
- *   Eligible Days      = COUNT(P + W + H + T + WH + WW + CL + SL + EL)
- *   Leave Days         = COUNT(CL + SL)
- *   Working Ratio      = Eligible Days ÷ Days in Month
- *   Earned SC          = Monthly SC × Working Ratio
- *   Leave Deduction    = Daily Rate × Leave Days
- *   Final Payable SC   = Earned SC − Leave Deduction
- *   SC Balance         = Leave Deduction (deferred)
+ * FORMULAS:
+ *   Earned Salary = (Monthly Base Salary / Calendar Days) × Payable Days
+ *   Payable Days = Calendar Days − Absent Days
+ *   Daily Rate = Monthly Base Salary / Calendar Days
  *
- * Project Distribution (with project-specific salaries):
- *   For each project, if EmployeeProjectAssignment.salaryAmount exists:
- *     Project Daily Rate = Assignment Salary / Days In Month
- *     Project Salary Share = Project Daily Rate × Days on Project
- *   Otherwise (fallback):
+ *   Project Allocation:
  *     Weight = Days on Project / Total Billable Days
- *     Project Salary Share = Total Monthly Salary × Weight
+ *     Salary Share = Earned Salary × Weight
+ *     (Total allocations MUST equal Earned Salary — NO duplication)
  *
- *   SC Share = Final SC × (Project Salary Share / Total Salary)
+ *   Tax Engine (YTD + Rolling Projection):
+ *     1. YTD Income = Sum of PayrollBatchLine.grossSalary in current fiscal year
+ *     2. Add current month's gross salary
+ *     3. Months Worked YTD = Count of months with payroll + 1 (current)
+ *     4. Projected Annual = (YTD / Months Worked YTD) × 12
+ *     5. Apply FBR slabs on Projected Annual Income
+ *     6. Monthly Tax = Annual Tax / 12
+ *     7. Tax Paid YTD = Sum of incomeTax from previous months
+ *     8. Current Month Tax = Monthly Tax (adjusted for YTD cumulative)
+ *
+ *   Social Contributions (conditional on employee flags):
+ *     EOBI: Employee = Rs 370 (fixed), Employer = Rs 870 (fixed) — if eobiEnabled
+ *     ESSI: Employer = 6% of earned salary, Employee = 0% (default) — if essiEnabled
+ *     Gratuity: Basic Salary / 12 — if gratuityEnabled
+ *     PF: Employee = 8.33% of basic, Employer = 8.33% of basic — if pfEnabled
+ *
+ *   Net Pay = Gross Salary - Income Tax - EOBI Employee - ESSI Employee - PF Employee
+ *             - Loan Deduction - Advance Deduction - Other Deductions
+ *   Employer Cost = EOBI Employer + ESSI Employer + PF Employer + Social Charges + Gratuity
  */
 export async function calculateMonthlyPayroll(
   employeeId: string,
@@ -167,11 +254,11 @@ export async function calculateMonthlyPayroll(
 
   const year = month.getUTCFullYear()
   const mon = month.getUTCMonth() + 1 // 1-indexed
-  const daysInMonth = getDaysInMonth(year, mon)
+  const calendarDays = getDaysInMonth(year, mon)
 
   // ── 2. Fetch all attendance records for this month ──
   const monthStart = new Date(Date.UTC(year, mon - 1, 1))
-  const monthEnd = new Date(Date.UTC(year, mon - 1, daysInMonth, 23, 59, 59, 999))
+  const monthEnd = new Date(Date.UTC(year, mon - 1, calendarDays, 23, 59, 59, 999))
 
   const attendance = await db.attendance.findMany({
     where: {
@@ -190,7 +277,38 @@ export async function calculateMonthlyPayroll(
     select: { date: true, projectId: true, status: true },
   })
 
-  // ── 4. Fetch EmployeeProjectAssignments (for project-specific salaries) ──
+  // ── 4. Core attendance calculations ──
+  const eligibleDays = attendance.filter(a => ELIGIBLE_STATUSES.has(a.status)).length
+  const leaveDays = attendance.filter(a => LEAVE_STATUSES.has(a.status)).length
+  const absentDays = attendance.filter(a => a.status === 'A' || a.status === 'CD').length
+
+  // ── 5. Earned Salary Calculation (CRITICAL) ──
+  // Payable Days = Calendar Days − Absent Days
+  const payableDays = calendarDays - absentDays
+  // Daily Rate = Monthly Base Salary / Calendar Days
+  const dailyRate = roundPKR(employee.baseSalary / calendarDays)
+  // Earned Salary = (Monthly Base Salary / Calendar Days) × Payable Days
+  const earnedSalary = roundPKR((employee.baseSalary / calendarDays) * payableDays)
+
+  // ── 6. Multi-Project Allocation (CRITICAL — NO duplication) ──
+  const billableProjects = dailyProjects.filter(dp => BILLABLE_STATUSES.has(dp.status))
+  const totalBillableDays = billableProjects.length
+
+  // Group daily project records by projectId
+  const projectGroups: Record<string, number> = {}
+  for (const rec of billableProjects) {
+    projectGroups[rec.projectId] = (projectGroups[rec.projectId] || 0) + 1
+  }
+
+  // Fetch project details
+  const projectIds = Object.keys(projectGroups)
+  const projects = await db.project.findMany({
+    where: { id: { in: projectIds } },
+    select: { id: true, code: true, name: true },
+  })
+  const projectMap = new Map(projects.map(p => [p.id, p]))
+
+  // Fetch EmployeeProjectAssignments for designation info
   const projectAssignments = await db.employeeProjectAssignment.findMany({
     where: {
       employeeId,
@@ -207,168 +325,94 @@ export async function calculateMonthlyPayroll(
       role: true,
     },
   })
-
-  // Build a map of projectId → assignment info
   const assignmentMap = new Map<string, { salaryAmount: number; role: string | null }>()
   for (const pa of projectAssignments) {
-    if (pa.salaryAmount && pa.salaryAmount > 0) {
-      assignmentMap.set(pa.projectId, { salaryAmount: pa.salaryAmount, role: pa.role })
+    assignmentMap.set(pa.projectId, { salaryAmount: pa.salaryAmount, role: pa.role })
+  }
+
+  // Allocate earned salary across projects by weight
+  // Weight = Days on Project / Total Billable Days
+  // Salary Share = Earned Salary × Weight
+  // Total MUST equal Earned Salary — NO duplication
+  const projectAllocations: ProjectAllocation[] = []
+
+  if (totalBillableDays > 0) {
+    let allocatedTotal = 0
+
+    for (const [pId, days] of Object.entries(projectGroups)) {
+      const proj = projectMap.get(pId)
+      const assignment = assignmentMap.get(pId)
+      const weight = days / totalBillableDays
+      const weightPct = (weight * 100).toFixed(2) + '%'
+
+      // Salary share is earned salary × weight (projects are cost centers only)
+      let salaryShare = roundPKR(earnedSalary * weight)
+      allocatedTotal += salaryShare
+
+      // Adjust last allocation to ensure total = earnedSalary (avoid rounding drift)
+      const projectDailyRate = roundPKR(salaryShare / days)
+
+      projectAllocations.push({
+        projectId: pId,
+        projectName: proj?.name || 'Unknown',
+        projectCode: proj?.code || 'UNK',
+        days,
+        weight: roundPKR(weight * 10000) / 10000, // 4 decimal precision
+        weightPct,
+        salaryShare, // will be adjusted below for last item
+        scShare: 0, // filled after SC calculation
+        scBalance: 0,
+        scOtherPayable: 0,
+        scEarnedLeave: 0,
+        scSickLeave: 0,
+        scCasualLeave: 0,
+        projectDailyRate,
+        projectSalary: assignment?.salaryAmount || null,
+        designation: assignment?.role || null,
+      })
+    }
+
+    // Fix rounding: adjust the largest project allocation so total = earnedSalary
+    if (projectAllocations.length > 0 && allocatedTotal !== earnedSalary) {
+      const diff = earnedSalary - allocatedTotal
+      // Find the project with the most days and adjust
+      const maxProject = projectAllocations.reduce((max, p) => p.days > max.days ? p : max, projectAllocations[0])
+      maxProject.salaryShare = roundPKR(maxProject.salaryShare + diff)
+      maxProject.projectDailyRate = roundPKR(maxProject.salaryShare / maxProject.days)
     }
   }
 
-  // ── 5. Core attendance calculations ──
-  const eligibleDays = attendance.filter(a => ELIGIBLE_STATUSES.has(a.status)).length
-  const leaveDays = attendance.filter(a => LEAVE_STATUSES.has(a.status)).length
-  const absentDays = attendance.filter(a => a.status === 'A' || a.status === 'CD').length
-
-  // ── 6. Project-level cost distribution ──
-  // Filter daily project records to only billable statuses (includes CL/SL/EL)
-  const billableProjects = dailyProjects.filter(dp => BILLABLE_STATUSES.has(dp.status))
-  const totalBillableDays = billableProjects.length
-
-  // Group daily project records by projectId
-  const projectGroups: Record<string, number> = {}
-  for (const rec of billableProjects) {
-    projectGroups[rec.projectId] = (projectGroups[rec.projectId] || 0) + 1
-  }
-
-  // Fetch project details for all referenced projects
-  const projectIds = Object.keys(projectGroups)
-  const projects = await db.project.findMany({
-    where: { id: { in: projectIds } },
-    select: { id: true, code: true, name: true },
-  })
-  const projectMap = new Map(projects.map(p => [p.id, p]))
-
-  // Calculate project salary shares
-  // If project has a specific salary in assignment, use it; otherwise use weight-based
-  let totalSalaryFromProjects = 0
-  const projectSalaryShares: {
-    projectId: string
-    days: number
-    projectSalary: number | null
-    projectDailyRate: number
-    salaryShare: number
-    designation: string | null
-  }[] = []
-
-  for (const [projectId, days] of Object.entries(projectGroups)) {
-    const assignment = assignmentMap.get(projectId)
-    let projectDailyRate = 0
-    let salaryShare = 0
-    let projectSalary: number | null = null
-    let designation: string | null = null
-
-    if (assignment && assignment.salaryAmount > 0) {
-      // Project-specific salary from assignment
-      projectSalary = assignment.salaryAmount
-      designation = assignment.role
-      projectDailyRate = round2(projectSalary / daysInMonth)
-      salaryShare = round2(projectDailyRate * days)
-    } else {
-      // Fallback: will calculate after we know total monthly salary
-      projectDailyRate = 0
-      salaryShare = 0
-    }
-
-    projectSalaryShares.push({
-      projectId,
-      days,
-      projectSalary,
-      projectDailyRate,
-      salaryShare,
-      designation,
-    })
-    totalSalaryFromProjects += salaryShare
-  }
-
-  // Determine total monthly salary
-  // If all projects have assignment salaries, total = sum of project salary shares
-  // Otherwise, use employee.baseSalary
-  const hasAnyProjectSalary = projectSalaryShares.some(p => p.projectSalary !== null)
-  const hasAllProjectSalaries = projectSalaryShares.length > 0 && projectSalaryShares.every(p => p.projectSalary !== null)
-
-  let monthlySalary: number
-  if (hasAllProjectSalaries) {
-    // All projects have specific salaries - total is the sum of actual worked shares
-    monthlySalary = totalSalaryFromProjects
-  } else if (hasAnyProjectSalary) {
-    // Mixed: some have project salaries, some don't
-    // Use baseSalary as fallback for the rest, distributed by weight
-    monthlySalary = employee.baseSalary
-  } else {
-    // No project-specific salaries - use baseSalary
-    monthlySalary = employee.baseSalary
-  }
-
-  // Fill in fallback salary shares for projects without assignment salaries
-  const totalAssignedSalary = projectSalaryShares.reduce((sum, p) => sum + p.salaryShare, 0)
-  const remainingSalary = monthlySalary - totalAssignedSalary
-  const unassignedDays = projectSalaryShares.filter(p => p.projectSalary === null).reduce((sum, p) => sum + p.days, 0)
-
-  for (const p of projectSalaryShares) {
-    if (p.projectSalary === null && totalBillableDays > 0) {
-      // Distribute remaining salary by weight
-      const weight = unassignedDays > 0 ? p.days / unassignedDays : p.days / totalBillableDays
-      p.salaryShare = round2(remainingSalary * weight)
-      p.projectDailyRate = round2(p.salaryShare / p.days)
-    }
-  }
-
-  // Recalculate total after filling in fallbacks
-  monthlySalary = projectSalaryShares.reduce((sum, p) => sum + p.salaryShare, 0)
-  if (monthlySalary === 0) {
-    // No attendance at all - use baseSalary
-    monthlySalary = employee.baseSalary
-  }
-
-  const dailyRate = round2(monthlySalary / daysInMonth)
+  const monthlySalary = earnedSalary // This is the earned salary (not base salary)
 
   // ── 7. SC calculation ──
-  const workingRatio = round2(eligibleDays / daysInMonth)
-  const monthlySC = round2(monthlySalary * SC_RATE)
-  const earnedSC = round2(monthlySC * workingRatio)
-  const leaveDeduction = round2(dailyRate * leaveDays)
-  const finalSC = round2(earnedSC - leaveDeduction)
+  const workingRatio = calendarDays > 0 ? roundPKR((eligibleDays / calendarDays) * 10000) / 10000 : 0
+  const monthlySC = roundPKR(monthlySalary * SC_RATE)
+  const earnedSC = roundPKR(monthlySC * workingRatio)
+  const leaveDeduction = roundPKR(dailyRate * leaveDays)
+  const finalSC = Math.max(0, roundPKR(earnedSC - leaveDeduction))
   const scBalance = leaveDeduction
 
   const scComponents = {
-    otherPayable: round2(finalSC * SC_COMPONENTS.otherPayable),
-    earnedLeave:  round2(finalSC * SC_COMPONENTS.earnedLeave),
-    sickLeave:    round2(finalSC * SC_COMPONENTS.sickLeave),
-    casualLeave:  round2(finalSC * SC_COMPONENTS.casualLeave),
+    otherPayable: roundPKR(finalSC * SC_COMPONENTS.otherPayable),
+    earnedLeave:  roundPKR(finalSC * SC_COMPONENTS.earnedLeave),
+    sickLeave:    roundPKR(finalSC * SC_COMPONENTS.sickLeave),
+    casualLeave:  roundPKR(finalSC * SC_COMPONENTS.casualLeave),
   }
 
-  // ── 8. Project allocation with SC distribution ──
-  const totalSalaryShares = projectSalaryShares.reduce((sum, p) => sum + p.salaryShare, 0)
+  // ── 8. Distribute SC across project allocations ──
+  const totalSalaryShares = projectAllocations.reduce((sum, p) => sum + p.salaryShare, 0)
 
-  const projectAllocations: ProjectAllocation[] = projectSalaryShares.map(p => {
-    const proj = projectMap.get(p.projectId)
-    const weight = totalBillableDays > 0 ? p.days / totalBillableDays : 0
-    const salaryWeight = totalSalaryShares > 0 ? p.salaryShare / totalSalaryShares : weight
+  for (const pa of projectAllocations) {
+    const salaryWeight = totalSalaryShares > 0 ? pa.salaryShare / totalSalaryShares : pa.weight
+    pa.scShare = roundPKR(finalSC * salaryWeight)
+    pa.scBalance = roundPKR(scBalance * salaryWeight)
+    pa.scOtherPayable = roundPKR(scComponents.otherPayable * salaryWeight)
+    pa.scEarnedLeave = roundPKR(scComponents.earnedLeave * salaryWeight)
+    pa.scSickLeave = roundPKR(scComponents.sickLeave * salaryWeight)
+    pa.scCasualLeave = roundPKR(scComponents.casualLeave * salaryWeight)
+  }
 
-    return {
-      projectId: p.projectId,
-      projectName: proj?.name || 'Unknown',
-      projectCode: proj?.code || 'UNK',
-      days: p.days,
-      weight: round2(weight),
-      weightPct: (weight * 100).toFixed(2) + '%',
-      salaryShare: p.salaryShare,
-      projectDailyRate: p.projectDailyRate,
-      projectSalary: p.projectSalary,
-      designation: p.designation,
-      scShare: round2(finalSC * salaryWeight),
-      scBalance: round2(scBalance * salaryWeight),
-      scOtherPayable: round2(scComponents.otherPayable * salaryWeight),
-      scEarnedLeave: round2(scComponents.earnedLeave * salaryWeight),
-      scSickLeave: round2(scComponents.sickLeave * salaryWeight),
-      scCasualLeave: round2(scComponents.casualLeave * salaryWeight),
-    }
-  })
-
-  // ── 9. Persist to ledger (upsert for idempotency) ──
-  // First, delete any existing ledger entries for this employee/month that are no longer valid
+  // ── 9. Persist to ProjectCostLedger (upsert for idempotency) ──
   const existingLedger = await db.projectCostLedger.findMany({
     where: { employeeId, month: monthStart },
     select: { projectId: true },
@@ -444,7 +488,7 @@ export async function calculateMonthlyPayroll(
     allowanceDetails.push({
       allowanceId: ea.allowanceId,
       name: ea.allowance.name,
-      amount: round2(finalAmount),
+      amount: roundPKR(finalAmount),
       isTaxable: ea.allowance.isTaxable,
     })
 
@@ -454,69 +498,141 @@ export async function calculateMonthlyPayroll(
     }
   }
 
-  totalAllowances = round2(totalAllowances)
-  taxFreeAllowances = round2(taxFreeAllowances)
+  totalAllowances = roundPKR(totalAllowances)
+  taxFreeAllowances = roundPKR(taxFreeAllowances)
 
   // ── 11. Gross Salary ──
-  const grossSalary = round2(monthlySalary + totalAllowances)
+  const grossSalary = roundPKR(monthlySalary + totalAllowances)
 
-  // ── 12. EOBI ──
+  // ── 12. EOBI (only if eobiEnabled) ──
   let eobiEmployee = 0
   let eobiEmployer = 0
   if (employee.eobiEnabled === true) {
-    const EOBI_MIN_WAGE_CAP = 32000
-    const eobiBase = Math.min(monthlySalary, EOBI_MIN_WAGE_CAP)
-    eobiEmployee = round2(eobiBase * 0.01)
-    eobiEmployer = round2(eobiBase * 0.05)
+    // FIXED amounts as per Pakistan EOBI regulations
+    eobiEmployee = 370   // Rs 370 FIXED employee contribution
+    eobiEmployer = 870   // Rs 870 FIXED employer contribution
   }
 
-  // ── 13. Provident Fund ──
+  // ── 13. ESSI (only if essiEnabled) ──
+  let essiEmployee = 0
+  let essiEmployer = 0
+  if (employee.essiEnabled === true) {
+    // Employer = 6% of earned salary (Gross = monthlySalary = earned salary)
+    essiEmployer = roundPKR(monthlySalary * 0.06)
+    // Employee = 0% (default, configurable) — currently set to 0
+    essiEmployee = roundPKR(monthlySalary * 0.00) // configurable but default 0
+  }
+
+  // ── 14. Provident Fund (only if pfEnabled) ──
   let pfEmployee = 0
   let pfEmployer = 0
   if (employee.pfEnabled === true) {
-    pfEmployee = round2(monthlySalary * 0.0833)
-    pfEmployer = round2(monthlySalary * 0.0833)
+    // 8.33% of basic salary (earned salary = basic)
+    pfEmployee = roundPKR(monthlySalary * 0.0833)
+    pfEmployer = roundPKR(monthlySalary * 0.0833)
   }
 
-  // ── 14. Income Tax ──
-  const taxSlabs = await db.taxSlab.findMany({
-    where: { isActive: true },
-    orderBy: { slabOrder: 'asc' },
-  })
-
+  // ── 15. Income Tax — YTD + Rolling Projection (MOST CRITICAL) ──
   let incomeTax = 0
   const taxBreakdown = {
     taxableIncome: 0,
+    ytdIncome: 0,
+    projectedAnnualIncome: 0,
+    monthsWorkedYtd: 0,
     taxSlab: '',
     fixedTax: 0,
     variableTax: 0,
-    monthlyTax: 0,
+    taxPaidYtd: 0,
   }
 
-  if (taxSlabs.length > 0 && grossSalary > 0 && employee.incomeTaxEnabled !== false) {
-    const annualTaxableIncome = (grossSalary - taxFreeAllowances) * 12
-    taxBreakdown.taxableIncome = annualTaxableIncome
+  if (employee.incomeTaxEnabled !== false && grossSalary > 0) {
+    // Step 1: Determine fiscal year boundaries
+    const fy = getFiscalYear(monthStart)
 
-    let applicableSlab = taxSlabs[taxSlabs.length - 1]
-    for (const slab of taxSlabs) {
-      if (annualTaxableIncome >= slab.minAmount && (slab.maxAmount === null || annualTaxableIncome <= slab.maxAmount)) {
-        applicableSlab = slab
-        break
+    // Step 2: Get YTD gross salary from previous payroll lines in this FY
+    // (exclude current month's batch lines to avoid double-counting)
+    const ytdLines = await db.payrollBatchLine.findMany({
+      where: {
+        employeeId,
+        grossSalary: { gt: 0 },
+      },
+      include: { batch: { select: { period: true } } },
+    })
+
+    // Filter to current fiscal year periods
+    let ytdIncome = 0
+    let monthsWorkedYtd = 0
+    const processedPeriods = new Set<string>()
+
+    for (const line of ytdLines) {
+      if (!line.batch?.period) continue
+      const linePeriod = line.batch.period // "YYYY-MM"
+      const [lineYear, lineMonth] = linePeriod.split('-').map(Number)
+      const lineDate = new Date(Date.UTC(lineYear, lineMonth - 1, 1))
+
+      // Check if within fiscal year
+      if (lineDate >= fy.fyStart && lineDate <= fy.fyEnd) {
+        // Skip current month to avoid double-counting
+        if (linePeriod === `${year}-${String(mon).padStart(2, '0')}`) continue
+
+        ytdIncome += line.grossSalary
+        if (!processedPeriods.has(linePeriod)) {
+          processedPeriods.add(linePeriod)
+          monthsWorkedYtd++
+        }
       }
     }
 
-    taxBreakdown.taxSlab = `PKR ${applicableSlab.minAmount.toLocaleString()} - ${applicableSlab.maxAmount ? 'PKR ' + applicableSlab.maxAmount.toLocaleString() : 'Above'}`
-    taxBreakdown.fixedTax = applicableSlab.fixedAmount
+    // Step 3: Add current month's gross salary to YTD
+    ytdIncome = roundPKR(ytdIncome + grossSalary)
+    monthsWorkedYtd += 1 // +1 for current month
 
-    const variableTax = (annualTaxableIncome - applicableSlab.minAmount) * applicableSlab.rate / 100
-    taxBreakdown.variableTax = round2(variableTax)
+    // Step 4: Projected Annual Income = (YTD / Months Worked YTD) × 12
+    const projectedAnnualIncome = monthsWorkedYtd > 0
+      ? roundPKR((ytdIncome / monthsWorkedYtd) * 12)
+      : roundPKR(grossSalary * 12)
 
-    const annualTax = applicableSlab.fixedAmount + variableTax
-    incomeTax = round2(annualTax / 12)
-    taxBreakdown.monthlyTax = incomeTax
+    // Step 5: Taxable income for current month
+    const taxableIncome = roundPKR(grossSalary - taxFreeAllowances)
+
+    // Step 6: Apply FBR Tax Slabs on Projected Annual Income
+    const { annualTax, slab, variableTax } = calculateFbrTax(projectedAnnualIncome)
+
+    // Step 7: Monthly Tax = Annual Tax / 12
+    const monthlyTax = roundPKR(annualTax / 12)
+
+    // Step 8: Tax Paid YTD = Sum of incomeTax from previous months
+    let taxPaidYtd = 0
+    for (const line of ytdLines) {
+      if (!line.batch?.period) continue
+      const linePeriod = line.batch.period
+      const [lineYear, lineMonth] = linePeriod.split('-').map(Number)
+      const lineDate = new Date(Date.UTC(lineYear, lineMonth - 1, 1))
+
+      if (lineDate >= fy.fyStart && lineDate <= fy.fyEnd) {
+        if (linePeriod === `${year}-${String(mon).padStart(2, '0')}`) continue
+        taxPaidYtd += line.incomeTax
+      }
+    }
+    taxPaidYtd = roundPKR(taxPaidYtd)
+
+    // Step 9: Current Month Tax = Monthly Tax (adjusted so YTD total equals correct cumulative)
+    // The adjustment ensures: taxPaidYtd + currentMonthTax = monthlyTax * monthsWorkedYtd
+    const expectedYtdTax = roundPKR(monthlyTax * monthsWorkedYtd)
+    incomeTax = Math.max(0, roundPKR(expectedYtdTax - taxPaidYtd))
+
+    // Populate tax breakdown
+    taxBreakdown.taxableIncome = taxableIncome
+    taxBreakdown.ytdIncome = ytdIncome
+    taxBreakdown.projectedAnnualIncome = projectedAnnualIncome
+    taxBreakdown.monthsWorkedYtd = monthsWorkedYtd
+    taxBreakdown.taxSlab = formatTaxSlab(slab)
+    taxBreakdown.fixedTax = slab.fixedTax
+    taxBreakdown.variableTax = roundPKR(variableTax)
+    taxBreakdown.taxPaidYtd = taxPaidYtd
   }
 
-  // ── 15. Loan deduction ──
+  // ── 16. Loan deduction ──
   const activeLoans = await db.loan.findMany({
     where: {
       employeeId,
@@ -525,20 +641,30 @@ export async function calculateMonthlyPayroll(
       startDate: { lte: monthEnd },
     },
   })
-  const loanDeduction = round2(activeLoans.reduce((sum, loan) => sum + loan.monthlyDeduction, 0))
+  const loanDeduction = roundPKR(activeLoans.reduce((sum, loan) => sum + loan.monthlyDeduction, 0))
 
-  // ── 16. Total Deductions ──
+  // ── 17. Total Deductions ──
   const advanceDeduction = 0
   const otherDeductions = 0
-  const totalDeductions = round2(incomeTax + eobiEmployee + pfEmployee + loanDeduction + advanceDeduction + otherDeductions)
+  const totalDeductions = roundPKR(
+    incomeTax + eobiEmployee + essiEmployee + pfEmployee +
+    loanDeduction + advanceDeduction + otherDeductions
+  )
 
-  // ── 17. Net Pay ──
-  const netPay = round2(grossSalary - totalDeductions)
+  // ── 18. Net Pay ──
+  const netPay = roundPKR(grossSalary - totalDeductions)
 
-  // ── 18. Gratuity ──
-  const gratuity = round2(monthlySalary * 0.0833)
+  // ── 19. Gratuity (only if gratuityEnabled) ──
+  const gratuity = employee.gratuityEnabled === true
+    ? roundPKR(employee.baseSalary / 12)  // Monthly provision = Basic Salary / 12
+    : 0
 
-  // ── 19. Return summary ──
+  // ── 20. Employer Cost ──
+  const employerCost = roundPKR(
+    eobiEmployer + essiEmployer + pfEmployer + finalSC + gratuity
+  )
+
+  // ── 21. Return summary ──
   return {
     employee: {
       id: employee.id,
@@ -547,7 +673,8 @@ export async function calculateMonthlyPayroll(
       baseSalary: employee.baseSalary,
     },
     month: `${year}-${String(mon).padStart(2, '0')}`,
-    daysInMonth,
+    calendarDays,
+    payableDays,
     eligibleDays,
     leaveDays,
     absentDays,
@@ -571,6 +698,8 @@ export async function calculateMonthlyPayroll(
       incomeTax,
       eobiEmployee,
       eobiEmployer,
+      essiEmployee,
+      essiEmployer,
       pfEmployee,
       pfEmployer,
       loanDeduction,
@@ -581,6 +710,7 @@ export async function calculateMonthlyPayroll(
     grossSalary,
     netPay,
     gratuity,
+    employerCost,
     taxBreakdown,
     scBreakdown: {
       monthlySC,

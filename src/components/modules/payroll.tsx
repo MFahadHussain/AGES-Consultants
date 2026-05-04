@@ -52,8 +52,17 @@ const statusLabels: Record<string, string> = {
   'draft-to-gl': 'Draft to GL',
 }
 
-// Workflow steps
-const workflowSteps = ['draft', 'reviewed', 'approved', 'draft-to-gl']
+// Workflow steps — enhanced with action labels
+const workflowSteps = ['draft', 'reviewed', 'approved', 'posted']
+const workflowStepActions: Record<string, { label: string; action: string; icon: any }[]> = {
+  draft: [{ label: 'Review', action: 'review', icon: Send }],
+  reviewed: [
+    { label: 'Approve', action: 'approve', icon: Shield },
+    { label: 'Send Back', action: 'send-back', icon: ArrowRight },
+  ],
+  approved: [{ label: 'Post to GL', action: 'post-to-gl', icon: BookOpen }],
+  posted: [],
+}
 
 // Line form interface
 interface PayrollLineForm {
@@ -679,27 +688,60 @@ export function PayrollIntegration() {
   // ----------------------------------------------------------
   // Render: Workflow Status Bar
   // ----------------------------------------------------------
-  const renderWorkflowBar = (status: string) => {
+  const renderWorkflowBar = (status: string, batchId: string) => {
     const currentIdx = workflowSteps.indexOf(status)
+    // For 'draft-to-gl' status, show as approved step
+    const effectiveIdx = status === 'draft-to-gl' ? workflowSteps.indexOf('approved') : currentIdx
     return (
-      <div className="flex items-center gap-1 my-3">
-        {workflowSteps.map((step, idx) => (
-          <div key={step} className="flex items-center gap-1">
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-              idx <= currentIdx
-                ? idx === currentIdx
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'bg-primary/10 text-primary'
-                : 'bg-muted text-muted-foreground'
-            }`}>
-              {idx <= currentIdx && <CheckCircle className="h-3 w-3" />}
-              <span>{statusLabels[step]}</span>
+      <div className="flex items-center gap-1 my-3 flex-wrap">
+        {workflowSteps.map((step, idx) => {
+          const stepActions = workflowStepActions[step] || []
+          return (
+            <div key={step} className="flex items-center gap-1">
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                idx <= effectiveIdx
+                  ? idx === effectiveIdx
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-primary/10 text-primary'
+                  : 'bg-muted text-muted-foreground'
+              }`}>
+                {idx <= effectiveIdx && <CheckCircle className="h-3 w-3" />}
+                <span>{statusLabels[step]}</span>
+                {/* Show action buttons for the current step */}
+                {idx === effectiveIdx && stepActions.length > 0 && (
+                  <div className="flex items-center gap-1 ml-2">
+                    {stepActions.map((sa) => {
+                      const IconComp = sa.icon
+                      return (
+                        <Button
+                          key={sa.action}
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 px-1.5 text-[9px] bg-white/20 hover:bg-white/40 text-primary-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (sa.action === 'post-to-gl') {
+                              setSelectedBatch(batches.find((b: any) => b.id === batchId) || null)
+                              setPostDialogOpen(true)
+                            } else {
+                              handleWorkflowAction(sa.action, batchId)
+                            }
+                          }}
+                        >
+                          <IconComp className="h-2.5 w-2.5 mr-0.5" />
+                          {sa.label}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+              {idx < workflowSteps.length - 1 && (
+                <ArrowRight className={`h-4 w-4 ${idx < effectiveIdx ? 'text-primary' : 'text-muted-foreground'}`} />
+              )}
             </div>
-            {idx < workflowSteps.length - 1 && (
-              <ArrowRight className={`h-4 w-4 ${idx < currentIdx ? 'text-primary' : 'text-muted-foreground'}`} />
-            )}
-          </div>
-        ))}
+          )
+        })}
       </div>
     )
   }
@@ -846,6 +888,11 @@ export function PayrollIntegration() {
                   <Shield className="h-3 w-3 mr-1" />EOBI: Active
                 </Badge>
               )}
+              {selectedLine.essiEmployee > 0 && (
+                <Badge className="text-[10px] bg-teal-50 text-teal-700 border border-teal-200">
+                  <Shield className="h-3 w-3 mr-1" />ESSI: Active
+                </Badge>
+              )}
               {selectedLine.pfEmployee > 0 && (
                 <Badge className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200">
                   <Building2 className="h-3 w-3 mr-1" />PF: Active
@@ -866,8 +913,10 @@ export function PayrollIntegration() {
             {/* Attendance */}
             <div>
               <p className="text-xs font-semibold mb-2">Attendance</p>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-7 gap-2">
                 {[
+                  { label: 'Calendar Days', value: selectedLine.calendarDays || selectedLine.workingDays, color: 'text-foreground' },
+                  { label: 'Payable Days', value: selectedLine.payableDays || selectedLine.eligibleDays, color: 'text-foreground' },
                   { label: 'Working', value: selectedLine.workingDays, color: 'text-blue-600' },
                   { label: 'Eligible', value: selectedLine.eligibleDays, color: 'text-green-600' },
                   { label: 'Leave', value: selectedLine.leaveDays, color: 'text-amber-600' },
@@ -939,6 +988,7 @@ export function PayrollIntegration() {
                 {[
                   { label: 'Income Tax', value: selectedLine.incomeTax },
                   { label: 'EOBI (Emp)', value: selectedLine.eobiEmployee },
+                  { label: 'ESSI (Emp)', value: selectedLine.essiEmployee },
                   { label: 'PF (Emp)', value: selectedLine.pfEmployee },
                   { label: 'Loan', value: selectedLine.loanDeduction },
                   { label: 'Advance', value: selectedLine.advanceDeduction },
@@ -972,10 +1022,14 @@ export function PayrollIntegration() {
             {/* Employer Charges */}
             <div>
               <p className="text-xs font-semibold mb-2">Employer Charges</p>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-5 gap-2">
                 <div className="text-center p-2 rounded bg-muted/50">
                   <p className="text-[10px] text-muted-foreground">EOBI (Er)</p>
                   <p className="text-xs font-bold">{formatCurrency(selectedLine.eobiEmployer)}</p>
+                </div>
+                <div className="text-center p-2 rounded bg-muted/50">
+                  <p className="text-[10px] text-muted-foreground">ESSI (Er)</p>
+                  <p className="text-xs font-bold">{formatCurrency(selectedLine.essiEmployer)}</p>
                 </div>
                 <div className="text-center p-2 rounded bg-muted/50">
                   <p className="text-[10px] text-muted-foreground">PF (Er)</p>
@@ -1013,6 +1067,10 @@ export function PayrollIntegration() {
                 <p className="text-xs font-semibold mb-2">Tax Calculation Breakdown</p>
                 <div className="p-3 rounded border bg-muted/30 text-xs space-y-1">
                   <div className="flex justify-between"><span className="text-muted-foreground">Annual Taxable Income:</span><span>{formatCurrency(taxBreakdown.taxableIncome)}</span></div>
+                  {taxBreakdown.ytdIncome != null && <div className="flex justify-between"><span className="text-muted-foreground">YTD Income:</span><span>{formatCurrency(taxBreakdown.ytdIncome)}</span></div>}
+                  {taxBreakdown.projectedAnnualIncome != null && <div className="flex justify-between"><span className="text-muted-foreground">Projected Annual Income:</span><span>{formatCurrency(taxBreakdown.projectedAnnualIncome)}</span></div>}
+                  {taxBreakdown.taxPaidYtd != null && <div className="flex justify-between"><span className="text-muted-foreground">Tax Paid YTD:</span><span>{formatCurrency(taxBreakdown.taxPaidYtd)}</span></div>}
+                  {taxBreakdown.monthsWorkedYtd != null && <div className="flex justify-between"><span className="text-muted-foreground">Months Worked YTD:</span><span>{taxBreakdown.monthsWorkedYtd}</span></div>}
                   <div className="flex justify-between"><span className="text-muted-foreground">Tax Slab:</span><span>{taxBreakdown.taxSlab}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Fixed Tax:</span><span>{formatCurrency(taxBreakdown.fixedTax)}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Variable Tax:</span><span>{formatCurrency(taxBreakdown.variableTax)}</span></div>
@@ -1021,6 +1079,42 @@ export function PayrollIntegration() {
                 </div>
               </div>
             )}
+
+            {/* Project Allocation */}
+            {selectedLine.projectAllocations && (() => {
+              let pa: any[] = []
+              try { pa = JSON.parse(selectedLine.projectAllocations) } catch {}
+              if (!pa.length) return null
+              return (
+                <div>
+                  <p className="text-xs font-semibold mb-2">Project Allocation Breakdown</p>
+                  <div className="rounded border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-[10px]">Project</TableHead>
+                          <TableHead className="text-[10px] text-center">Days</TableHead>
+                          <TableHead className="text-[10px] text-right">Weight</TableHead>
+                          <TableHead className="text-[10px] text-right">Salary Share</TableHead>
+                          <TableHead className="text-[10px] text-right">SC Share</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {pa.map((alloc: any, idx: number) => (
+                          <TableRow key={idx}>
+                            <TableCell className="text-xs py-1 font-medium">{alloc.projectCode} — {alloc.projectName}</TableCell>
+                            <TableCell className="text-xs py-1 text-center">{alloc.days}</TableCell>
+                            <TableCell className="text-xs py-1 text-right">{alloc.weightPct || ((alloc.weight || 0) * 100).toFixed(1) + '%'}</TableCell>
+                            <TableCell className="text-xs py-1 text-right">{formatCurrency(alloc.salaryShare)}</TableCell>
+                            <TableCell className="text-xs py-1 text-right text-orange-600">{formatCurrency(alloc.scShare)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         </DialogContent>
       </Dialog>
@@ -1657,7 +1751,7 @@ export function PayrollIntegration() {
               </div>
 
               {/* Workflow Status Bar */}
-              {renderWorkflowBar(batch.status)}
+              {renderWorkflowBar(batch.status, batch.id)}
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2 flex-wrap">
@@ -1671,6 +1765,32 @@ export function PayrollIntegration() {
                     >
                       {isRunning ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Play className="h-3 w-3 mr-1" />}
                       {isRunning ? 'Processing...' : 'Run Payroll'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[10px]"
+                      onClick={async () => {
+                        setRunningPayroll(batch.id)
+                        try {
+                          const res = await fetch('/api/payroll', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'recalculate', batchId: batch.id }),
+                          })
+                          const result = await res.json()
+                          if (!res.ok) throw new Error(result.error || 'Failed')
+                          toast({ title: 'Recalculated', description: result.message || 'Payroll recalculated with updated YTD data' })
+                          fetchData()
+                        } catch (e: any) {
+                          toast({ title: 'Error', description: e.message, variant: 'destructive' })
+                        } finally {
+                          setRunningPayroll(null)
+                        }
+                      }}
+                      disabled={isRunning}
+                    >
+                      <Receipt className="h-3 w-3 mr-1" />Recalculate
                     </Button>
                     <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleApproveAllLines(batch.id)} disabled={processingAction === 'approve-all-lines'}>
                       {processingAction === 'approve-all-lines' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Shield className="h-3 w-3 mr-1" />}
@@ -1762,7 +1882,7 @@ export function PayrollIntegration() {
                         />
                         <span className="text-[10px] font-medium text-muted-foreground">
                           {selectedLineIds.size > 0
-                            ? `${selectedLineIds.size} of ${batch.lines.length} selected`
+                            ? `${selectedLineIds.size} of ${batch.lines.length} lines selected`
                             : 'Select All'}
                         </span>
                       </div>
@@ -1789,22 +1909,20 @@ export function PayrollIntegration() {
                             {processingAction === 'draft-to-gl' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <FileText className="h-3 w-3 mr-1" />}
                             Draft Selected to GL
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-[10px] text-muted-foreground ml-auto"
+                            onClick={() => setSelectedLineIds(new Set())}
+                          >
+                            Deselect All
+                          </Button>
                         </>
-                      )}
-                      {selectedLineIds.size > 0 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-[10px] text-muted-foreground ml-auto"
-                          onClick={() => setSelectedLineIds(new Set())}
-                        >
-                          Clear Selection
-                        </Button>
                       )}
                     </div>
 
                     <ScrollArea className="w-full">
-                    <div className="min-w-[1300px]">
+                    <div className="min-w-[1500px]">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -1821,6 +1939,8 @@ export function PayrollIntegration() {
                             <TableHead className="text-[10px] text-right">Tax</TableHead>
                             <TableHead className="text-[10px] text-right">EOBI(E)</TableHead>
                             <TableHead className="text-[10px] text-right">EOBI(R)</TableHead>
+                            <TableHead className="text-[10px] text-right">ESSI(E)</TableHead>
+                            <TableHead className="text-[10px] text-right">ESSI(R)</TableHead>
                             <TableHead className="text-[10px] text-right">PF(E)</TableHead>
                             <TableHead className="text-[10px] text-right">PF(R)</TableHead>
                             <TableHead className="text-[10px] text-right">Loan</TableHead>
@@ -1862,6 +1982,8 @@ export function PayrollIntegration() {
                                   <TableCell className="text-xs py-1.5 text-right text-red-600">{line.incomeTax > 0 ? formatNumber(line.incomeTax) : '-'}</TableCell>
                                   <TableCell className="text-xs py-1.5 text-right text-red-600">{line.eobiEmployee > 0 ? formatNumber(line.eobiEmployee) : '-'}</TableCell>
                                   <TableCell className="text-xs py-1.5 text-right">{line.eobiEmployer > 0 ? formatNumber(line.eobiEmployer) : '-'}</TableCell>
+                                  <TableCell className="text-xs py-1.5 text-right text-red-600">{line.essiEmployee > 0 ? formatNumber(line.essiEmployee) : '-'}</TableCell>
+                                  <TableCell className="text-xs py-1.5 text-right">{line.essiEmployer > 0 ? formatNumber(line.essiEmployer) : '-'}</TableCell>
                                   <TableCell className="text-xs py-1.5 text-right text-red-600">{line.pfEmployee > 0 ? formatNumber(line.pfEmployee) : '-'}</TableCell>
                                   <TableCell className="text-xs py-1.5 text-right">{line.pfEmployer > 0 ? formatNumber(line.pfEmployer) : '-'}</TableCell>
                                   <TableCell className="text-xs py-1.5 text-right text-red-600">{line.loanDeduction > 0 ? formatNumber(line.loanDeduction) : '-'}</TableCell>
@@ -1884,11 +2006,13 @@ export function PayrollIntegration() {
                                 {/* Expanded Line Detail */}
                                 {isLineExpanded && (
                                   <TableRow>
-                                    <TableCell colSpan={batch.status === 'draft' ? 21 : 20} className="p-0">
+                                    <TableCell colSpan={batch.status === 'draft' ? 23 : 22} className="p-0">
                                       <div className="p-4 bg-muted/20 space-y-3">
                                         {/* Quick Detail Row */}
                                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
                                           {[
+                                            { label: 'Calendar Days', value: line.calendarDays || line.workingDays || '—' },
+                                            { label: 'Payable Days', value: line.payableDays || line.eligibleDays || '—' },
                                             { label: 'Leave Days', value: line.leaveDays },
                                             { label: 'Absent Days', value: line.absentDays },
                                             { label: 'Daily Rate', value: formatCurrency(line.dailyRate) },
@@ -1896,6 +2020,8 @@ export function PayrollIntegration() {
                                             { label: 'Other Ded.', value: formatCurrency(line.otherDeductions) },
                                             { label: 'Total Ded.', value: formatCurrency(line.totalDeductions) },
                                             { label: 'EOBI (Employer)', value: formatCurrency(line.eobiEmployer) },
+                                            { label: 'ESSI (Employee)', value: formatCurrency(line.essiEmployee) },
+                                            { label: 'ESSI (Employer)', value: formatCurrency(line.essiEmployer) },
                                             { label: 'PF (Employer)', value: formatCurrency(line.pfEmployer) },
                                             { label: 'Social Charges', value: formatCurrency(line.socialCharges) },
                                             { label: 'Gratuity', value: formatCurrency(line.gratuity) },
@@ -1908,6 +2034,26 @@ export function PayrollIntegration() {
                                             </div>
                                           ))}
                                         </div>
+
+                                        {/* YTD Tax Info */}
+                                        {line.taxBreakdown && (() => {
+                                          let tx: any = null
+                                          try { tx = JSON.parse(line.taxBreakdown) } catch {}
+                                          if (!tx) return null
+                                          const hasYtd = tx.ytdIncome != null || tx.projectedAnnualIncome != null || tx.taxPaidYtd != null
+                                          if (!hasYtd) return null
+                                          return (
+                                            <div className="p-2 rounded border bg-background">
+                                              <p className="text-[10px] font-semibold mb-1">YTD Tax Information</p>
+                                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px]">
+                                                {tx.ytdIncome != null && <div>YTD Income: {formatCurrency(tx.ytdIncome)}</div>}
+                                                {tx.projectedAnnualIncome != null && <div>Projected Annual: {formatCurrency(tx.projectedAnnualIncome)}</div>}
+                                                {tx.taxPaidYtd != null && <div>Tax Paid YTD: {formatCurrency(tx.taxPaidYtd)}</div>}
+                                                {tx.monthsWorkedYtd != null && <div>Months Worked YTD: {tx.monthsWorkedYtd}</div>}
+                                              </div>
+                                            </div>
+                                          )
+                                        })()}
 
                                         {/* SC Breakdown */}
                                         {line.scBreakdown && (() => {
@@ -1960,6 +2106,42 @@ export function PayrollIntegration() {
                                                     {a.name}: {formatCurrency(a.amount)} {a.isTaxable ? '(Taxable)' : '(Non-Taxable)'}
                                                   </span>
                                                 ))}
+                                              </div>
+                                            </div>
+                                          )
+                                        })()}
+
+                                        {/* Project Allocation Breakdown */}
+                                        {line.projectAllocations && (() => {
+                                          let pa: any[] = []
+                                          try { pa = JSON.parse(line.projectAllocations) } catch {}
+                                          if (!pa.length) return null
+                                          return (
+                                            <div className="p-2 rounded border bg-background">
+                                              <p className="text-[10px] font-semibold mb-1">Project Allocation Breakdown</p>
+                                              <div className="rounded border overflow-hidden mt-1">
+                                                <Table>
+                                                  <TableHeader>
+                                                    <TableRow>
+                                                      <TableHead className="text-[9px] h-7">Project</TableHead>
+                                                      <TableHead className="text-[9px] h-7 text-center">Days</TableHead>
+                                                      <TableHead className="text-[9px] h-7 text-right">Weight</TableHead>
+                                                      <TableHead className="text-[9px] h-7 text-right">Salary Share</TableHead>
+                                                      <TableHead className="text-[9px] h-7 text-right">SC Share</TableHead>
+                                                    </TableRow>
+                                                  </TableHeader>
+                                                  <TableBody>
+                                                    {pa.map((alloc: any, idx: number) => (
+                                                      <TableRow key={idx}>
+                                                        <TableCell className="text-[10px] py-1 font-medium">{alloc.projectCode} — {alloc.projectName}</TableCell>
+                                                        <TableCell className="text-[10px] py-1 text-center">{alloc.days}</TableCell>
+                                                        <TableCell className="text-[10px] py-1 text-right">{alloc.weightPct || ((alloc.weight || 0) * 100).toFixed(1) + '%'}</TableCell>
+                                                        <TableCell className="text-[10px] py-1 text-right">{formatCurrency(alloc.salaryShare)}</TableCell>
+                                                        <TableCell className="text-[10px] py-1 text-right text-orange-600">{formatCurrency(alloc.scShare)}</TableCell>
+                                                      </TableRow>
+                                                    ))}
+                                                  </TableBody>
+                                                </Table>
                                               </div>
                                             </div>
                                           )

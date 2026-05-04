@@ -4,9 +4,10 @@ import { calculateMonthlyPayroll } from '@/lib/payroll/calculateMonthlyPayroll'
 import { findAccountByRole, findFirstBankAccount } from '@/lib/account-roles'
 
 // ============================================================
-// Enhanced Payroll Engine API
+// Enhanced Payroll Engine API v2.0
 // Supports: create batch, run-payroll, add-line, update-line,
-// delete-line, review, approve, post-to-gl
+// delete-line, review, approve, post-to-gl, draft-to-gl,
+// recalculate
 // ============================================================
 
 // Helper: get days in month from period string "YYYY-MM"
@@ -40,6 +41,8 @@ async function recalcBatchTotals(batchId: string) {
       totalIncomeTax: acc.totalIncomeTax + l.incomeTax,
       totalEobiEmployee: acc.totalEobiEmployee + l.eobiEmployee,
       totalEobiEmployer: acc.totalEobiEmployer + l.eobiEmployer,
+      totalEssiEmployee: acc.totalEssiEmployee + l.essiEmployee,
+      totalEssiEmployer: acc.totalEssiEmployer + l.essiEmployer,
       totalPfEmployee: acc.totalPfEmployee + l.pfEmployee,
       totalPfEmployer: acc.totalPfEmployer + l.pfEmployer,
       totalLoanDeduction: acc.totalLoanDeduction + l.loanDeduction,
@@ -49,7 +52,7 @@ async function recalcBatchTotals(batchId: string) {
       totalNetPay: acc.totalNetPay + l.netPay,
       totalSocialCharges: acc.totalSocialCharges + l.socialCharges,
       totalGratuity: acc.totalGratuity + l.gratuity,
-      totalEmployerCharges: acc.totalEmployerCharges + l.eobiEmployer + l.pfEmployer + l.socialCharges + l.gratuity,
+      totalEmployerCharges: acc.totalEmployerCharges + l.eobiEmployer + l.pfEmployer + l.essiEmployer + l.socialCharges + l.gratuity,
     }),
     {
       totalBasicSalary: 0,
@@ -58,6 +61,8 @@ async function recalcBatchTotals(batchId: string) {
       totalIncomeTax: 0,
       totalEobiEmployee: 0,
       totalEobiEmployer: 0,
+      totalEssiEmployee: 0,
+      totalEssiEmployer: 0,
       totalPfEmployee: 0,
       totalPfEmployer: 0,
       totalLoanDeduction: 0,
@@ -95,7 +100,7 @@ export async function GET(request: Request) {
       return NextResponse.json(batch)
     }
 
-    const where: any = {}
+    const where: Record<string, string> = {}
     if (status) where.status = status
 
     const batches = await db.payrollBatch.findMany({
@@ -150,7 +155,7 @@ export async function POST(request: Request) {
     }
 
     // ----------------------------------------------------------
-    // 2. RUN PAYROLL — Uses Attendance-Driven Calculator
+    // 2. RUN PAYROLL — Uses Attendance-Driven Calculator v2.0
     // ----------------------------------------------------------
     if (action === 'run-payroll') {
       const { batchId } = data
@@ -178,7 +183,7 @@ export async function POST(request: Request) {
       // Delete existing lines for this batch (re-run)
       await db.payrollBatchLine.deleteMany({ where: { batchId } })
 
-      const linesData: any[] = []
+      const linesData: Record<string, unknown>[] = []
       const errors: { employeeId: string; name: string; error: string }[] = []
 
       // Step 2: For each employee, use the Attendance-Driven Calculator
@@ -192,6 +197,18 @@ export async function POST(request: Request) {
             ? result.projectAllocations.reduce((max, p) => p.days > max.days ? p : max, result.projectAllocations[0])
             : null
 
+          // Build project allocations JSON for storage
+          const projectAllocationsJson = result.projectAllocations.map(pa => ({
+            projectId: pa.projectId,
+            projectName: pa.projectName,
+            projectCode: pa.projectCode,
+            days: pa.days,
+            weight: pa.weight,
+            weightPct: pa.weightPct,
+            salaryShare: pa.salaryShare,
+            scShare: pa.scShare,
+          }))
+
           linesData.push({
             batchId,
             employeeId: emp.id,
@@ -199,16 +216,20 @@ export async function POST(request: Request) {
             employeeCode: emp.employeeCode,
             basicSalary: result.monthlySalary,
             dailyRate: result.dailyRate,
-            workingDays: result.daysInMonth,
+            workingDays: result.calendarDays,
             eligibleDays: result.eligibleDays,
             leaveDays: result.leaveDays,
             absentDays: result.absentDays,
+            calendarDays: result.calendarDays,
+            payableDays: result.payableDays,
             allowanceDetails: JSON.stringify(result.allowances.details),
             allowances: result.allowances.totalAllowances,
             grossSalary: result.grossSalary,
             incomeTax: result.deductions.incomeTax,
             eobiEmployee: result.deductions.eobiEmployee,
             eobiEmployer: result.deductions.eobiEmployer,
+            essiEmployee: result.deductions.essiEmployee,
+            essiEmployer: result.deductions.essiEmployer,
             pfEmployee: result.deductions.pfEmployee,
             pfEmployer: result.deductions.pfEmployer,
             loanDeduction: result.deductions.loanDeduction,
@@ -220,6 +241,7 @@ export async function POST(request: Request) {
             gratuity: result.gratuity,
             scBreakdown: JSON.stringify(result.scBreakdown),
             taxBreakdown: JSON.stringify(result.taxBreakdown),
+            projectAllocations: JSON.stringify(projectAllocationsJson),
             projectId: primaryProject?.projectId || emp.defaultProjectId || null,
             department: emp.department,
             lineStatus: 'draft',
@@ -232,7 +254,7 @@ export async function POST(request: Request) {
 
       // Step 3: Create PayrollBatchLine for each employee
       if (linesData.length > 0) {
-        await db.payrollBatchLine.createMany({ data: linesData })
+        await db.payrollBatchLine.createMany({ data: linesData as any })
       }
 
       // Step 4: Update PayrollBatch totals
@@ -262,10 +284,25 @@ export async function POST(request: Request) {
       if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
       if (batch.status !== 'draft') return NextResponse.json({ error: 'Can only add lines to draft batches' }, { status: 400 })
 
-      // Conditional deduction check: if employeeId is real, check EOBI/PF/IncomeTax flags
-      let empFlags: { eobiEnabled: boolean; pfEnabled: boolean; incomeTaxEnabled: boolean } | null = null
+      // Conditional deduction check: fetch all employee flags
+      let empFlags: {
+        eobiEnabled: boolean
+        pfEnabled: boolean
+        incomeTaxEnabled: boolean
+        essiEnabled: boolean
+        gratuityEnabled: boolean
+      } | null = null
       if (line.employeeId && !String(line.employeeId).startsWith('MANUAL-')) {
-        const emp = await db.employee.findUnique({ where: { id: line.employeeId }, select: { eobiEnabled: true, pfEnabled: true, incomeTaxEnabled: true } })
+        const emp = await db.employee.findUnique({
+          where: { id: line.employeeId },
+          select: {
+            eobiEnabled: true,
+            pfEnabled: true,
+            incomeTaxEnabled: true,
+            essiEnabled: true,
+            gratuityEnabled: true,
+          },
+        })
         if (emp) empFlags = emp
       }
 
@@ -275,13 +312,21 @@ export async function POST(request: Request) {
       const incomeTax = (empFlags && !empFlags.incomeTaxEnabled) ? 0 : (line.incomeTax || 0)
       const eobiEmployee = (empFlags && !empFlags.eobiEnabled) ? 0 : (line.eobiEmployee || 0)
       const eobiEmployer = (empFlags && !empFlags.eobiEnabled) ? 0 : (line.eobiEmployer || 0)
+      const essiEmployee = (empFlags && !empFlags.essiEnabled) ? 0 : (line.essiEmployee || 0)
+      const essiEmployer = (empFlags && !empFlags.essiEnabled) ? 0 : (line.essiEmployer || 0)
       const pfEmployee = (empFlags && !empFlags.pfEnabled) ? 0 : (line.pfEmployee || 0)
       const pfEmployer = (empFlags && !empFlags.pfEnabled) ? 0 : (line.pfEmployer || 0)
+      const gratuity = (empFlags && !empFlags.gratuityEnabled) ? 0 : (line.gratuity || 0)
       const loanDeduction = line.loanDeduction || 0
       const advanceDeduction = line.advanceDeduction || 0
       const otherDeductions = line.otherDeductions || 0
-      const totalDeductions = incomeTax + eobiEmployee + pfEmployee + loanDeduction + advanceDeduction + otherDeductions
+      const totalDeductions = incomeTax + eobiEmployee + essiEmployee + pfEmployee + loanDeduction + advanceDeduction + otherDeductions
       const netPay = grossSalary - totalDeductions
+
+      // Calendar days / payable days
+      const calendarDays = line.calendarDays || getDaysInMonth(batch.period)
+      const absentDays = line.absentDays || 0
+      const payableDays = line.payableDays || (calendarDays - absentDays)
 
       const newLine = await db.payrollBatchLine.create({
         data: {
@@ -291,16 +336,20 @@ export async function POST(request: Request) {
           employeeCode: line.employeeCode || null,
           basicSalary,
           dailyRate: line.dailyRate || 0,
-          workingDays: line.workingDays || 0,
+          workingDays: line.workingDays || calendarDays,
           eligibleDays: line.eligibleDays || 0,
           leaveDays: line.leaveDays || 0,
-          absentDays: line.absentDays || 0,
+          absentDays,
+          calendarDays,
+          payableDays,
           allowanceDetails: line.allowanceDetails || null,
           allowances,
           grossSalary,
           incomeTax,
           eobiEmployee,
           eobiEmployer,
+          essiEmployee,
+          essiEmployer,
           pfEmployee,
           pfEmployer,
           loanDeduction,
@@ -309,9 +358,10 @@ export async function POST(request: Request) {
           totalDeductions,
           netPay,
           socialCharges: line.socialCharges || 0,
-          gratuity: line.gratuity || 0,
+          gratuity,
           scBreakdown: line.scBreakdown || null,
           taxBreakdown: line.taxBreakdown || null,
+          projectAllocations: line.projectAllocations || null,
           projectId: line.projectId || null,
           department: line.department || null,
         },
@@ -336,11 +386,26 @@ export async function POST(request: Request) {
       if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
       if (batch.status !== 'draft') return NextResponse.json({ error: 'Can only update lines in draft batches' }, { status: 400 })
 
-      // Conditional deduction check: if employeeId is real, check EOBI/PF/IncomeTax flags
-      let empFlags: { eobiEnabled: boolean; pfEnabled: boolean; incomeTaxEnabled: boolean } | null = null
+      // Conditional deduction check: fetch all employee flags
+      let empFlags: {
+        eobiEnabled: boolean
+        pfEnabled: boolean
+        incomeTaxEnabled: boolean
+        essiEnabled: boolean
+        gratuityEnabled: boolean
+      } | null = null
       const empId = line.employeeId || existingLine.employeeId
       if (empId && !String(empId).startsWith('MANUAL-')) {
-        const emp = await db.employee.findUnique({ where: { id: empId }, select: { eobiEnabled: true, pfEnabled: true, incomeTaxEnabled: true } })
+        const emp = await db.employee.findUnique({
+          where: { id: empId },
+          select: {
+            eobiEnabled: true,
+            pfEnabled: true,
+            incomeTaxEnabled: true,
+            essiEnabled: true,
+            gratuityEnabled: true,
+          },
+        })
         if (emp) empFlags = emp
       }
 
@@ -350,18 +415,31 @@ export async function POST(request: Request) {
       const rawIncomeTax = line.incomeTax ?? existingLine.incomeTax
       const rawEobiEmployee = line.eobiEmployee ?? existingLine.eobiEmployee
       const rawEobiEmployer = line.eobiEmployer ?? existingLine.eobiEmployer
+      const rawEssiEmployee = line.essiEmployee ?? existingLine.essiEmployee
+      const rawEssiEmployer = line.essiEmployer ?? existingLine.essiEmployer
       const rawPfEmployee = line.pfEmployee ?? existingLine.pfEmployee
       const rawPfEmployer = line.pfEmployer ?? existingLine.pfEmployer
+      const rawGratuity = line.gratuity ?? existingLine.gratuity
+
       const incomeTax = (empFlags && !empFlags.incomeTaxEnabled) ? 0 : rawIncomeTax
       const eobiEmployee = (empFlags && !empFlags.eobiEnabled) ? 0 : rawEobiEmployee
       const eobiEmployer = (empFlags && !empFlags.eobiEnabled) ? 0 : rawEobiEmployer
+      const essiEmployee = (empFlags && !empFlags.essiEnabled) ? 0 : rawEssiEmployee
+      const essiEmployer = (empFlags && !empFlags.essiEnabled) ? 0 : rawEssiEmployer
       const pfEmployee = (empFlags && !empFlags.pfEnabled) ? 0 : rawPfEmployee
       const pfEmployer = (empFlags && !empFlags.pfEnabled) ? 0 : rawPfEmployer
+      const gratuity = (empFlags && !empFlags.gratuityEnabled) ? 0 : rawGratuity
+
       const loanDeduction = line.loanDeduction ?? existingLine.loanDeduction
       const advanceDeduction = line.advanceDeduction ?? existingLine.advanceDeduction
       const otherDeductions = line.otherDeductions ?? existingLine.otherDeductions
-      const totalDeductions = incomeTax + eobiEmployee + pfEmployee + loanDeduction + advanceDeduction + otherDeductions
+      const totalDeductions = incomeTax + eobiEmployee + essiEmployee + pfEmployee + loanDeduction + advanceDeduction + otherDeductions
       const netPay = grossSalary - totalDeductions
+
+      // Calendar / payable days
+      const calendarDays = line.calendarDays ?? existingLine.calendarDays
+      const absentDays = line.absentDays ?? existingLine.absentDays
+      const payableDays = line.payableDays ?? (calendarDays > 0 ? calendarDays - absentDays : existingLine.payableDays)
 
       const updated = await db.payrollBatchLine.update({
         where: { id: lineId },
@@ -373,13 +451,17 @@ export async function POST(request: Request) {
           workingDays: line.workingDays ?? existingLine.workingDays,
           eligibleDays: line.eligibleDays ?? existingLine.eligibleDays,
           leaveDays: line.leaveDays ?? existingLine.leaveDays,
-          absentDays: line.absentDays ?? existingLine.absentDays,
+          absentDays,
+          calendarDays,
+          payableDays,
           allowanceDetails: line.allowanceDetails !== undefined ? line.allowanceDetails : existingLine.allowanceDetails,
           allowances,
           grossSalary,
           incomeTax,
           eobiEmployee,
           eobiEmployer,
+          essiEmployee,
+          essiEmployer,
           pfEmployee,
           pfEmployer,
           loanDeduction,
@@ -388,9 +470,10 @@ export async function POST(request: Request) {
           totalDeductions,
           netPay,
           socialCharges: line.socialCharges ?? existingLine.socialCharges,
-          gratuity: line.gratuity ?? existingLine.gratuity,
+          gratuity,
           scBreakdown: line.scBreakdown !== undefined ? line.scBreakdown : existingLine.scBreakdown,
           taxBreakdown: line.taxBreakdown !== undefined ? line.taxBreakdown : existingLine.taxBreakdown,
+          projectAllocations: line.projectAllocations !== undefined ? line.projectAllocations : existingLine.projectAllocations,
           projectId: line.projectId !== undefined ? line.projectId : existingLine.projectId,
           department: line.department ?? existingLine.department,
         },
@@ -500,7 +583,6 @@ export async function POST(request: Request) {
       const ids: string[] = lineIds || (lineId ? [lineId] : [])
       if (ids.length === 0) return NextResponse.json({ error: 'lineId or lineIds required' }, { status: 400 })
 
-      // Verify all lines exist and belong to batches with valid status
       const lines = await db.payrollBatchLine.findMany({ where: { id: { in: ids } } })
       if (lines.length === 0) return NextResponse.json({ error: 'No lines found' }, { status: 404 })
 
@@ -517,7 +599,6 @@ export async function POST(request: Request) {
         data: { lineStatus: 'approved' },
       })
 
-      // Recalc totals for affected batches
       for (const bid of batchIds) {
         await recalcBatchTotals(bid)
       }
@@ -561,12 +642,12 @@ export async function POST(request: Request) {
       if (batch.postedToGL) return NextResponse.json({ error: 'Already posted to GL' }, { status: 400 })
 
       // Determine which lines to include
-      const lineFilter: any = lineIds?.length > 0
+      const lineFilter: Record<string, unknown> = lineIds?.length > 0
         ? { id: { in: lineIds }, lineStatus: 'approved' }
         : { lineStatus: 'approved' }
       lineFilter.batchId = batchId
 
-      const approvedLines = await db.payrollBatchLine.findMany({ where: lineFilter })
+      const approvedLines = await db.payrollBatchLine.findMany({ where: lineFilter as any })
       if (approvedLines.length === 0) {
         return NextResponse.json({ error: 'No approved lines found to post' }, { status: 400 })
       }
@@ -580,6 +661,8 @@ export async function POST(request: Request) {
           totalIncomeTax: acc.totalIncomeTax + l.incomeTax,
           totalEobiEmployee: acc.totalEobiEmployee + l.eobiEmployee,
           totalEobiEmployer: acc.totalEobiEmployer + l.eobiEmployer,
+          totalEssiEmployee: acc.totalEssiEmployee + l.essiEmployee,
+          totalEssiEmployer: acc.totalEssiEmployer + l.essiEmployer,
           totalPfEmployee: acc.totalPfEmployee + l.pfEmployee,
           totalPfEmployer: acc.totalPfEmployer + l.pfEmployer,
           totalLoanDeduction: acc.totalLoanDeduction + l.loanDeduction,
@@ -589,127 +672,23 @@ export async function POST(request: Request) {
           totalNetPay: acc.totalNetPay + l.netPay,
           totalSocialCharges: acc.totalSocialCharges + l.socialCharges,
           totalGratuity: acc.totalGratuity + l.gratuity,
-          totalEmployerCharges: acc.totalEmployerCharges + l.eobiEmployer + l.pfEmployer + l.socialCharges + l.gratuity,
+          totalEmployerCharges: acc.totalEmployerCharges + l.eobiEmployer + l.pfEmployer + l.essiEmployer + l.socialCharges + l.gratuity,
         }),
         {
           totalBasicSalary: 0, totalAllowances: 0, totalGross: 0, totalIncomeTax: 0,
-          totalEobiEmployee: 0, totalEobiEmployer: 0, totalPfEmployee: 0, totalPfEmployer: 0,
+          totalEobiEmployee: 0, totalEobiEmployer: 0, totalEssiEmployee: 0, totalEssiEmployer: 0,
+          totalPfEmployee: 0, totalPfEmployer: 0,
           totalLoanDeduction: 0, totalAdvanceDeduction: 0, totalOtherDeductions: 0, totalDeductions: 0,
           totalNetPay: 0, totalSocialCharges: 0, totalGratuity: 0, totalEmployerCharges: 0,
         }
       )
 
-      // Use PayrollAccountMapping table to find GL accounts
-      const mappings = await db.payrollAccountMapping.findMany({ where: { isActive: true } })
-      const getMappedAccounts = (componentType: string) => {
-        const mapping = mappings.find(m => m.componentType === componentType)
-        return { debitAccountId: mapping?.debitAccountId, creditAccountId: mapping?.creditAccountId }
-      }
-
-      const salaryExpenseAccount = await findAccountByRole('SALARY_EXPENSE')
-      const salaryPayableAccount = await findAccountByRole('SALARY_PAYABLE')
-      const bankAccount = await findFirstBankAccount()
-      const incomeTaxPayableAccount = await findAccountByRole('INCOME_TAX_PAYABLE')
-      const eobiPayableAccount = await findAccountByRole('EOBI_PAYABLE')
-      const pfPayableAccount = await findAccountByRole('PROVIDENT_FUND_PAYABLE')
-      const socialChargesAccount = await findAccountByRole('SOCIAL_CHARGES')
-      const socialChargesPayableAccount = await findAccountByRole('SOCIAL_CHARGES_PAYABLE')
-
-      const getDebitAccount = (componentType: string, fallback: any) => {
-        const mapped = getMappedAccounts(componentType)
-        return mapped.debitAccountId || fallback?.id
-      }
-      const getCreditAccount = (componentType: string, fallback: any) => {
-        const mapped = getMappedAccounts(componentType)
-        return mapped.creditAccountId || fallback?.id
-      }
-
-      const entries: any[] = []
-      let lineNumber = 0
-
-      const addEntry = (accountId: string | null | undefined, debit: number, credit: number, description: string) => {
-        if (!accountId || (debit === 0 && credit === 0)) return
-        lineNumber++
-        entries.push({
-          lineNumber,
-          accountId,
-          debit: Math.round(debit * 100) / 100,
-          credit: Math.round(credit * 100) / 100,
-          description,
-          payrollRef: batch.batchNumber,
-        })
-      }
-
-      // 1. Dr Salary Expense / Cr Salary Payable
-      addEntry(getDebitAccount('SALARY_EXPENSE', salaryExpenseAccount), totals.totalBasicSalary, 0, 'Basic salary expense')
-      addEntry(getCreditAccount('SALARY_EXPENSE', salaryPayableAccount), 0, totals.totalBasicSalary, 'Basic salary payable')
-
-      // 2. Dr Allowance Expense / Cr Allowance Payable
-      if (totals.totalAllowances > 0) {
-        addEntry(getDebitAccount('ALLOWANCE_EXPENSE', salaryExpenseAccount), totals.totalAllowances, 0, 'Allowances expense')
-        addEntry(getCreditAccount('ALLOWANCE_EXPENSE', salaryPayableAccount), 0, totals.totalAllowances, 'Allowances payable')
-      }
-
-      // 3. Dr Social Charges Expense / Cr Social Charges Payable
-      if (totals.totalSocialCharges > 0) {
-        addEntry(getDebitAccount('SOCIAL_CHARGES', socialChargesAccount), totals.totalSocialCharges, 0, 'Social charges expense')
-        addEntry(getCreditAccount('SOCIAL_CHARGES', socialChargesPayableAccount || eobiPayableAccount), 0, totals.totalSocialCharges, 'Social charges payable')
-      }
-
-      // 4. Dr Salary Payable / Cr Income Tax Payable
-      if (totals.totalIncomeTax > 0) {
-        addEntry(getDebitAccount('INCOME_TAX_PAYABLE', salaryPayableAccount), totals.totalIncomeTax, 0, 'Income tax deduction from salary')
-        addEntry(getCreditAccount('INCOME_TAX_PAYABLE', incomeTaxPayableAccount), 0, totals.totalIncomeTax, 'Income tax payable')
-      }
-
-      // 5. Dr Salary Payable / Cr EOBI Payable (employee)
-      if (totals.totalEobiEmployee > 0) {
-        addEntry(getDebitAccount('EOBI_EMPLOYEE', salaryPayableAccount), totals.totalEobiEmployee, 0, 'EOBI employee deduction from salary')
-        addEntry(getCreditAccount('EOBI_EMPLOYEE', eobiPayableAccount), 0, totals.totalEobiEmployee, 'EOBI payable (employee)')
-      }
-
-      // 6. Dr Salary Payable / Cr PF Payable (employee)
-      if (totals.totalPfEmployee > 0) {
-        addEntry(getDebitAccount('PF_EMPLOYEE', salaryPayableAccount), totals.totalPfEmployee, 0, 'PF employee deduction from salary')
-        addEntry(getCreditAccount('PF_EMPLOYEE', pfPayableAccount), 0, totals.totalPfEmployee, 'Provident fund payable (employee)')
-      }
-
-      // 7. Dr Salary Payable / Cr Bank (for net pay)
-      if (totals.totalNetPay > 0) {
-        addEntry(salaryPayableAccount?.id || bankAccount?.id, totals.totalNetPay, 0, 'Net salary payable via bank')
-        addEntry(bankAccount?.id, 0, totals.totalNetPay, 'Net pay bank transfer')
-      }
-
-      // 8. Employer EOBI
-      if (totals.totalEobiEmployer > 0) {
-        addEntry(getDebitAccount('EOBI_EMPLOYER', socialChargesAccount), totals.totalEobiEmployer, 0, 'Employer EOBI contribution expense')
-        addEntry(getCreditAccount('EOBI_EMPLOYER', eobiPayableAccount), 0, totals.totalEobiEmployer, 'Employer EOBI payable')
-      }
-
-      // 9. Employer PF
-      if (totals.totalPfEmployer > 0) {
-        addEntry(getDebitAccount('PF_EMPLOYER', socialChargesAccount), totals.totalPfEmployer, 0, 'Employer PF contribution expense')
-        addEntry(getCreditAccount('PF_EMPLOYER', pfPayableAccount), 0, totals.totalPfEmployer, 'Employer PF payable')
-      }
-
-      // Loan deductions
-      if (totals.totalLoanDeduction > 0) {
-        addEntry(salaryPayableAccount?.id, totals.totalLoanDeduction, 0, 'Loan deduction from salary')
-        addEntry(getCreditAccount('LOAN_DEDUCTION', salaryPayableAccount), 0, totals.totalLoanDeduction, 'Loan recovery payable')
-      }
-
-      // Advance deductions
-      if (totals.totalAdvanceDeduction > 0) {
-        addEntry(salaryPayableAccount?.id, totals.totalAdvanceDeduction, 0, 'Advance deduction from salary')
-        addEntry(getCreditAccount('ADVANCE_DEDUCTION', salaryPayableAccount), 0, totals.totalAdvanceDeduction, 'Advance recovery payable')
-      }
+      // Build GL entries using shared helper
+      const { entries, totalDebit, totalCredit } = await buildGlEntries(batch, totals)
 
       if (entries.length === 0) {
         return NextResponse.json({ error: 'No journal entries could be created. Check GL account mappings.' }, { status: 400 })
       }
-
-      const totalDebit = entries.reduce((s, e) => s + e.debit, 0)
-      const totalCredit = entries.reduce((s, e) => s + e.credit, 0)
 
       // Create a DRAFT voucher (not posted)
       const voucher = await db.voucher.create({
@@ -765,7 +744,7 @@ export async function POST(request: Request) {
     }
 
     // ----------------------------------------------------------
-    // 9. POST TO GL — Post approved batch to GL (creates voucher)
+    // 10. POST TO GL — Post approved batch to GL (creates voucher)
     // ----------------------------------------------------------
     if (action === 'post-to-gl') {
       const { batchId, financialYearId } = data
@@ -789,213 +768,34 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Financial Year ID required' }, { status: 400 })
       }
 
-      // Use PayrollAccountMapping table to find GL accounts
-      const mappings = await db.payrollAccountMapping.findMany({
-        where: { isActive: true },
-      })
-
-      const getMappedAccounts = (componentType: string) => {
-        const mapping = mappings.find(m => m.componentType === componentType)
-        return {
-          debitAccountId: mapping?.debitAccountId,
-          creditAccountId: mapping?.creditAccountId,
-        }
+      // Build totals from batch
+      const batchTotals = {
+        totalBasicSalary: batch.totalBasicSalary,
+        totalAllowances: batch.totalAllowances,
+        totalGross: batch.totalGross,
+        totalIncomeTax: batch.totalIncomeTax,
+        totalEobiEmployee: batch.totalEobiEmployee,
+        totalEobiEmployer: batch.totalEobiEmployer,
+        totalEssiEmployee: batch.totalEssiEmployee,
+        totalEssiEmployer: batch.totalEssiEmployer,
+        totalPfEmployee: batch.totalPfEmployee,
+        totalPfEmployer: batch.totalPfEmployer,
+        totalLoanDeduction: batch.totalLoanDeduction,
+        totalAdvanceDeduction: batch.totalAdvanceDeduction,
+        totalOtherDeductions: batch.totalOtherDeductions,
+        totalDeductions: batch.totalDeductions,
+        totalNetPay: batch.totalNetPay,
+        totalSocialCharges: batch.totalSocialCharges,
+        totalGratuity: batch.totalGratuity,
+        totalEmployerCharges: batch.totalEmployerCharges,
       }
 
-      // Fallback: use account roles if mappings not found
-      const salaryExpenseAccount = await findAccountByRole('SALARY_EXPENSE')
-      const salaryPayableAccount = await findAccountByRole('SALARY_PAYABLE')
-      const bankAccount = await findFirstBankAccount()
-      const incomeTaxPayableAccount = await findAccountByRole('INCOME_TAX_PAYABLE')
-      const eobiPayableAccount = await findAccountByRole('EOBI_PAYABLE')
-      const pfPayableAccount = await findAccountByRole('PROVIDENT_FUND_PAYABLE')
-      const socialChargesAccount = await findAccountByRole('SOCIAL_CHARGES')
-      const socialChargesPayableAccount = await findAccountByRole('SOCIAL_CHARGES_PAYABLE')
+      // Build GL entries using shared helper
+      const { entries, totalDebit, totalCredit } = await buildGlEntries(batch, batchTotals)
 
-      const getDebitAccount = (componentType: string, fallback: any) => {
-        const mapped = getMappedAccounts(componentType)
-        return mapped.debitAccountId || fallback?.id
-      }
-      const getCreditAccount = (componentType: string, fallback: any) => {
-        const mapped = getMappedAccounts(componentType)
-        return mapped.creditAccountId || fallback?.id
-      }
-
-      const entries: any[] = []
-      let lineNumber = 0
-
-      const addEntry = (accountId: string | null | undefined, debit: number, credit: number, description: string) => {
-        if (!accountId || (debit === 0 && credit === 0)) return
-        lineNumber++
-        entries.push({
-          lineNumber,
-          accountId,
-          debit: Math.round(debit * 100) / 100,
-          credit: Math.round(credit * 100) / 100,
-          description,
-          payrollRef: batch.batchNumber,
-        })
-      }
-
-      // 1. Dr Salary Expense / Cr Salary Payable (for basic salary)
-      addEntry(
-        getDebitAccount('SALARY_EXPENSE', salaryExpenseAccount),
-        batch.totalBasicSalary, 0,
-        'Basic salary expense'
-      )
-      addEntry(
-        getCreditAccount('SALARY_EXPENSE', salaryPayableAccount),
-        0, batch.totalBasicSalary,
-        'Basic salary payable'
-      )
-
-      // 2. Dr Allowance Expense / Cr Allowance Payable
-      if (batch.totalAllowances > 0) {
-        addEntry(
-          getDebitAccount('ALLOWANCE_EXPENSE', salaryExpenseAccount),
-          batch.totalAllowances, 0,
-          'Allowances expense'
-        )
-        addEntry(
-          getCreditAccount('ALLOWANCE_EXPENSE', salaryPayableAccount),
-          0, batch.totalAllowances,
-          'Allowances payable'
-        )
-      }
-
-      // 3. Dr Social Charges Expense / Cr Social Charges Payable
-      if (batch.totalSocialCharges > 0) {
-        addEntry(
-          getDebitAccount('SOCIAL_CHARGES', socialChargesAccount),
-          batch.totalSocialCharges, 0,
-          'Social charges expense'
-        )
-        addEntry(
-          getCreditAccount('SOCIAL_CHARGES', socialChargesPayableAccount || eobiPayableAccount),
-          0, batch.totalSocialCharges,
-          'Social charges payable'
-        )
-      }
-
-      // 4. Dr Salary Payable / Cr Income Tax Payable
-      if (batch.totalIncomeTax > 0) {
-        addEntry(
-          getDebitAccount('INCOME_TAX_PAYABLE', salaryPayableAccount),
-          batch.totalIncomeTax, 0,
-          'Income tax deduction from salary'
-        )
-        addEntry(
-          getCreditAccount('INCOME_TAX_PAYABLE', incomeTaxPayableAccount),
-          0, batch.totalIncomeTax,
-          'Income tax payable'
-        )
-      }
-
-      // 5. Dr Salary Payable / Cr EOBI Payable (employee)
-      if (batch.totalEobiEmployee > 0) {
-        addEntry(
-          getDebitAccount('EOBI_EMPLOYEE', salaryPayableAccount),
-          batch.totalEobiEmployee, 0,
-          'EOBI employee deduction from salary'
-        )
-        addEntry(
-          getCreditAccount('EOBI_EMPLOYEE', eobiPayableAccount),
-          0, batch.totalEobiEmployee,
-          'EOBI payable (employee)'
-        )
-      }
-
-      // 6. Dr Salary Payable / Cr PF Payable (employee)
-      if (batch.totalPfEmployee > 0) {
-        addEntry(
-          getDebitAccount('PF_EMPLOYEE', salaryPayableAccount),
-          batch.totalPfEmployee, 0,
-          'PF employee deduction from salary'
-        )
-        addEntry(
-          getCreditAccount('PF_EMPLOYEE', pfPayableAccount),
-          0, batch.totalPfEmployee,
-          'Provident fund payable (employee)'
-        )
-      }
-
-      // 7. Dr Salary Payable / Cr Bank (for net pay)
-      if (batch.totalNetPay > 0) {
-        addEntry(
-          salaryPayableAccount?.id || bankAccount?.id,
-          batch.totalNetPay, 0,
-          'Net salary payable via bank'
-        )
-        addEntry(
-          bankAccount?.id,
-          0, batch.totalNetPay,
-          'Net pay bank transfer'
-        )
-      }
-
-      // 8. Employer EOBI
-      if (batch.totalEobiEmployer > 0) {
-        addEntry(
-          getDebitAccount('EOBI_EMPLOYER', socialChargesAccount),
-          batch.totalEobiEmployer, 0,
-          'Employer EOBI contribution expense'
-        )
-        addEntry(
-          getCreditAccount('EOBI_EMPLOYER', eobiPayableAccount),
-          0, batch.totalEobiEmployer,
-          'Employer EOBI payable'
-        )
-      }
-
-      // 9. Employer PF
-      if (batch.totalPfEmployer > 0) {
-        addEntry(
-          getDebitAccount('PF_EMPLOYER', socialChargesAccount),
-          batch.totalPfEmployer, 0,
-          'Employer PF contribution expense'
-        )
-        addEntry(
-          getCreditAccount('PF_EMPLOYER', pfPayableAccount),
-          0, batch.totalPfEmployer,
-          'Employer PF payable'
-        )
-      }
-
-      // Loan deductions
-      if (batch.totalLoanDeduction > 0) {
-        addEntry(
-          salaryPayableAccount?.id,
-          batch.totalLoanDeduction, 0,
-          'Loan deduction from salary'
-        )
-        addEntry(
-          getCreditAccount('LOAN_DEDUCTION', salaryPayableAccount),
-          0, batch.totalLoanDeduction,
-          'Loan recovery payable'
-        )
-      }
-
-      // Advance deductions
-      if (batch.totalAdvanceDeduction > 0) {
-        addEntry(
-          salaryPayableAccount?.id,
-          batch.totalAdvanceDeduction, 0,
-          'Advance deduction from salary'
-        )
-        addEntry(
-          getCreditAccount('ADVANCE_DEDUCTION', salaryPayableAccount),
-          0, batch.totalAdvanceDeduction,
-          'Advance recovery payable'
-        )
-      }
-
-      // Validate entries exist
       if (entries.length === 0) {
         return NextResponse.json({ error: 'No journal entries could be created. Check GL account mappings.' }, { status: 400 })
       }
-
-      const totalDebit = entries.reduce((s, e) => s + e.debit, 0)
-      const totalCredit = entries.reduce((s, e) => s + e.credit, 0)
 
       // Create the voucher
       const voucher = await db.voucher.create({
@@ -1053,8 +853,113 @@ export async function POST(request: Request) {
     }
 
     // ----------------------------------------------------------
-    // 10. DRAFT TO GL — Alias handled above (kept for completeness)
+    // 11. RECALCULATE — Re-run payroll calculation for all lines
+    //     Useful when tax slabs change or YTD data updates
     // ----------------------------------------------------------
+    if (action === 'recalculate') {
+      const { batchId } = data
+      if (!batchId) return NextResponse.json({ error: 'Batch ID required' }, { status: 400 })
+
+      const batch = await db.payrollBatch.findUnique({
+        where: { id: batchId },
+        include: { lines: true },
+      })
+      if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
+      if (batch.status !== 'draft') {
+        return NextResponse.json({ error: 'Can only recalculate draft batches' }, { status: 400 })
+      }
+      if (batch.lines.length === 0) {
+        return NextResponse.json({ error: 'No lines to recalculate' }, { status: 400 })
+      }
+
+      // Parse the period to get month start date
+      const [pYear, pMonth] = batch.period.split('-').map(Number)
+      const monthDate = new Date(Date.UTC(pYear, pMonth - 1, 1))
+
+      const updatedLines: string[] = []
+      const errors: { employeeId: string; name: string; error: string }[] = []
+
+      for (const existingLine of batch.lines) {
+        // Only recalculate lines linked to real employees
+        if (!existingLine.employeeId || String(existingLine.employeeId).startsWith('MANUAL-')) continue
+
+        try {
+          const result = await calculateMonthlyPayroll(existingLine.employeeId, monthDate)
+
+          // Build project allocations JSON
+          const projectAllocationsJson = result.projectAllocations.map(pa => ({
+            projectId: pa.projectId,
+            projectName: pa.projectName,
+            projectCode: pa.projectCode,
+            days: pa.days,
+            weight: pa.weight,
+            weightPct: pa.weightPct,
+            salaryShare: pa.salaryShare,
+            scShare: pa.scShare,
+          }))
+
+          // Determine primary project
+          const primaryProject = result.projectAllocations.length > 0
+            ? result.projectAllocations.reduce((max, p) => p.days > max.days ? p : max, result.projectAllocations[0])
+            : null
+
+          await db.payrollBatchLine.update({
+            where: { id: existingLine.id },
+            data: {
+              basicSalary: result.monthlySalary,
+              dailyRate: result.dailyRate,
+              workingDays: result.calendarDays,
+              eligibleDays: result.eligibleDays,
+              leaveDays: result.leaveDays,
+              absentDays: result.absentDays,
+              calendarDays: result.calendarDays,
+              payableDays: result.payableDays,
+              allowanceDetails: JSON.stringify(result.allowances.details),
+              allowances: result.allowances.totalAllowances,
+              grossSalary: result.grossSalary,
+              incomeTax: result.deductions.incomeTax,
+              eobiEmployee: result.deductions.eobiEmployee,
+              eobiEmployer: result.deductions.eobiEmployer,
+              essiEmployee: result.deductions.essiEmployee,
+              essiEmployer: result.deductions.essiEmployer,
+              pfEmployee: result.deductions.pfEmployee,
+              pfEmployer: result.deductions.pfEmployer,
+              loanDeduction: result.deductions.loanDeduction,
+              advanceDeduction: result.deductions.advanceDeduction,
+              otherDeductions: result.deductions.otherDeductions,
+              totalDeductions: result.deductions.totalDeductions,
+              netPay: result.netPay,
+              socialCharges: result.finalSC,
+              gratuity: result.gratuity,
+              scBreakdown: JSON.stringify(result.scBreakdown),
+              taxBreakdown: JSON.stringify(result.taxBreakdown),
+              projectAllocations: JSON.stringify(projectAllocationsJson),
+              projectId: primaryProject?.projectId || existingLine.projectId,
+            },
+          })
+
+          updatedLines.push(existingLine.id)
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          errors.push({ employeeId: existingLine.employeeId, name: existingLine.employeeName, error: message })
+        }
+      }
+
+      // Recalculate batch totals
+      await recalcBatchTotals(batchId)
+
+      const updatedBatch = await db.payrollBatch.findUnique({
+        where: { id: batchId },
+        include: { lines: { orderBy: { employeeName: 'asc' } } },
+      })
+
+      return NextResponse.json({
+        message: `Recalculated ${updatedLines.length} lines${errors.length > 0 ? ` (${errors.length} errors)` : ''}`,
+        batch: updatedBatch,
+        recalculatedCount: updatedLines.length,
+        errors: errors.length > 0 ? errors : undefined,
+      })
+    }
 
     // Unknown action
     return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
@@ -1116,4 +1021,161 @@ export async function DELETE(request: Request) {
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
+}
+
+// ============================================================
+// Shared Helper: Build GL Entries from batch totals
+// Includes ESSI employee/employer GL entries
+// ============================================================
+interface GlTotals {
+  totalBasicSalary: number
+  totalAllowances: number
+  totalGross: number
+  totalIncomeTax: number
+  totalEobiEmployee: number
+  totalEobiEmployer: number
+  totalEssiEmployee: number
+  totalEssiEmployer: number
+  totalPfEmployee: number
+  totalPfEmployer: number
+  totalLoanDeduction: number
+  totalAdvanceDeduction: number
+  totalOtherDeductions: number
+  totalDeductions: number
+  totalNetPay: number
+  totalSocialCharges: number
+  totalGratuity: number
+  totalEmployerCharges: number
+}
+
+async function buildGlEntries(batch: { batchNumber: string; projectId: string | null }, totals: GlTotals) {
+  // Use PayrollAccountMapping table to find GL accounts
+  const mappings = await db.payrollAccountMapping.findMany({ where: { isActive: true } })
+  const getMappedAccounts = (componentType: string) => {
+    const mapping = mappings.find(m => m.componentType === componentType)
+    return { debitAccountId: mapping?.debitAccountId, creditAccountId: mapping?.creditAccountId }
+  }
+
+  // Fallback: use account roles if mappings not found
+  const salaryExpenseAccount = await findAccountByRole('SALARY_EXPENSE')
+  const salaryPayableAccount = await findAccountByRole('SALARY_PAYABLE')
+  const bankAccount = await findFirstBankAccount()
+  const incomeTaxPayableAccount = await findAccountByRole('INCOME_TAX_PAYABLE')
+  const eobiPayableAccount = await findAccountByRole('EOBI_PAYABLE')
+  const pfPayableAccount = await findAccountByRole('PROVIDENT_FUND_PAYABLE')
+  const socialChargesAccount = await findAccountByRole('SOCIAL_CHARGES')
+  const socialChargesPayableAccount = await findAccountByRole('SOCIAL_CHARGES_PAYABLE')
+  const gratuityPayableAccount = await findAccountByRole('GRATUITY_PAYABLE')
+
+  const getDebitAccount = (componentType: string, fallback: { id: string } | null) => {
+    const mapped = getMappedAccounts(componentType)
+    return mapped.debitAccountId || fallback?.id
+  }
+  const getCreditAccount = (componentType: string, fallback: { id: string } | null) => {
+    const mapped = getMappedAccounts(componentType)
+    return mapped.creditAccountId || fallback?.id
+  }
+
+  const entries: { lineNumber: number; accountId: string; debit: number; credit: number; description: string; payrollRef: string }[] = []
+  let lineNumber = 0
+
+  const addEntry = (accountId: string | null | undefined, debit: number, credit: number, description: string) => {
+    if (!accountId || (debit === 0 && credit === 0)) return
+    lineNumber++
+    entries.push({
+      lineNumber,
+      accountId,
+      debit: Math.round(debit * 100) / 100,
+      credit: Math.round(credit * 100) / 100,
+      description,
+      payrollRef: batch.batchNumber,
+    })
+  }
+
+  // 1. Dr Salary Expense / Cr Salary Payable
+  addEntry(getDebitAccount('SALARY_EXPENSE', salaryExpenseAccount), totals.totalBasicSalary, 0, 'Basic salary expense')
+  addEntry(getCreditAccount('SALARY_EXPENSE', salaryPayableAccount), 0, totals.totalBasicSalary, 'Basic salary payable')
+
+  // 2. Dr Allowance Expense / Cr Allowance Payable
+  if (totals.totalAllowances > 0) {
+    addEntry(getDebitAccount('ALLOWANCE_EXPENSE', salaryExpenseAccount), totals.totalAllowances, 0, 'Allowances expense')
+    addEntry(getCreditAccount('ALLOWANCE_EXPENSE', salaryPayableAccount), 0, totals.totalAllowances, 'Allowances payable')
+  }
+
+  // 3. Dr Social Charges Expense / Cr Social Charges Payable
+  if (totals.totalSocialCharges > 0) {
+    addEntry(getDebitAccount('SOCIAL_CHARGES', socialChargesAccount), totals.totalSocialCharges, 0, 'Social charges expense')
+    addEntry(getCreditAccount('SOCIAL_CHARGES', socialChargesPayableAccount || eobiPayableAccount), 0, totals.totalSocialCharges, 'Social charges payable')
+  }
+
+  // 4. Dr Salary Payable / Cr Income Tax Payable
+  if (totals.totalIncomeTax > 0) {
+    addEntry(getDebitAccount('INCOME_TAX_PAYABLE', salaryPayableAccount), totals.totalIncomeTax, 0, 'Income tax deduction from salary')
+    addEntry(getCreditAccount('INCOME_TAX_PAYABLE', incomeTaxPayableAccount), 0, totals.totalIncomeTax, 'Income tax payable')
+  }
+
+  // 5. Dr Salary Payable / Cr EOBI Payable (employee)
+  if (totals.totalEobiEmployee > 0) {
+    addEntry(getDebitAccount('EOBI_EMPLOYEE', salaryPayableAccount), totals.totalEobiEmployee, 0, 'EOBI employee deduction from salary')
+    addEntry(getCreditAccount('EOBI_EMPLOYEE', eobiPayableAccount), 0, totals.totalEobiEmployee, 'EOBI payable (employee)')
+  }
+
+  // 6. Dr Salary Payable / Cr ESSI Payable (employee)
+  if (totals.totalEssiEmployee > 0) {
+    addEntry(getDebitAccount('ESSI_EMPLOYEE', salaryPayableAccount), totals.totalEssiEmployee, 0, 'ESSI employee deduction from salary')
+    addEntry(getCreditAccount('ESSI_EMPLOYEE', eobiPayableAccount), 0, totals.totalEssiEmployee, 'ESSI payable (employee)')
+  }
+
+  // 7. Dr Salary Payable / Cr PF Payable (employee)
+  if (totals.totalPfEmployee > 0) {
+    addEntry(getDebitAccount('PF_EMPLOYEE', salaryPayableAccount), totals.totalPfEmployee, 0, 'PF employee deduction from salary')
+    addEntry(getCreditAccount('PF_EMPLOYEE', pfPayableAccount), 0, totals.totalPfEmployee, 'Provident fund payable (employee)')
+  }
+
+  // 8. Dr Salary Payable / Cr Bank (for net pay)
+  if (totals.totalNetPay > 0) {
+    addEntry(salaryPayableAccount?.id || bankAccount?.id, totals.totalNetPay, 0, 'Net salary payable via bank')
+    addEntry(bankAccount?.id, 0, totals.totalNetPay, 'Net pay bank transfer')
+  }
+
+  // 9. Employer EOBI
+  if (totals.totalEobiEmployer > 0) {
+    addEntry(getDebitAccount('EOBI_EMPLOYER', socialChargesAccount), totals.totalEobiEmployer, 0, 'Employer EOBI contribution expense')
+    addEntry(getCreditAccount('EOBI_EMPLOYER', eobiPayableAccount), 0, totals.totalEobiEmployer, 'Employer EOBI payable')
+  }
+
+  // 10. Employer ESSI
+  if (totals.totalEssiEmployer > 0) {
+    addEntry(getDebitAccount('ESSI_EMPLOYER', socialChargesAccount), totals.totalEssiEmployer, 0, 'Employer ESSI contribution expense')
+    addEntry(getCreditAccount('ESSI_EMPLOYER', eobiPayableAccount), 0, totals.totalEssiEmployer, 'Employer ESSI payable')
+  }
+
+  // 11. Employer PF
+  if (totals.totalPfEmployer > 0) {
+    addEntry(getDebitAccount('PF_EMPLOYER', socialChargesAccount), totals.totalPfEmployer, 0, 'Employer PF contribution expense')
+    addEntry(getCreditAccount('PF_EMPLOYER', pfPayableAccount), 0, totals.totalPfEmployer, 'Employer PF payable')
+  }
+
+  // 12. Gratuity provision
+  if (totals.totalGratuity > 0) {
+    addEntry(getDebitAccount('GRATUITY', socialChargesAccount), totals.totalGratuity, 0, 'Gratuity provision expense')
+    addEntry(getCreditAccount('GRATUITY', gratuityPayableAccount || salaryPayableAccount), 0, totals.totalGratuity, 'Gratuity provision payable')
+  }
+
+  // Loan deductions
+  if (totals.totalLoanDeduction > 0) {
+    addEntry(salaryPayableAccount?.id, totals.totalLoanDeduction, 0, 'Loan deduction from salary')
+    addEntry(getCreditAccount('LOAN_DEDUCTION', salaryPayableAccount), 0, totals.totalLoanDeduction, 'Loan recovery payable')
+  }
+
+  // Advance deductions
+  if (totals.totalAdvanceDeduction > 0) {
+    addEntry(salaryPayableAccount?.id, totals.totalAdvanceDeduction, 0, 'Advance deduction from salary')
+    addEntry(getCreditAccount('ADVANCE_DEDUCTION', salaryPayableAccount), 0, totals.totalAdvanceDeduction, 'Advance recovery payable')
+  }
+
+  const totalDebit = entries.reduce((s, e) => s + e.debit, 0)
+  const totalCredit = entries.reduce((s, e) => s + e.credit, 0)
+
+  return { entries, totalDebit, totalCredit }
 }

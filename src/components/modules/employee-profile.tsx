@@ -27,6 +27,11 @@ interface EmployeeData {
   scRate: number; taxRate: number; status: string; projects: string[]
   loanEMI: number; advanceBalance: number
   eobiEnabled: boolean; pfEnabled: boolean; incomeTaxEnabled: boolean
+  essiEnabled: boolean; gratuityEnabled: boolean
+  applyToAllProjects: boolean
+  defaultAllocationMethod: string
+  taxFilingStatus: string | null
+  taxCity: string | null
   employeeCode: string; baseSalary: number; cnic: string
 }
 
@@ -62,6 +67,8 @@ interface SalaryRow {
   status: 'Paid' | 'Pending' | 'Draft'
   earnings: { basic: number; housing: number; transport: number; other: number }
   deductionBreakdown: { absentDeduction: number; tax: number; loanEmi: number; scEmployee: number }
+  taxBreakdown?: { ytdIncome?: number; projectedAnnualIncome?: number; taxSlab?: string; taxPaidYtd?: number } | null
+  projectAllocations?: { projectId: string; projectName: string; projectCode: string; days: number; weight: number; weightPct: string; salaryShare: number; scShare: number }[] | null
 }
 
 // Payroll API result type
@@ -291,6 +298,12 @@ export function EmployeeProfile() {
             eobiEnabled: e.eobiEnabled as boolean || false,
             pfEnabled: e.pfEnabled as boolean || false,
             incomeTaxEnabled: e.incomeTaxEnabled as boolean !== false,
+            essiEnabled: e.essiEnabled as boolean || false,
+            gratuityEnabled: e.gratuityEnabled as boolean || false,
+            applyToAllProjects: e.applyToAllProjects as boolean || false,
+            defaultAllocationMethod: (e.defaultAllocationMethod as string) || 'days',
+            taxFilingStatus: (e.taxFilingStatus as string) || null,
+            taxCity: (e.taxCity as string) || null,
             employeeCode: e.employeeCode as string || '',
             baseSalary: (e.baseSalary as number) || 0,
             cnic: e.cnic as string || '',
@@ -464,6 +477,8 @@ export function EmployeeProfile() {
                 loanEmi: (line.loanDeduction as number) || 0,
                 scEmployee: 0,
               },
+              taxBreakdown: line.taxBreakdown ? JSON.parse(line.taxBreakdown as string) : null,
+              projectAllocations: line.projectAllocations ? JSON.parse(line.projectAllocations as string) : null,
             })
           }
 
@@ -514,7 +529,7 @@ export function EmployeeProfile() {
   }, [availableMonths, payrollMonth])
 
   // ---- Derived ----
-  const emp = useMemo(() => employees.find(e => e.id === selectedId) || employees[0], [employees, selectedId])
+  const emp = useMemo(() => employees.find(e => e.id === selectedId), [employees, selectedId])
   const empId = emp?.id || ''
   const scLedger = empId ? (scLedgers[empId] || []) : []
   const loans = empId ? (loansStore[empId] || []) : []
@@ -523,7 +538,6 @@ export function EmployeeProfile() {
   const attMonth = empId ? (attMonths[empId] || new Date().toISOString().slice(0, 7)) : new Date().toISOString().slice(0, 7)
 
   const initials = emp?.name?.split(' ').map(w=>w[0]).join('').slice(0,2) || '??'
-
   // Quick stats
   const scOutstanding = useMemo(() => scLedger.reduce((s,r) => s + r.scAmount - r.paid, 0), [scLedger])
   const loanOutstanding = useMemo(() => loans.reduce((s,l) => s + l.remaining, 0), [loans])
@@ -846,23 +860,23 @@ export function EmployeeProfile() {
       <div className="bg-white border border-slate-200 rounded-xl p-6">
         <div className="flex flex-col items-center text-center">
           <div className="h-16 w-16 bg-slate-900 text-white rounded-2xl flex items-center justify-center text-2xl font-semibold mb-3">{initials}</div>
-          <h2 className="text-xl font-semibold text-slate-900">{emp.name}</h2>
+          <h2 className="text-xl font-semibold text-slate-900">{emp?.name || 'No Employee'}</h2>
           <div className="mt-1.5"><span className="bg-slate-100 text-slate-500 text-[11px] rounded px-2 py-0.5 font-mono">{emp?.employeeCode || empId}</span></div>
-          <p className="text-[13px] text-slate-500 mt-2">{emp.designation || '—'}</p>
-          <p className="text-[13px] text-slate-500">{emp.department || '—'}</p>
+          <p className="text-[13px] text-slate-500 mt-2">{emp?.designation || '—'}</p>
+          <p className="text-[13px] text-slate-500">{emp?.department || '—'}</p>
           <div className="mt-2.5">
-            <span className={`rounded-full text-[11px] px-3 py-1 font-medium border ${emp.status==='Active'||emp.status==='active'?'bg-emerald-50 text-emerald-600 border-emerald-200':'bg-red-50 text-red-600 border-red-200'}`}>{emp.status}</span>
+            <span className={`rounded-full text-[11px] px-3 py-1 font-medium border ${emp?.status==='Active'||emp?.status==='active'?'bg-emerald-50 text-emerald-600 border-emerald-200':'bg-red-50 text-red-600 border-red-200'}`}>{emp?.status || '—'}</span>
           </div>
         </div>
         <Separator className="my-4" />
         <div className="space-y-2.5">
           {[
-            {icon:Calendar,label:'Join Date',value:formatDate(emp.joinDate)},
-            {icon:MapPin,label:'Location',value:emp.location || '—'},
-            {icon:Landmark,label:'Bank Account',value:emp.bank || '—'},
-            {icon:Phone,label:'Phone',value:emp.phone || '—'},
-            {icon:Mail,label:'Email',value:emp.email || '—'},
-            {icon:Briefcase,label:'Contract Type',value:emp.contractType || '—'},
+            {icon:Calendar,label:'Join Date',value:formatDate(emp?.joinDate || null)},
+            {icon:MapPin,label:'Location',value:emp?.location || '—'},
+            {icon:Landmark,label:'Bank Account',value:emp?.bank || '—'},
+            {icon:Phone,label:'Phone',value:emp?.phone || '—'},
+            {icon:Mail,label:'Email',value:emp?.email || '—'},
+            {icon:Briefcase,label:'Contract Type',value:emp?.contractType || '—'},
           ].map(r => (
             <div key={r.label} className="flex items-center gap-2.5 text-[13px]">
               <r.icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
@@ -871,30 +885,42 @@ export function EmployeeProfile() {
             </div>
           ))}
         </div>
-        {emp.projects.length > 0 && (
+        {(emp?.projects?.length || 0) > 0 && (
           <>
             <Separator className="my-4" />
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[11px] text-slate-500">Projects:</span>
-              {emp.projects.map((p,i) => (
+              {emp?.projects?.map((p,i) => (
                 <span key={p} className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${PROJECT_COLORS[i%PROJECT_COLORS.length]}`}>{p}</span>
               ))}
             </div>
           </>
         )}
-        {/* EOBI / PF / Income Tax Status Badges */}
+        {/* EOBI / PF / Income Tax / ESSI / Gratuity / Tax Filing Status Badges */}
         <Separator className="my-4" />
         <div className="space-y-2">
           <p className="text-[11px] text-slate-500 font-medium">Statutory Status</p>
           <div className="flex flex-wrap gap-2">
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp.eobiEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-              EOBI {emp.eobiEnabled ? '✓' : '✗'}
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp?.eobiEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+              EOBI {emp?.eobiEnabled ? '✓' : '✗'}
             </span>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp.pfEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-              PF {emp.pfEnabled ? '✓' : '✗'}
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp?.pfEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+              PF {emp?.pfEnabled ? '✓' : '✗'}
             </span>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp.incomeTaxEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-              Income Tax {emp.incomeTaxEnabled ? '✓' : '✗'}
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp?.incomeTaxEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+              Income Tax {emp?.incomeTaxEnabled ? '✓' : '✗'}
+            </span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp?.essiEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+              ESSI {emp?.essiEnabled ? '✓' : '✗'}
+            </span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp?.gratuityEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+              Gratuity {emp?.gratuityEnabled ? '✓' : '✗'}
+            </span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp?.taxFilingStatus === 'filer' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : emp?.taxFilingStatus === 'non-filer' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+              {emp?.taxFilingStatus === 'filer' ? 'Filer' : emp?.taxFilingStatus === 'non-filer' ? 'Non-Filer' : 'Tax —'}
+            </span>
+            <span className="text-[11px] px-2 py-0.5 rounded-full font-medium border bg-blue-50 text-blue-700 border-blue-200">
+              {emp?.defaultAllocationMethod === 'percentage' ? 'Pct' : 'Days'}
             </span>
           </div>
         </div>
@@ -917,7 +943,7 @@ export function EmployeeProfile() {
     <div className="grid grid-cols-2 gap-3">
       <div className="bg-white border border-slate-200 rounded-xl p-4">
         <p className="text-[11px] text-slate-500">Monthly Salary</p>
-        <p className="text-[18px] font-semibold text-slate-900">{formatPKR(emp.monthlySalary || emp.baseSalary)}</p>
+        <p className="text-[18px] font-semibold text-slate-900">{formatPKR(emp?.monthlySalary || emp?.baseSalary || 0)}</p>
       </div>
       <TooltipProvider>
         <Tooltip>
@@ -1218,6 +1244,73 @@ export function EmployeeProfile() {
                                 <span className="text-[12px] text-slate-500 mr-3">Net Pay:</span>
                                 <span className="text-[14px] font-semibold text-emerald-600">{formatPKR(row.netPaid)}</span>
                               </div>
+                              {/* YTD Tax Info */}
+                              {row.taxBreakdown && (
+                                <div className="mt-3 pt-3 border-t border-slate-200">
+                                  <h5 className="text-[11px] font-semibold text-slate-700 mb-2 uppercase tracking-wider">YTD Tax Information</h5>
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    {row.taxBreakdown.ytdIncome != null && (
+                                      <div className="bg-white rounded-lg p-2 border border-slate-100">
+                                        <span className="text-[10px] text-slate-500 block">YTD Income</span>
+                                        <span className="text-[12px] font-semibold text-slate-900">{formatPKR(row.taxBreakdown.ytdIncome)}</span>
+                                      </div>
+                                    )}
+                                    {row.taxBreakdown.projectedAnnualIncome != null && (
+                                      <div className="bg-white rounded-lg p-2 border border-slate-100">
+                                        <span className="text-[10px] text-slate-500 block">Projected Annual</span>
+                                        <span className="text-[12px] font-semibold text-slate-900">{formatPKR(row.taxBreakdown.projectedAnnualIncome)}</span>
+                                      </div>
+                                    )}
+                                    {row.taxBreakdown.taxSlab && (
+                                      <div className="bg-white rounded-lg p-2 border border-slate-100">
+                                        <span className="text-[10px] text-slate-500 block">Tax Slab</span>
+                                        <span className="text-[12px] font-semibold text-slate-900">{row.taxBreakdown.taxSlab}</span>
+                                      </div>
+                                    )}
+                                    {row.taxBreakdown.taxPaidYtd != null && (
+                                      <div className="bg-white rounded-lg p-2 border border-slate-100">
+                                        <span className="text-[10px] text-slate-500 block">Tax Paid YTD</span>
+                                        <span className="text-[12px] font-semibold text-red-500">{formatPKR(row.taxBreakdown.taxPaidYtd)}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                              {/* Project Allocation Breakdown */}
+                              {row.projectAllocations && row.projectAllocations.length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-slate-200">
+                                  <h5 className="text-[11px] font-semibold text-slate-700 mb-2 uppercase tracking-wider">Project Allocation</h5>
+                                  <div className="overflow-hidden rounded-lg border border-slate-200">
+                                    <table className="w-full text-xs">
+                                      <thead>
+                                        <tr className="border-b border-slate-100 bg-slate-50/50">
+                                          <th className="text-left py-1.5 px-2 text-[10px] font-medium text-slate-500">Project</th>
+                                          <th className="text-center py-1.5 px-2 text-[10px] font-medium text-slate-500">Days</th>
+                                          <th className="text-center py-1.5 px-2 text-[10px] font-medium text-slate-500">Weight</th>
+                                          <th className="text-right py-1.5 px-2 text-[10px] font-medium text-slate-500">Salary Share</th>
+                                          <th className="text-right py-1.5 px-2 text-[10px] font-medium text-slate-500">SC Share</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {row.projectAllocations.map((pa, i) => (
+                                          <tr key={pa.projectId || i} className="border-b border-slate-50 last:border-0">
+                                            <td className="py-1.5 px-2">
+                                              <span className="flex items-center gap-1.5">
+                                                <span className={`w-2 h-2 rounded-full ${PROJECT_BAR_COLORS[i % PROJECT_BAR_COLORS.length]}`}/>
+                                                <span className="font-medium text-slate-900">{pa.projectName}</span>
+                                              </span>
+                                            </td>
+                                            <td className="py-1.5 px-2 text-center text-slate-600">{pa.days}</td>
+                                            <td className="py-1.5 px-2 text-center text-slate-600">{pa.weightPct}</td>
+                                            <td className="py-1.5 px-2 text-right text-slate-900">{formatPKR(pa.salaryShare)}</td>
+                                            <td className="py-1.5 px-2 text-right text-slate-900">{formatPKR(pa.scShare)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -1643,7 +1736,7 @@ export function EmployeeProfile() {
                           </td>
                           <td className="py-2 px-3 text-center text-slate-600">{p.days}</td>
                           <td className="py-2 px-3 text-center text-slate-600">{p.pct}%</td>
-                          <td className="py-2 px-3 text-right text-slate-900">{formatPKR(Math.round((emp.monthlySalary || emp.baseSalary) * p.days / daysInMonth))}</td>
+                          <td className="py-2 px-3 text-right text-slate-900">{formatPKR(Math.round((emp?.monthlySalary || emp?.baseSalary || 0) * p.days / daysInMonth))}</td>
                         </tr>
                       )
                     })}
@@ -1662,8 +1755,8 @@ export function EmployeeProfile() {
   // ========================================================================
   const renderDocuments = () => {
     const docsList = docs.length > 0 ? docs : [
-      { id:1, name:'CNIC Copy', type:'pdf', uploaded: emp.joinDate || new Date().toISOString().split('T')[0], size:'—' },
-      { id:2, name:'Employment Contract', type:'pdf', uploaded: emp.joinDate || new Date().toISOString().split('T')[0], size:'—' },
+      { id:1, name:'CNIC Copy', type:'pdf', uploaded: emp?.joinDate || new Date().toISOString().split('T')[0], size:'—' },
+      { id:2, name:'Employment Contract', type:'pdf', uploaded: emp?.joinDate || new Date().toISOString().split('T')[0], size:'—' },
     ]
 
     return (
@@ -1765,12 +1858,22 @@ export function EmployeeProfile() {
     )
   }
 
-  if (employees.length === 0) {
+  if (employees.length === 0 && !employeesLoading) {
     return (
       <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
         <Info className="h-10 w-10 text-slate-300 mx-auto mb-3"/>
         <h3 className="text-lg font-semibold text-slate-700 mb-1">No Employees Found</h3>
         <p className="text-sm text-slate-400">There are no employees in the system. Add employees first to view their profiles.</p>
+      </div>
+    )
+  }
+
+  if (!emp) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
+        <Info className="h-10 w-10 text-slate-300 mx-auto mb-3"/>
+        <h3 className="text-lg font-semibold text-slate-700 mb-1">Select an Employee</h3>
+        <p className="text-sm text-slate-400">Use the search bar above to find and select an employee to view their profile.</p>
       </div>
     )
   }

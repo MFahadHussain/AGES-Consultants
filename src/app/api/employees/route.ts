@@ -153,6 +153,13 @@ export async function POST(request: Request) {
       socialSecurityNo: body.socialSecurityNo || null,
       eobiEnabled: body.eobiEnabled === true,
       pfEnabled: body.pfEnabled === true,
+      incomeTaxEnabled: body.incomeTaxEnabled !== false,
+      essiEnabled: body.essiEnabled === true,
+      gratuityEnabled: body.gratuityEnabled === true,
+      applyToAllProjects: body.applyToAllProjects === true,
+      defaultAllocationMethod: body.defaultAllocationMethod || 'days',
+      taxFilingStatus: body.taxFilingStatus || null,
+      taxCity: body.taxCity || null,
 
       qualification1: body.qualification1 || null,
       institute1: body.institute1 || null,
@@ -324,6 +331,13 @@ export async function PUT(request: Request) {
       updateData.socialSecurityNo = body.socialSecurityNo
     if (body.eobiEnabled !== undefined) updateData.eobiEnabled = body.eobiEnabled === true
     if (body.pfEnabled !== undefined) updateData.pfEnabled = body.pfEnabled === true
+    if (body.incomeTaxEnabled !== undefined) updateData.incomeTaxEnabled = body.incomeTaxEnabled !== false
+    if (body.essiEnabled !== undefined) updateData.essiEnabled = body.essiEnabled === true
+    if (body.gratuityEnabled !== undefined) updateData.gratuityEnabled = body.gratuityEnabled === true
+    if (body.applyToAllProjects !== undefined) updateData.applyToAllProjects = body.applyToAllProjects === true
+    if (body.defaultAllocationMethod !== undefined) updateData.defaultAllocationMethod = body.defaultAllocationMethod
+    if (body.taxFilingStatus !== undefined) updateData.taxFilingStatus = body.taxFilingStatus
+    if (body.taxCity !== undefined) updateData.taxCity = body.taxCity
 
     // Qualification
     if (body.qualification1 !== undefined)

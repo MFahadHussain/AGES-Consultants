@@ -35,6 +35,8 @@ import {
   Scale,
   Link2,
   FileCheck2,
+  Printer,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Input } from '@/components/ui/input'
@@ -56,7 +58,7 @@ const ROLE_MODULES: Record<UserRole, ModuleKey[]> = {
     'budgets', 'taxation', 'aging', 'financial-year',
     'reports', 'fixed-assets', 'payroll',
     'employees', 'employee-profile', 'project-assignments', 'allowances', 'attendance',
-    'loans', 'tax-slabs', 'payroll-gl-mapping', 'final-settlement',
+    'loans', 'tax-slabs', 'payroll-gl-mapping', 'final-settlement', 'payroll-slips', 'payroll-reports',
     'user-management', 'import-export', 'audit-log', 'settings',
   ],
   manager: [
@@ -65,7 +67,7 @@ const ROLE_MODULES: Record<UserRole, ModuleKey[]> = {
     'budgets', 'taxation', 'aging', 'financial-year',
     'reports', 'fixed-assets', 'payroll',
     'employees', 'employee-profile', 'project-assignments', 'allowances', 'attendance',
-    'loans', 'final-settlement',
+    'loans', 'final-settlement', 'payroll-slips', 'payroll-reports',
     'audit-log',
   ],
   accountant: [
@@ -74,14 +76,14 @@ const ROLE_MODULES: Record<UserRole, ModuleKey[]> = {
     'budgets', 'taxation', 'aging', 'financial-year',
     'reports', 'fixed-assets', 'payroll',
     'employees', 'employee-profile', 'project-assignments', 'allowances', 'attendance',
-    'loans', 'payroll-gl-mapping',
+    'loans', 'payroll-gl-mapping', 'payroll-slips', 'payroll-reports',
   ],
   auditor: [
     'dashboard', 'chart-of-accounts', 'vouchers', 'ledgers',
     'customers', 'suppliers', 'projects', 'donors', 'locations', 'clients',
     'budgets', 'aging', 'financial-year',
     'reports', 'fixed-assets', 'payroll',
-    'employees', 'employee-profile', 'attendance', 'tax-slabs', 'payroll-gl-mapping',
+    'employees', 'employee-profile', 'attendance', 'tax-slabs', 'payroll-gl-mapping', 'payroll-slips', 'payroll-reports',
     'audit-log',
   ],
   viewer: [
@@ -161,6 +163,8 @@ const navigation: NavGroup[] = [
       { key: 'payroll', label: 'Payroll Engine', icon: Banknote },
       { key: 'payroll-gl-mapping', label: 'GL Account Mapping', icon: Link2 },
       { key: 'final-settlement', label: 'Final Settlement', icon: FileCheck2 },
+      { key: 'payroll-slips', label: 'Payroll Slips & Letters', icon: Printer },
+      { key: 'payroll-reports', label: 'Payroll Reports', icon: FileSpreadsheet },
     ],
   },
   {
