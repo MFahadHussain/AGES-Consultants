@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, Fragment } from 'react'
+import { useEffect, useState, useCallback, useRef, Fragment } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -113,6 +113,144 @@ const emptyLineForm: PayrollLineForm = {
   gratuity: 0,
   projectId: '',
   department: '',
+}
+
+// ── Journal Voucher Card Component ──────────────────────────────────────────
+function JournalVoucherCard({ batch, draftVoucher, setDraftVoucher }: { batch: any; draftVoucher: any; setDraftVoucher: (v: any) => void }) {
+  const [fetchedVoucher, setFetchedVoucher] = useState<any>(null)
+  const [loadingVoucher, setLoadingVoucher] = useState(false)
+  const fetchedVoucherIdRef = useRef<string | null>(null)
+
+  // Use draftVoucher directly if available (from API response), otherwise fetch from DB
+  const voucherData = draftVoucher?.voucherId ? draftVoucher : fetchedVoucher
+
+  // Fetch voucher data from DB when batch has a postedVoucherId and no draftVoucher
+  const fetchVoucherData = useCallback(async (voucherId: string) => {
+    setLoadingVoucher(true)
+    try {
+      const r = await fetch(`/api/payroll?voucherId=${voucherId}`)
+      const data = await r.json()
+      if (data.entries) {
+        setFetchedVoucher({
+          voucherId: data.id,
+          voucherNumber: data.voucherNumber,
+          voucherStatus: data.status,
+          totalDebit: data.totalDebit,
+          totalCredit: data.totalCredit,
+          entries: data.entries.map((e: any) => ({
+            lineNumber: e.lineNumber,
+            accountId: e.accountId,
+            accountCode: e.account?.accountCode || '',
+            accountName: e.account?.accountName || 'Unknown',
+            debit: e.debit,
+            credit: e.credit,
+            description: e.description,
+          })),
+        })
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingVoucher(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (draftVoucher?.voucherId) return
+    if (batch.postedVoucherId && fetchedVoucherIdRef.current !== batch.postedVoucherId) {
+      fetchedVoucherIdRef.current = batch.postedVoucherId
+      fetchVoucherData(batch.postedVoucherId)
+    }
+  }, [batch.postedVoucherId, draftVoucher?.voucherId, fetchVoucherData])
+
+  const isBalanced = voucherData && Math.abs(voucherData.totalDebit - voucherData.totalCredit) < 1
+
+  if (loadingVoucher) {
+    return (
+      <Card className="border-violet-200 bg-violet-50/30">
+        <CardContent className="p-4 text-center">
+          <Loader2 className="h-5 w-5 animate-spin mx-auto text-violet-600" />
+          <p className="text-xs text-violet-600 mt-2">Loading journal voucher...</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!voucherData) return null
+
+  return (
+    <Card className="border-violet-200 bg-gradient-to-br from-violet-50/50 to-slate-50/50">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-violet-600" />
+            <CardTitle className="text-sm font-bold text-violet-900">JOURNAL VOUCHER</CardTitle>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-200">
+              {voucherData.voucherStatus === 'draft' ? 'Draft' : voucherData.voucherStatus}
+            </Badge>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 mt-1">
+          <span className="text-xs text-muted-foreground">Voucher No:</span>
+          <span className="text-xs font-mono font-bold text-violet-800">{voucherData.voucherNumber || `JV-PAY-${batch.batchNumber}`}</span>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="rounded border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-violet-100/50">
+                <TableHead className="text-[10px] h-8 w-10">#</TableHead>
+                <TableHead className="text-[10px] h-8">Account Code</TableHead>
+                <TableHead className="text-[10px] h-8">Account Name</TableHead>
+                <TableHead className="text-[10px] h-8 text-right">Debit (PKR)</TableHead>
+                <TableHead className="text-[10px] h-8 text-right">Credit (PKR)</TableHead>
+                <TableHead className="text-[10px] h-8">Description</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {voucherData.entries.map((entry: any, idx: number) => (
+                <TableRow key={idx} className={entry.debit > 0 ? 'bg-red-50/30' : 'bg-green-50/30'}>
+                  <TableCell className="text-[10px] py-1.5 font-mono">{entry.lineNumber}</TableCell>
+                  <TableCell className="text-[10px] py-1.5 font-mono">{entry.accountCode}</TableCell>
+                  <TableCell className="text-[10px] py-1.5 font-medium">{entry.accountName}</TableCell>
+                  <TableCell className="text-[10px] py-1.5 text-right font-mono">{entry.debit > 0 ? formatCurrency(entry.debit) : ''}</TableCell>
+                  <TableCell className="text-[10px] py-1.5 text-right font-mono">{entry.credit > 0 ? formatCurrency(entry.credit) : ''}</TableCell>
+                  <TableCell className="text-[10px] py-1.5 text-muted-foreground">{entry.description}</TableCell>
+                </TableRow>
+              ))}
+              {/* Totals row */}
+              <TableRow className="bg-violet-100/50 font-bold border-t-2 border-violet-300">
+                <TableCell className="text-[10px] py-2" colSpan={3}>TOTAL</TableCell>
+                <TableCell className="text-[10px] py-2 text-right font-mono">{formatCurrency(voucherData.totalDebit)}</TableCell>
+                <TableCell className="text-[10px] py-2 text-right font-mono">{formatCurrency(voucherData.totalCredit)}</TableCell>
+                <TableCell className="text-[10px] py-2"></TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+        {/* Balance validation */}
+        <div className="flex items-center justify-between mt-2">
+          <div className="flex items-center gap-2">
+            {isBalanced ? (
+              <Badge className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-200">
+                <CheckCircle className="h-3 w-3 mr-1" />Balanced (Dr = Cr)
+              </Badge>
+            ) : (
+              <Badge className="text-[10px] bg-red-100 text-red-800 border border-red-200">
+                <AlertCircle className="h-3 w-3 mr-1" />Imbalanced (Diff: {formatCurrency(Math.abs(voucherData.totalDebit - voucherData.totalCredit))})
+              </Badge>
+            )}
+          </div>
+          <div className="text-[10px] text-muted-foreground">
+            {voucherData.entries.length} entries | Approved lines: {voucherData.approvedLineCount || '—'}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
 }
 
 function computeLineTotals(line: PayrollLineForm) {
@@ -468,6 +606,20 @@ export function PayrollIntegration() {
       })
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || 'Failed')
+
+      // Store voucher data for Journal Voucher card display
+      if (result.voucherEntries) {
+        setDraftVoucher({
+          voucherId: result.voucherId,
+          voucherNumber: result.voucherNumber,
+          voucherStatus: result.voucherStatus,
+          totalDebit: result.totalDebit,
+          totalCredit: result.totalCredit,
+          entries: result.voucherEntries,
+          approvedLineCount: result.approvedLineCount,
+        })
+      }
+
       toast({ title: 'Draft Voucher Created', description: result.message || 'Approved lines posted to GL as draft voucher' })
       setDraftToGLDialogOpen(false)
       setSelectedLineIds(new Set())
@@ -1793,7 +1945,8 @@ export function PayrollIntegration() {
         const statusIdx = workflowSteps.indexOf(batch.status)
 
         return (
-          <Card key={batch.id} className="group overflow-hidden">
+          <Fragment key={batch.id}>
+          <Card className="group overflow-hidden">
             {/* Batch Header */}
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
@@ -2254,7 +2407,12 @@ export function PayrollIntegration() {
               </CardContent>
             )}
           </Card>
-        )
+
+          {batch.status === 'draft-to-gl' && (
+            <JournalVoucherCard key={`jv-${batch.id}`} batch={batch} draftVoucher={draftVoucher} setDraftVoucher={setDraftVoucher} />
+          )}
+        </Fragment>
+      )
       })}
 
       {!loading && batches.length === 0 && (

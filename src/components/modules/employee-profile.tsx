@@ -550,7 +550,7 @@ export function EmployeeProfile() {
   }, [availableMonths, payrollMonth])
 
   // ---- Derived ----
-  const emp = useMemo(() => employees.find(e => e.id === selectedId), [employees, selectedId])
+  const emp = useMemo(() => employees.find(e => e.id === selectedId) || null, [employees, selectedId])
   const empId = emp?.id || ''
   const scLedger = empId ? (scLedgers[empId] || []) : []
   const loans = empId ? (loansStore[empId] || []) : []
@@ -1247,13 +1247,13 @@ export function EmployeeProfile() {
                 </div>
               </div>
               {/* SC Details */}
-              {(apiPayrollResult.leaveDaysPaid > 0 || (apiPayrollResult.projectScDetails && apiPayrollResult.projectScDetails.length > 0)) && (
+              {((apiPayrollResult.leaveDaysPaid ?? 0) > 0 || (apiPayrollResult.projectScDetails && apiPayrollResult.projectScDetails.length > 0)) && (
                 <div className="bg-amber-50 rounded-lg p-2 text-[10px] space-y-1">
                   <div className="flex items-center gap-1 text-amber-700 font-semibold">
                     <AlertCircle className="h-3 w-3"/>
                     Social Charges: Leave days (SL/CL/EL) are paid but excluded from SC calculation
                   </div>
-                  {apiPayrollResult.leaveDaysPaid > 0 && (
+                  {(apiPayrollResult.leaveDaysPaid ?? 0) > 0 && (
                     <div className="text-amber-600">Leave days (no SC): {apiPayrollResult.leaveDaysPaid}</div>
                   )}
                   {apiPayrollResult.projectScDetails && apiPayrollResult.projectScDetails.length > 0 && (
@@ -2054,10 +2054,13 @@ export function EmployeeProfile() {
 
   if (!emp) {
     return (
-      <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
-        <Info className="h-10 w-10 text-slate-300 mx-auto mb-3"/>
-        <h3 className="text-lg font-semibold text-slate-700 mb-1">Select an Employee</h3>
-        <p className="text-sm text-slate-400">Use the search bar above to find and select an employee to view their profile.</p>
+      <div>
+        {renderSearch()}
+        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
+          <Info className="h-10 w-10 text-slate-300 mx-auto mb-3"/>
+          <h3 className="text-lg font-semibold text-slate-700 mb-1">Select an Employee</h3>
+          <p className="text-sm text-slate-400">Use the search bar above to find and select an employee to view their profile.</p>
+        </div>
       </div>
     )
   }

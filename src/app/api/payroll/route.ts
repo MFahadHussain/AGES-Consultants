@@ -100,6 +100,22 @@ export async function GET(request: Request) {
       return NextResponse.json(batch)
     }
 
+    // If fetching voucher for a batch
+    const voucherId = searchParams.get('voucherId')
+    if (voucherId) {
+      const voucher = await db.voucher.findUnique({
+        where: { id: voucherId },
+        include: {
+          entries: {
+            include: { account: { select: { id: true, accountName: true, accountCode: true } } },
+            orderBy: { lineNumber: 'asc' },
+          },
+        },
+      })
+      if (!voucher) return NextResponse.json({ error: 'Voucher not found' }, { status: 404 })
+      return NextResponse.json(voucher)
+    }
+
     const where: Record<string, string> = {}
     if (status) where.status = status
 
@@ -750,13 +766,34 @@ export async function POST(request: Request) {
         }
       }
 
-      // Mark batch as posted
+      // Mark batch as draft-to-gl (not fully posted yet — voucher is draft)
       await db.payrollBatch.update({
         where: { id: batchId },
         data: {
-          postedToGL: true, postedVoucherId: voucher.id, status: 'posted', postedBy: 'system',
+          postedToGL: true, postedVoucherId: voucher.id, status: 'draft-to-gl', postedBy: 'system',
         },
       })
+
+      // Fetch voucher entries with account names for display
+      const voucherWithEntries = await db.voucher.findUnique({
+        where: { id: voucher.id },
+        include: {
+          entries: {
+            include: { account: { select: { id: true, accountName: true, accountCode: true } } },
+            orderBy: { lineNumber: 'asc' },
+          },
+        },
+      })
+
+      const displayEntries = (voucherWithEntries?.entries || []).map(e => ({
+        lineNumber: e.lineNumber,
+        accountId: e.accountId,
+        accountCode: e.account?.accountCode || '',
+        accountName: e.account?.accountName || 'Unknown',
+        debit: e.debit,
+        credit: e.credit,
+        description: e.description,
+      }))
 
       return NextResponse.json({
         message: 'Payroll draft posted to GL (approved lines only)',
@@ -766,6 +803,7 @@ export async function POST(request: Request) {
         totalDebit, totalCredit,
         entryCount: entries.length,
         approvedLineCount: approvedLines.length,
+        voucherEntries: displayEntries,
       })
     }
 
