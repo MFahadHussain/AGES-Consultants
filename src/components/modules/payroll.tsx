@@ -72,21 +72,6 @@ interface PayrollLineForm {
   department: string
 }
 
-// Calculator row interface for attendance-driven payroll
-interface CalculatorRow {
-  employeeId: string
-  employeeCode: string
-  employeeName: string
-  monthlySalary: number
-  workingDays: number
-  presentDays: number
-  leaveDays: number
-  absentDays: number
-  earnedSalary: number
-  deductions: number
-  netPay: number
-}
-
 const emptyLineForm: PayrollLineForm = {
   employeeId: '',
   employeeName: '',
@@ -145,8 +130,14 @@ export function PayrollIntegration() {
 
   // Calculator state (Fix 4)
   const [calculatorPeriod, setCalculatorPeriod] = useState(new Date().toISOString().slice(0, 7))
-  const [calculatorData, setCalculatorData] = useState<CalculatorRow[]>([])
+  const [calculatorData, setCalculatorData] = useState<any[]>([])
   const [calculating, setCalculating] = useState(false)
+
+  // Project Cost state
+  const [projectCostData, setProjectCostData] = useState<any>(null)
+  const [projectCostPeriod, setProjectCostPeriod] = useState(new Date().toISOString().slice(0, 7))
+  const [loadingProjectCost, setLoadingProjectCost] = useState(false)
+  const [expandedProject, setExpandedProject] = useState<string | null>(null)
 
   // Draft voucher state (Fix 5)
   const [draftVoucher, setDraftVoucher] = useState<any>(null)
@@ -423,69 +414,53 @@ export function PayrollIntegration() {
   }
 
   // ----------------------------------------------------------
-  // Fix 4: Attendance-Driven Payroll Calculator
+  // Fix 4: Attendance-Driven Payroll Calculator (Backend API)
   // ----------------------------------------------------------
   const handleRecalculate = async () => {
     setCalculating(true)
     try {
-      const empRes = await fetch('/api/employees?pageSize=200&status=active')
-      const empData = await empRes.json()
-      const activeEmps = Array.isArray(empData) ? empData.filter((e: any) => e.status === 'active') : (empData.data || []).filter((e: any) => e.status === 'active')
-
-      const attRes = await fetch(`/api/attendance?month=${calculatorPeriod}&pageSize=2000`)
-      const attData = await attRes.json()
-      const records = Array.isArray(attData?.data) ? attData.data : Array.isArray(attData) ? attData : []
-
-      const [cYear, cMonth] = calculatorPeriod.split('-').map(Number)
-      const workingDays = new Date(cYear, cMonth, 0).getDate()
-
-      const rows: CalculatorRow[] = activeEmps.map((emp: any) => {
-        const empRecords = records.filter((r: any) => r.employeeId === emp.id)
-        const monthlySalary = emp.baseSalary || 0
-        const dailyRate = monthlySalary / workingDays
-
-        let presentDays = 0
-        let leaveDays = 0
-        let absentDays = 0
-
-        const PRESENT_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO'])
-        const LEAVE_STATUSES = new Set(['SL', 'CL', 'EL'])
-
-        for (const rec of empRecords) {
-          if (PRESENT_STATUSES.has(rec.status)) presentDays++
-          else if (LEAVE_STATUSES.has(rec.status)) leaveDays++
-          else if (rec.status === 'A') absentDays++
-        }
-
-        const effectiveDays = presentDays + leaveDays
-        const earnedSalary = effectiveDays * dailyRate
-        const deductions = Math.round(earnedSalary * 0.05)
-        const netPay = earnedSalary - deductions
-
-        return {
-          employeeId: emp.id,
-          employeeCode: emp.employeeCode || '',
-          employeeName: emp.name,
-          monthlySalary,
-          workingDays,
-          presentDays,
-          leaveDays,
-          absentDays,
-          earnedSalary: Math.round(earnedSalary),
-          deductions: Math.round(deductions),
-          netPay: Math.round(netPay),
-        }
+      const res = await fetch('/api/payroll/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allEmployees: true, month: calculatorPeriod, skipValidation: true }),
       })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Calculation failed')
 
+      // data.results is a Record<employeeId, PayrollResult>
+      const rows = Object.values(data.results || {}) as any[]
       setCalculatorData(rows)
       setDraftVoucher(null)
       setVoucherPosted(false)
+      toast({
+        title: 'Calculation Complete',
+        description: `Processed ${data.successful || rows.length} employees${data.failed ? ` (${data.failed} failed)` : ''}`,
+      })
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' })
     } finally {
       setCalculating(false)
     }
   }
+
+  // ----------------------------------------------------------
+  // Project Cost Breakdown fetcher
+  // ----------------------------------------------------------
+  const fetchProjectCost = useCallback(async (month?: string) => {
+    const period = month || projectCostPeriod
+    setLoadingProjectCost(true)
+    try {
+      const res = await fetch(`/api/payroll/project-cost?month=${period}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to load project cost')
+      setProjectCostData(data)
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+      setProjectCostData(null)
+    } finally {
+      setLoadingProjectCost(false)
+    }
+  }, [projectCostPeriod, toast])
 
   // ----------------------------------------------------------
   // Fix 5: Draft → Post Voucher Workflow
@@ -504,8 +479,8 @@ export function PayrollIntegration() {
     const voucherNo = `DRAFT-PAY-${String(Date.now()).slice(-6)}`
     const periodLabel = new Date(calculatorPeriod + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
 
-    const lines = calculatorData.map(r => ({
-      account: `Salary Expense - ${r.employeeName}`,
+    const lines = calculatorData.map((r: any) => ({
+      account: `Salary Expense - ${r.employee?.name || r.employeeName || 'Unknown'}`,
       debit: r.netPay,
       credit: 0,
     }))
@@ -1070,13 +1045,18 @@ export function PayrollIntegration() {
         </Card>
       </div>
 
-      {/* Payroll Calculator Section (Fix 4) */}
+      {/* Payroll Calculator Section — Attendance-Driven with Project Detail */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-4">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-semibold">Attendance-Driven Payroll Calculator</h3>
-              <p className="text-[10px] text-muted-foreground">Calculates salary based on actual attendance data</p>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                Attendance-Driven Payroll Calculator
+              </CardTitle>
+              <CardDescription className="text-[10px]">
+                Calculates salary, deductions &amp; project cost distribution based on actual attendance data
+              </CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <Input type="month" className="h-8 text-xs w-40" value={calculatorPeriod} onChange={e => setCalculatorPeriod(e.target.value)} />
@@ -1086,68 +1066,163 @@ export function PayrollIntegration() {
               </Button>
             </div>
           </div>
-
-          {calculatorData.length > 0 && (
-            <div className="rounded border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-[10px]">Employee</TableHead>
-                    <TableHead className="text-[10px] text-right">Monthly Salary</TableHead>
-                    <TableHead className="text-[10px] text-center">Working Days</TableHead>
-                    <TableHead className="text-[10px] text-center">Present</TableHead>
-                    <TableHead className="text-[10px] text-center">Leave</TableHead>
-                    <TableHead className="text-[10px] text-center">Absent</TableHead>
-                    <TableHead className="text-[10px] text-right">Earned</TableHead>
-                    <TableHead className="text-[10px] text-right">Deductions</TableHead>
-                    <TableHead className="text-[10px] text-right">Net Pay</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {calculatorData.map(row => (
-                    <TableRow key={row.employeeId}>
-                      <TableCell className="text-xs py-1.5">
-                        <div><span className="font-medium">{row.employeeName}</span></div>
-                        <div className="text-[9px] text-muted-foreground">{row.employeeCode}</div>
-                      </TableCell>
-                      <TableCell className="text-xs py-1.5 text-right">{formatCurrency(row.monthlySalary)}</TableCell>
-                      <TableCell className="text-xs py-1.5 text-center">{row.workingDays}</TableCell>
-                      <TableCell className="text-xs py-1.5 text-center text-green-600 font-medium">{row.presentDays}</TableCell>
-                      <TableCell className="text-xs py-1.5 text-center text-amber-600 font-medium">{row.leaveDays}</TableCell>
-                      <TableCell className="text-xs py-1.5 text-center text-red-600 font-medium">{row.absentDays}</TableCell>
-                      <TableCell className="text-xs py-1.5 text-right">{formatCurrency(row.earnedSalary)}</TableCell>
-                      <TableCell className="text-xs py-1.5 text-right text-red-600">{formatCurrency(row.deductions)}</TableCell>
-                      <TableCell className="text-xs py-1.5 text-right font-semibold text-green-600">{formatCurrency(row.netPay)}</TableCell>
-                    </TableRow>
-                  ))}
-                  {/* Totals row */}
-                  <TableRow className="bg-muted/30 font-semibold">
-                    <TableCell className="text-xs py-1.5">Total</TableCell>
-                    <TableCell className="text-xs py-1.5 text-right">{formatCurrency(calculatorData.reduce((s, r) => s + r.monthlySalary, 0))}</TableCell>
-                    <TableCell className="text-xs py-1.5 text-center">&mdash;</TableCell>
-                    <TableCell className="text-xs py-1.5 text-center">{calculatorData.reduce((s, r) => s + r.presentDays, 0)}</TableCell>
-                    <TableCell className="text-xs py-1.5 text-center">{calculatorData.reduce((s, r) => s + r.leaveDays, 0)}</TableCell>
-                    <TableCell className="text-xs py-1.5 text-center">{calculatorData.reduce((s, r) => s + r.absentDays, 0)}</TableCell>
-                    <TableCell className="text-xs py-1.5 text-right">{formatCurrency(calculatorData.reduce((s, r) => s + r.earnedSalary, 0))}</TableCell>
-                    <TableCell className="text-xs py-1.5 text-right text-red-600">{formatCurrency(calculatorData.reduce((s, r) => s + r.deductions, 0))}</TableCell>
-                    <TableCell className="text-xs py-1.5 text-right text-green-600">{formatCurrency(calculatorData.reduce((s, r) => s + r.netPay, 0))}</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+        </CardHeader>
+        <CardContent className="p-4 pt-0">
+          {calculatorData.length === 0 && !calculating && (
+            <div className="text-center py-8 text-muted-foreground">
+              <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-30" />
+              <p className="text-xs">Select a period and click <strong>Recalculate</strong> to compute payroll for all active employees</p>
             </div>
           )}
 
-          {calculatorData.length > 0 && (
-            <div className="flex items-center gap-2 mt-3">
-              <Button
-                variant="outline"
-                className="border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 rounded-lg px-4 py-2"
-                onClick={handleCreateDraftVoucher}
-                disabled={!!draftVoucher}
-              >
-                Create Draft Voucher
-              </Button>
+          {calculating && (
+            <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span className="text-xs">Calculating payroll via attendance engine…</span>
             </div>
+          )}
+
+          {calculatorData.length > 0 && !calculating && (
+            <>
+              {/* Summary KPIs */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                <div className="p-2.5 rounded-lg bg-muted/50 text-center">
+                  <p className="text-[10px] text-muted-foreground">Total Gross</p>
+                  <p className="text-sm font-bold">{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.grossSalary || 0), 0))}</p>
+                </div>
+                <div className="p-2.5 rounded-lg bg-red-50 border border-red-100 text-center">
+                  <p className="text-[10px] text-red-700">Total Deductions</p>
+                  <p className="text-sm font-bold text-red-700">{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.deductions?.totalDeductions || 0), 0))}</p>
+                </div>
+                <div className="p-2.5 rounded-lg bg-green-50 border border-green-100 text-center">
+                  <p className="text-[10px] text-green-700">Total Net Pay</p>
+                  <p className="text-sm font-bold text-green-700">{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.netPay || 0), 0))}</p>
+                </div>
+                <div className="p-2.5 rounded-lg bg-orange-50 border border-orange-100 text-center">
+                  <p className="text-[10px] text-orange-700">Total SC</p>
+                  <p className="text-sm font-bold text-orange-700">{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.finalSC || 0), 0))}</p>
+                </div>
+              </div>
+
+              {/* Employee breakdown table */}
+              <div className="rounded border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-[10px]">Employee</TableHead>
+                      <TableHead className="text-[10px] text-center">Eligible</TableHead>
+                      <TableHead className="text-[10px] text-center">Leave</TableHead>
+                      <TableHead className="text-[10px] text-center">Absent</TableHead>
+                      <TableHead className="text-[10px] text-right">Gross</TableHead>
+                      <TableHead className="text-[10px] text-right">Deductions</TableHead>
+                      <TableHead className="text-[10px] text-right">Net Pay</TableHead>
+                      <TableHead className="text-[10px] text-right">SC</TableHead>
+                      <TableHead className="text-[10px] text-center">Projects</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {calculatorData.map((row: any) => {
+                      const projCount = row.projectAllocations?.length || 0
+                      return (
+                        <TableRow key={row.employee?.id || row.employeeId}>
+                          <TableCell className="text-xs py-1.5">
+                            <div><span className="font-medium">{row.employee?.name || row.employeeName}</span></div>
+                            <div className="text-[9px] text-muted-foreground">{row.employee?.employeeCode || row.employeeCode}</div>
+                          </TableCell>
+                          <TableCell className="text-xs py-1.5 text-center text-green-600 font-medium">{row.eligibleDays}</TableCell>
+                          <TableCell className="text-xs py-1.5 text-center text-amber-600 font-medium">{row.leaveDays}</TableCell>
+                          <TableCell className="text-xs py-1.5 text-center text-red-600 font-medium">{row.absentDays}</TableCell>
+                          <TableCell className="text-xs py-1.5 text-right">{formatCurrency(row.grossSalary || 0)}</TableCell>
+                          <TableCell className="text-xs py-1.5 text-right text-red-600">{formatCurrency(row.deductions?.totalDeductions || 0)}</TableCell>
+                          <TableCell className="text-xs py-1.5 text-right font-semibold text-green-600">{formatCurrency(row.netPay || 0)}</TableCell>
+                          <TableCell className="text-xs py-1.5 text-right text-orange-600">{formatCurrency(row.finalSC || 0)}</TableCell>
+                          <TableCell className="text-xs py-1.5 text-center">
+                            {projCount > 0 ? (
+                              <Badge variant="outline" className="text-[9px] h-5 px-1.5">{projCount} project{projCount > 1 ? 's' : ''}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-[9px]">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                    {/* Totals row */}
+                    <TableRow className="bg-muted/30 font-semibold">
+                      <TableCell className="text-xs py-1.5">Total ({calculatorData.length} employees)</TableCell>
+                      <TableCell className="text-xs py-1.5 text-center">{calculatorData.reduce((s: number, r: any) => s + (r.eligibleDays || 0), 0)}</TableCell>
+                      <TableCell className="text-xs py-1.5 text-center">{calculatorData.reduce((s: number, r: any) => s + (r.leaveDays || 0), 0)}</TableCell>
+                      <TableCell className="text-xs py-1.5 text-center">{calculatorData.reduce((s: number, r: any) => s + (r.absentDays || 0), 0)}</TableCell>
+                      <TableCell className="text-xs py-1.5 text-right">{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.grossSalary || 0), 0))}</TableCell>
+                      <TableCell className="text-xs py-1.5 text-right text-red-600">{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.deductions?.totalDeductions || 0), 0))}</TableCell>
+                      <TableCell className="text-xs py-1.5 text-right text-green-600">{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.netPay || 0), 0))}</TableCell>
+                      <TableCell className="text-xs py-1.5 text-right text-orange-600">{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.finalSC || 0), 0))}</TableCell>
+                      <TableCell className="text-xs py-1.5 text-center">&mdash;</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Project-level detail per employee (collapsible) */}
+              {calculatorData.some((r: any) => r.projectAllocations?.length > 0) && (
+                <div className="mt-4">
+                  <h4 className="text-xs font-semibold mb-2 flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5" />
+                    Project-Level Salary Distribution
+                  </h4>
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {calculatorData.filter((r: any) => r.projectAllocations?.length > 0).map((row: any) => (
+                      <div key={row.employee?.id} className="rounded border bg-muted/20 p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium">{row.employee?.name} <span className="text-muted-foreground">({row.employee?.employeeCode})</span></span>
+                          <span className="text-[10px] text-muted-foreground">Monthly: {formatCurrency(row.monthlySalary || 0)}</span>
+                        </div>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-[9px] h-7">Project</TableHead>
+                              <TableHead className="text-[9px] h-7 text-center">Days</TableHead>
+                              <TableHead className="text-[9px] h-7 text-right">Weight</TableHead>
+                              <TableHead className="text-[9px] h-7 text-right">Salary Share</TableHead>
+                              <TableHead className="text-[9px] h-7 text-right">SC Share</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {row.projectAllocations.map((pa: any) => (
+                              <TableRow key={pa.projectId}>
+                                <TableCell className="text-[10px] py-1 font-medium">{pa.projectCode} — {pa.projectName}</TableCell>
+                                <TableCell className="text-[10px] py-1 text-center">{pa.days}</TableCell>
+                                <TableCell className="text-[10px] py-1 text-right">{pa.weightPct}</TableCell>
+                                <TableCell className="text-[10px] py-1 text-right">{formatCurrency(pa.salaryShare)}</TableCell>
+                                <TableCell className="text-[10px] py-1 text-right text-orange-600">{formatCurrency(pa.scShare)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 mt-3">
+                <Button
+                  variant="outline"
+                  className="border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 rounded-lg px-4 py-2"
+                  onClick={handleCreateDraftVoucher}
+                  disabled={!!draftVoucher}
+                >
+                  Create Draft Voucher
+                </Button>
+                <Button
+                  variant="outline"
+                  className="rounded-lg px-4 py-2"
+                  onClick={() => { setProjectCostPeriod(calculatorPeriod); fetchProjectCost(calculatorPeriod) }}
+                >
+                  <Building2 className="h-3.5 w-3.5 mr-1" />
+                  View Project Cost Ledger
+                </Button>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -1216,6 +1291,181 @@ export function PayrollIntegration() {
           </CardContent>
         </Card>
       )}
+
+      {/* Project Cost Distribution Card */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                Project Cost Distribution
+              </CardTitle>
+              <CardDescription className="text-[10px]">
+                Salary &amp; social charges grouped by project from the Project Cost Ledger
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                type="month"
+                className="h-8 text-xs w-40"
+                value={projectCostPeriod}
+                onChange={e => setProjectCostPeriod(e.target.value)}
+              />
+              <Button
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => fetchProjectCost()}
+                disabled={loadingProjectCost}
+              >
+                {loadingProjectCost ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Receipt className="h-3.5 w-3.5 mr-1" />}
+                Load
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 pt-0">
+          {!projectCostData && !loadingProjectCost && (
+            <div className="text-center py-8 text-muted-foreground">
+              <Building2 className="h-8 w-8 mx-auto mb-2 opacity-30" />
+              <p className="text-xs">Select a month and click <strong>Load</strong> to view project cost distribution from the ledger</p>
+            </div>
+          )}
+
+          {loadingProjectCost && (
+            <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span className="text-xs">Loading project cost data…</span>
+            </div>
+          )}
+
+          {projectCostData && !loadingProjectCost && (
+            <>
+              {/* Grand Total KPIs */}
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="p-2.5 rounded-lg bg-muted/50 text-center">
+                  <p className="text-[10px] text-muted-foreground">Total Salary</p>
+                  <p className="text-sm font-bold">{formatCurrency(projectCostData.grandTotal?.salary || 0)}</p>
+                </div>
+                <div className="p-2.5 rounded-lg bg-orange-50 border border-orange-100 text-center">
+                  <p className="text-[10px] text-orange-700">Total SC</p>
+                  <p className="text-sm font-bold text-orange-700">{formatCurrency(projectCostData.grandTotal?.sc || 0)}</p>
+                </div>
+                <div className="p-2.5 rounded-lg bg-muted/50 text-center">
+                  <p className="text-[10px] text-muted-foreground">Total Days</p>
+                  <p className="text-sm font-bold">{projectCostData.grandTotal?.days || 0}</p>
+                </div>
+              </div>
+
+              {/* Projects Table */}
+              {projectCostData.byProject?.length > 0 ? (
+                <div className="space-y-3">
+                  {projectCostData.byProject.map((proj: any) => (
+                    <div key={proj.projectId} className="rounded border">
+                      <div
+                        className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/30 transition-colors"
+                        onClick={() => setExpandedProject(expandedProject === proj.projectId ? null : proj.projectId)}
+                      >
+                        <div className="flex items-center gap-2">
+                          {expandedProject === proj.projectId ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
+                          <span className="text-xs font-semibold">{proj.projectCode} — {proj.projectName}</span>
+                          <Badge variant="outline" className="text-[9px] h-5 px-1.5">{proj.employees?.length || 0} emp</Badge>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs">
+                          <span className="text-muted-foreground">Days: <strong>{proj.totalDays}</strong></span>
+                          <span>Salary: <strong>{formatCurrency(proj.totalSalary)}</strong></span>
+                          <span className="text-orange-600">SC: <strong>{formatCurrency(proj.totalSC)}</strong></span>
+                        </div>
+                      </div>
+
+                      {expandedProject === proj.projectId && (
+                        <div className="border-t">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-[9px] h-7">Employee</TableHead>
+                                <TableHead className="text-[9px] h-7">Designation</TableHead>
+                                <TableHead className="text-[9px] h-7 text-center">Days</TableHead>
+                                <TableHead className="text-[9px] h-7 text-right">Salary Share</TableHead>
+                                <TableHead className="text-[9px] h-7 text-right">SC Share</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {proj.employees.map((emp: any) => (
+                                <TableRow key={emp.employeeId}>
+                                  <TableCell className="text-[10px] py-1">
+                                    <span className="font-medium">{emp.employeeName}</span>
+                                    <span className="text-muted-foreground ml-1">({emp.employeeCode})</span>
+                                  </TableCell>
+                                  <TableCell className="text-[10px] py-1 text-muted-foreground">{emp.designation || '—'}</TableCell>
+                                  <TableCell className="text-[10px] py-1 text-center">{emp.days}</TableCell>
+                                  <TableCell className="text-[10px] py-1 text-right">{formatCurrency(emp.salaryShare)}</TableCell>
+                                  <TableCell className="text-[10px] py-1 text-right text-orange-600">{formatCurrency(emp.scShare)}</TableCell>
+                                </TableRow>
+                              ))}
+                              {/* Project subtotal */}
+                              <TableRow className="bg-muted/20 font-semibold">
+                                <TableCell className="text-[10px] py-1" colSpan={2}>Project Total</TableCell>
+                                <TableCell className="text-[10px] py-1 text-center">{proj.totalDays}</TableCell>
+                                <TableCell className="text-[10px] py-1 text-right">{formatCurrency(proj.totalSalary)}</TableCell>
+                                <TableCell className="text-[10px] py-1 text-right text-orange-600">{formatCurrency(proj.totalSC)}</TableCell>
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <AlertCircle className="h-6 w-6 mx-auto mb-2 opacity-30" />
+                  <p className="text-xs">No project cost data found for this period. Run the payroll calculator first to populate the ledger.</p>
+                </div>
+              )}
+
+              {/* By-Employee Summary */}
+              {projectCostData.byEmployee?.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-xs font-semibold mb-2 flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5" />
+                    Employee Cost Summary
+                  </h4>
+                  <div className="rounded border overflow-hidden max-h-72 overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-[9px]">Employee</TableHead>
+                          <TableHead className="text-[9px] text-center">Projects</TableHead>
+                          <TableHead className="text-[9px] text-center">Total Days</TableHead>
+                          <TableHead className="text-[9px] text-right">Total Salary</TableHead>
+                          <TableHead className="text-[9px] text-right">Total SC</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {projectCostData.byEmployee.map((emp: any) => (
+                          <TableRow key={emp.employee.id}>
+                            <TableCell className="text-[10px] py-1">
+                              <span className="font-medium">{emp.employee.name}</span>
+                              <span className="text-muted-foreground ml-1">({emp.employee.employeeCode})</span>
+                            </TableCell>
+                            <TableCell className="text-[10px] py-1 text-center">
+                              <Badge variant="outline" className="text-[9px] h-5 px-1.5">{emp.projects?.length || 0}</Badge>
+                            </TableCell>
+                            <TableCell className="text-[10px] py-1 text-center">{emp.totalDays}</TableCell>
+                            <TableCell className="text-[10px] py-1 text-right">{formatCurrency(emp.totalSalary)}</TableCell>
+                            <TableCell className="text-[10px] py-1 text-right text-orange-600">{formatCurrency(emp.totalSC)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Header */}
       <div className="flex items-center justify-between">

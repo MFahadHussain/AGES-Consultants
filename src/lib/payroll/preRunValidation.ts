@@ -7,7 +7,7 @@
 
 import { db } from '@/lib/db'
 
-const BILLABLE_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO'])
+const BILLABLE_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO', 'CL', 'SL', 'EL'])
 
 export interface ValidationResult {
   isValid: boolean

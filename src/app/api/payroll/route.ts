@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { calculateMonthlyPayroll } from '@/lib/payroll/calculateMonthlyPayroll'
 import { findAccountByRole, findFirstBankAccount } from '@/lib/account-roles'
 
 // ============================================================
@@ -144,7 +145,7 @@ export async function POST(request: Request) {
     }
 
     // ----------------------------------------------------------
-    // 2. RUN PAYROLL — THE MOST CRITICAL ACTION
+    // 2. RUN PAYROLL — Uses Attendance-Driven Calculator
     // ----------------------------------------------------------
     if (action === 'run-payroll') {
       const { batchId } = data
@@ -156,233 +157,79 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Payroll can only be run on draft batches' }, { status: 400 })
       }
 
-      const { startDate, endDate } = getPeriodDates(batch.period)
-      const daysInMonth = getDaysInMonth(batch.period)
+      // Parse the period to get month start date
+      const [pYear, pMonth] = batch.period.split('-').map(Number)
+      const monthDate = new Date(Date.UTC(pYear, pMonth - 1, 1))
 
-      // Step 1: Load all active employees for the period/project
-      const employeeWhere: any = { status: 'active' }
-      if (batch.projectId) {
-        // Get employees assigned to this project
-        const assignments = await db.employeeProjectAssignment.findMany({
-          where: {
-            projectId: batch.projectId,
-            isActive: true,
-            startDate: { lte: endDate },
-            OR: [
-              { endDate: null },
-              { endDate: { gte: startDate } },
-            ],
-          },
-          select: { employeeId: true },
-        })
-        employeeWhere.id = { in: assignments.map(a => a.employeeId) }
-      }
-
-      const employees = await db.employee.findMany({ where: employeeWhere })
+      // Step 1: Load all active employees
+      const employees = await db.employee.findMany({
+        where: { status: 'active' },
+      })
 
       if (employees.length === 0) {
-        return NextResponse.json({ error: 'No active employees found for this period/project' }, { status: 400 })
+        return NextResponse.json({ error: 'No active employees found' }, { status: 400 })
       }
-
-      // Load tax slabs for the current fiscal year (try "2024-25" or "2025-26")
-      const taxSlabs = await db.taxSlab.findMany({
-        where: { isActive: true },
-        orderBy: { slabOrder: 'asc' },
-      })
 
       // Delete existing lines for this batch (re-run)
       await db.payrollBatchLine.deleteMany({ where: { batchId } })
 
       const linesData: any[] = []
+      const errors: { employeeId: string; name: string; error: string }[] = []
 
-      // Step 2 & 3: For each employee, load data and calculate
+      // Step 2: For each employee, use the Attendance-Driven Calculator
       for (const emp of employees) {
-        // a) Daily Rate
-        const basicSalary = emp.baseSalary || 0
-        const dailyRate = daysInMonth > 0 ? basicSalary / daysInMonth : 0
+        try {
+          const result = await calculateMonthlyPayroll(emp.id, monthDate)
 
-        // b) Attendance records
-        const attendanceRecords = await db.attendance.findMany({
-          where: {
+          // Build the PayrollBatchLine from calculator result
+          // Determine primary project (the one with most days)
+          const primaryProject = result.projectAllocations.length > 0
+            ? result.projectAllocations.reduce((max, p) => p.days > max.days ? p : max, result.projectAllocations[0])
+            : null
+
+          linesData.push({
+            batchId,
             employeeId: emp.id,
-            date: { gte: startDate, lte: endDate },
-          },
-        })
-
-        // Count attendance statuses
-        const eligibleStatuses = ['P', 'W', 'H', 'T', 'WH', 'WW', 'CL', 'SL', 'EL']
-        const leaveStatuses = ['CL', 'SL']  // Only CL+SL trigger SC deduction (not EL, not CO)
-        const absentStatuses = ['A', 'CD']
-
-        const eligibleDays = attendanceRecords.filter(a => eligibleStatuses.includes(a.status)).length
-        const leaveDays = attendanceRecords.filter(a => leaveStatuses.includes(a.status)).length
-        const absentDays = attendanceRecords.filter(a => absentStatuses.includes(a.status)).length
-        const workingDays = daysInMonth  // Always days in month (28-31)
-
-        // If no attendance records, assume full month present
-        const finalEligibleDays = attendanceRecords.length > 0 ? eligibleDays : daysInMonth
-        const finalLeaveDays = attendanceRecords.length > 0 ? leaveDays : 0
-        const finalAbsentDays = attendanceRecords.length > 0 ? absentDays : 0
-        const finalWorkingDays = daysInMonth  // Always days in month
-
-        // c) Allowances
-        const empAllowances = await db.employeeAllowance.findMany({
-          where: {
-            employeeId: emp.id,
-            isActive: true,
-            effectiveDate: { lte: endDate },
-          },
-          include: { allowance: true },
-        })
-
-        const allowanceDetailsArr: { allowanceId: string; name: string; amount: number; isTaxable: boolean }[] = []
-        let totalAllowances = 0
-        let taxFreeAllowances = 0
-
-        for (const ea of empAllowances) {
-          const amount = ea.customValue !== null && ea.customValue !== undefined
-            ? ea.customValue
-            : ea.allowance.value
-
-          let finalAmount = amount
-          if (ea.allowance.allowanceType === 'percentage') {
-            finalAmount = (basicSalary * amount) / 100
-          }
-
-          allowanceDetailsArr.push({
-            allowanceId: ea.allowanceId,
-            name: ea.allowance.name,
-            amount: finalAmount,
-            isTaxable: ea.allowance.isTaxable,
+            employeeName: emp.name,
+            employeeCode: emp.employeeCode,
+            basicSalary: result.monthlySalary,
+            dailyRate: result.dailyRate,
+            workingDays: result.daysInMonth,
+            eligibleDays: result.eligibleDays,
+            leaveDays: result.leaveDays,
+            absentDays: result.absentDays,
+            allowanceDetails: JSON.stringify(result.allowances.details),
+            allowances: result.allowances.totalAllowances,
+            grossSalary: result.grossSalary,
+            incomeTax: result.deductions.incomeTax,
+            eobiEmployee: result.deductions.eobiEmployee,
+            eobiEmployer: result.deductions.eobiEmployer,
+            pfEmployee: result.deductions.pfEmployee,
+            pfEmployer: result.deductions.pfEmployer,
+            loanDeduction: result.deductions.loanDeduction,
+            advanceDeduction: result.deductions.advanceDeduction,
+            otherDeductions: result.deductions.otherDeductions,
+            totalDeductions: result.deductions.totalDeductions,
+            netPay: result.netPay,
+            socialCharges: result.finalSC,
+            gratuity: result.gratuity,
+            scBreakdown: JSON.stringify(result.scBreakdown),
+            taxBreakdown: JSON.stringify(result.taxBreakdown),
+            projectId: primaryProject?.projectId || emp.defaultProjectId || null,
+            department: emp.department,
           })
-
-          totalAllowances += finalAmount
-          if (!ea.allowance.isTaxable) {
-            taxFreeAllowances += finalAmount
-          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          errors.push({ employeeId: emp.id, name: emp.name, error: message })
         }
-
-        // d) Gross Salary
-        const grossSalary = basicSalary + totalAllowances
-
-        // e) Social Charges (SC) calculation (20% of salary)
-        const monthlySC = basicSalary * 0.20
-        const workingRatio = daysInMonth > 0 ? finalEligibleDays / daysInMonth : 0
-        const earnedSC = monthlySC * workingRatio
-        const leaveDeductionSC = dailyRate * finalLeaveDays
-        const finalSC = Math.max(0, earnedSC - leaveDeductionSC)
-
-        const scBreakdown = {
-          monthlySC,
-          workingRatio: Math.round(workingRatio * 10000) / 10000,
-          earnedSC: Math.round(earnedSC * 100) / 100,
-          leaveDeduction: Math.round(leaveDeductionSC * 100) / 100,
-          finalSC: Math.round(finalSC * 100) / 100,
-        }
-
-        // f) EOBI: Employee 1% of basic, Employer 5% of basic (capped at minimum wage)
-        const EOBI_MIN_WAGE_CAP = 32000 // PKR minimum wage cap for EOBI
-        const eobiBase = Math.min(basicSalary, EOBI_MIN_WAGE_CAP)
-        const eobiEmployee = Math.round(eobiBase * 0.01 * 100) / 100
-        const eobiEmployer = Math.round(eobiBase * 0.05 * 100) / 100
-
-        // g) Provident Fund: Employee 8.33% of basic, Employer 8.33% of basic
-        const pfEmployee = Math.round(basicSalary * 0.0833 * 100) / 100
-        const pfEmployer = Math.round(basicSalary * 0.0833 * 100) / 100
-
-        // h) Income Tax: Calculate using tax slabs
-        let incomeTax = 0
-        let taxBreakdownData: any = { taxableIncome: 0, taxSlab: '', fixedTax: 0, variableTax: 0, monthlyTax: 0 }
-
-        if (taxSlabs.length > 0 && grossSalary > 0) {
-          const annualTaxableIncome = (grossSalary - taxFreeAllowances) * 12
-          taxBreakdownData.taxableIncome = annualTaxableIncome
-
-          // Find applicable slab
-          let applicableSlab = taxSlabs[taxSlabs.length - 1] // default to last slab
-          for (const slab of taxSlabs) {
-            if (annualTaxableIncome >= slab.minAmount && (slab.maxAmount === null || annualTaxableIncome <= slab.maxAmount)) {
-              applicableSlab = slab
-              break
-            }
-          }
-
-          taxBreakdownData.taxSlab = `PKR ${applicableSlab.minAmount.toLocaleString()} - ${applicableSlab.maxAmount ? 'PKR ' + applicableSlab.maxAmount.toLocaleString() : 'Above'}`
-          taxBreakdownData.fixedTax = applicableSlab.fixedAmount
-
-          const variableTax = (annualTaxableIncome - applicableSlab.minAmount) * applicableSlab.rate / 100
-          taxBreakdownData.variableTax = Math.round(variableTax * 100) / 100
-
-          const annualTax = applicableSlab.fixedAmount + variableTax
-          incomeTax = Math.round((annualTax / 12) * 100) / 100
-          taxBreakdownData.monthlyTax = incomeTax
-        }
-
-        // i) Loan deduction
-        const activeLoans = await db.loan.findMany({
-          where: {
-            employeeId: emp.id,
-            status: 'active',
-            isDisbursed: true,
-            startDate: { lte: endDate },
-          },
-        })
-        const loanDeduction = activeLoans.reduce((sum, loan) => sum + loan.monthlyDeduction, 0)
-
-        // j) Total Deductions
-        const advanceDeduction = 0 // Manual entry
-        const otherDeductions = 0 // Manual entry
-        const totalDeductions = incomeTax + eobiEmployee + pfEmployee + loanDeduction + advanceDeduction + otherDeductions
-
-        // k) Net Pay
-        const netPay = grossSalary - totalDeductions
-
-        // Gratuity
-        const gratuity = Math.round(basicSalary * 0.0833 * 100) / 100 // 8.33% gratuity
-
-        // Determine project from employee assignment
-        let lineProjectId = batch.projectId
-        if (!lineProjectId && emp.defaultProjectId) {
-          lineProjectId = emp.defaultProjectId
-        }
-
-        linesData.push({
-          batchId,
-          employeeId: emp.id,
-          employeeName: emp.name,
-          employeeCode: emp.employeeCode,
-          basicSalary,
-          dailyRate: Math.round(dailyRate * 100) / 100,
-          workingDays: finalWorkingDays,
-          eligibleDays: finalEligibleDays,
-          leaveDays: finalLeaveDays,
-          absentDays: finalAbsentDays,
-          allowanceDetails: JSON.stringify(allowanceDetailsArr),
-          allowances: Math.round(totalAllowances * 100) / 100,
-          grossSalary: Math.round(grossSalary * 100) / 100,
-          incomeTax,
-          eobiEmployee,
-          eobiEmployer,
-          pfEmployee,
-          pfEmployer,
-          loanDeduction: Math.round(loanDeduction * 100) / 100,
-          advanceDeduction,
-          otherDeductions,
-          totalDeductions: Math.round(totalDeductions * 100) / 100,
-          netPay: Math.round(netPay * 100) / 100,
-          socialCharges: Math.round(finalSC * 100) / 100,
-          gratuity,
-          scBreakdown: JSON.stringify(scBreakdown),
-          taxBreakdown: JSON.stringify(taxBreakdownData),
-          projectId: lineProjectId,
-          department: emp.department,
-        })
       }
 
-      // Step 4: Create PayrollBatchLine for each employee
-      await db.payrollBatchLine.createMany({ data: linesData })
+      // Step 3: Create PayrollBatchLine for each employee
+      if (linesData.length > 0) {
+        await db.payrollBatchLine.createMany({ data: linesData })
+      }
 
-      // Step 5: Update PayrollBatch totals
+      // Step 4: Update PayrollBatch totals
       await recalcBatchTotals(batchId)
 
       const updatedBatch = await db.payrollBatch.findUnique({
@@ -391,9 +238,10 @@ export async function POST(request: Request) {
       })
 
       return NextResponse.json({
-        message: `Payroll processed for ${employees.length} employees`,
+        message: `Payroll processed for ${linesData.length} employees${errors.length > 0 ? ` (${errors.length} errors)` : ''}`,
         batch: updatedBatch,
-        employeeCount: employees.length,
+        employeeCount: linesData.length,
+        errors: errors.length > 0 ? errors : undefined,
       })
     }
 
@@ -656,7 +504,6 @@ export async function POST(request: Request) {
       const socialChargesAccount = await findAccountByRole('SOCIAL_CHARGES')
       const socialChargesPayableAccount = await findAccountByRole('SOCIAL_CHARGES_PAYABLE')
 
-      // Helper to get debit/credit accounts with mapping fallback
       const getDebitAccount = (componentType: string, fallback: any) => {
         const mapped = getMappedAccounts(componentType)
         return mapped.debitAccountId || fallback?.id
@@ -778,7 +625,7 @@ export async function POST(request: Request) {
         )
       }
 
-      // 8. Dr EOBI Payable / Cr EOBI Payable (employer contribution) — Employer EOBI
+      // 8. Employer EOBI
       if (batch.totalEobiEmployer > 0) {
         addEntry(
           getDebitAccount('EOBI_EMPLOYER', socialChargesAccount),
@@ -792,7 +639,7 @@ export async function POST(request: Request) {
         )
       }
 
-      // 9. Dr PF Payable / Cr PF Payable (employer contribution) — Employer PF
+      // 9. Employer PF
       if (batch.totalPfEmployer > 0) {
         addEntry(
           getDebitAccount('PF_EMPLOYER', socialChargesAccount),
