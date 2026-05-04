@@ -151,6 +151,8 @@ export async function POST(request: Request) {
 
       eobiNumber: body.eobiNumber || null,
       socialSecurityNo: body.socialSecurityNo || null,
+      eobiEnabled: body.eobiEnabled === true,
+      pfEnabled: body.pfEnabled === true,
 
       qualification1: body.qualification1 || null,
       institute1: body.institute1 || null,
@@ -320,6 +322,8 @@ export async function PUT(request: Request) {
     if (body.eobiNumber !== undefined) updateData.eobiNumber = body.eobiNumber
     if (body.socialSecurityNo !== undefined)
       updateData.socialSecurityNo = body.socialSecurityNo
+    if (body.eobiEnabled !== undefined) updateData.eobiEnabled = body.eobiEnabled === true
+    if (body.pfEnabled !== undefined) updateData.pfEnabled = body.pfEnabled === true
 
     // Qualification
     if (body.qualification1 !== undefined)

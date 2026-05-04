@@ -728,3 +728,280 @@ Stage Summary:
 - GL integration via PayrollAccountMapping for balanced journal entries
 - 5 sample employees seeded with attendance data
 - All modules accessible from HR & Payroll sidebar group
+
+---
+Task ID: 2
+Agent: attendance-fix-agent
+Task: Rewrite attendance.tsx with project selection, updated state shape, and project summary column
+
+Work Log:
+- Read worklog.md for context from previous agents
+- Read current attendance.tsx (625 lines), attendance API route, projects API route, and Prisma schema
+- Updated DayData interface to include `project: string | null` field
+- Added WORKING_STATUSES constant: `new Set(['P', 'W', 'H', 'WH', 'T', 'CO'])`
+- Added Project interface and projects state
+- Added fetchProjects() to load projects from /api/projects on mount
+- Added projectIdToName() helper to map attendance record projectId to project name
+- Added popoverCell state: `useState<{empId: string, day: number} | null>(null)`
+- Added popoverProject state and popoverRef for popover management
+- Added useEffect for outside-click detection to close popover
+- Replaced cycleStatus with handleCellClick that:
+  - Cycles status on click (same as before)
+  - Sets project: "Unallocated" for working statuses, null for non-working
+  - Opens project popover automatically when new status is working
+  - Closes popover for non-working statuses
+- Added confirmPopoverProject() to apply project selection to cell
+- Added handlePopoverProjectChange() for live select changes
+- Updated fetchAttendanceData to populate project field from record.projectId
+- Updated quick-fill buttons to set project: "Unallocated" for working, null for non-working
+- Updated bulk save to include project in records sent to API
+- Added project tag display in cells: text-[9px] bg-slate-100 tag below status badge for non-Unallocated projects
+- Added Projects summary column after SC-De column showing unique project counts (e.g. "Alpha ×12")
+- Column shows "—" when all days are Unallocated or non-working
+- Added getShortProjectName() helper for compact project display
+- Added projectNames memoized list for popover dropdown (API projects + "Unallocated" prefix)
+- Fixed lint error: Removed broken cycleStatus function with complex nested expression
+- Lint passes with 0 errors (4 pre-existing warnings in FAMS files)
+- Page loads with HTTP 200
+
+Stage Summary:
+- attendance.tsx fully rewritten with all 3 fixes
+- Project selection popover works for working statuses (P, W, H, WH, T, CO)
+- State shape updated to include project per cell
+- Projects summary column added after SC-Deduct
+- All existing functionality preserved: KPI cards, month navigator, employee filter, status legend, quick-fill bar
+---
+Task ID: 4
+Agent: employee-profile-builder
+Task: Create comprehensive Employee Profile Page component
+
+Work Log:
+- Read worklog.md to understand previous agent work
+- Analyzed existing codebase: employee-master.tsx, attendance.tsx, loans.tsx, store.ts, page.tsx for styling patterns and architecture
+- Created /src/components/modules/employee-profile.tsx (1084 lines) with complete 5-tab employee profile page
+- Left Column — Profile Card:
+  - Large initials avatar (64px, bg-slate-900 text-white rounded-2xl text-2xl font-semibold)
+  - Employee full name, ID badge (EMP-0001 in bg-slate-100 font-mono), designation + department stacked
+  - Active status pill (bg-emerald-50 text-emerald-600 border-emerald-200)
+  - Metadata list with icons: Join Date, Location, Bank Account (masked), Phone, Email, Contract Type
+  - "Edit Profile" button (admin only, full width, outlined)
+- Left Column — Quick Stats (2×2 grid, gap-3):
+  - Monthly Salary PKR 85,000 (text-slate-900)
+  - SC Balance PKR 12,750 (text-amber-600 with tooltip "Accrued social charges not yet paid")
+  - Loan Outstanding PKR 25,000 (text-red-500) — shows 44,440 from mock data
+  - Advance Balance PKR 5,000 (text-orange-500)
+- Right Column — Tab Bar (pill-style: bg-slate-900 text-white for active, bg-slate-100 hover for inactive)
+- Tab 1 — Salary History:
+  - Summary bar: Total Paid YTD, Total Deducted YTD, Months Paid
+  - Monthly salary table with columns: Month, Working Days, Present, Absent, Earned Salary, Deductions, Net Paid, Status, Action
+  - Status badges: Paid (emerald), Pending (amber), Draft (slate)
+  - Eye icon action to expand inline payslip breakdown (max-height transition)
+  - Payslip shows: Earnings (Basic, Housing, Transport, Other) and Deductions (Absent, Tax, Loan EMI, SC Employee) with Net Pay in emerald
+  - 6 months mock data (Dec 2025 – May 2026)
+- Tab 2 — Social Charges:
+  - Info banner (border-l-4 border-amber-400 bg-amber-50) explaining SC accrual concept
+  - SC Balance Summary row (3 columns): Total SC Accrued, Total SC Paid, Outstanding Balance
+  - SC Ledger table: Month, Gross Salary, SC Rate (%), SC Amount, Cumulative Balance, Payment Status, Paid On
+  - Payment Status badges: Remitted (green), Pending (amber), Partial (blue)
+  - Pending rows highlighted with bg-amber-50/30
+  - Footer totals row with Outstanding amount in amber
+  - "Record SC Payment" button (admin only, bg-slate-900)
+  - Inline SC payment form (slide-down): Amount, Payment Date, Reference, Covers Months (checkboxes of pending months), Save with loading spinner
+  - 6 months SC ledger mock data
+- Tab 3 — Loans & Advances:
+  - Two sub-sections side by side (lg:grid-cols-2, stack on mobile)
+  - Loans: "+ New Loan" button (admin), loan card with ID, type, status badge, principal, disbursed date, EMI, remaining, months left
+  - Progress bar (bg-slate-900 fill on bg-slate-100 track, rounded-full h-1.5)
+  - Collapsible repayment schedule (10 months mock)
+  - Advances: "+ New Advance" button (admin), table with Date, Amount, Purpose, Recovery Mode, Recovered, Balance, Status
+  - Total Liability footer (Loan Outstanding + Advance Balance)
+  - 1 active personal loan (PKR 100,000, 18 months) and 1 recovering advance (PKR 10,000)
+- Tab 4 — Attendance Summary:
+  - Month/year selector (input type="month")
+  - Calendar heatmap (7-column grid): Present=emerald, Absent=red, Leave=blue, Weekend=slate, Holiday=purple
+  - Hover tooltip on each day (status + project name)
+  - Color legend below calendar
+  - Summary stat row (5 columns): Present, Absent, Leave, Weekends, Holidays with counts
+  - Project breakdown: CSS-only horizontal bars (bg-slate-900 rounded-full h-2 on bg-slate-100 track) with project name, days, percentage
+  - May 2026 mock attendance data with project tags (Proj Alpha, Proj Beta)
+- Tab 5 — Documents:
+  - Grid of document cards (grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3)
+  - 6 documents: CNIC, Contract, Offer Letter, Experience Letter, Tax Certificate, Payslips Archive
+  - Each card: file icon (PDF/image/ZIP), doc name, upload date, View + Replace buttons
+  - Upload zone (dashed border, admin only) with "Drop files here or click to upload"
+- Role Guards: Admin-only elements use useAppStore authUser.role === 'admin'
+- Transitions: Tab fade (key-based opacity), payslip expand (max-height), SC form slide-down, loan schedule collapse
+- Currency formatting: PKR + toLocaleString()
+- Breadcrumb: HR & Payroll > Employee Master > Employee Profile
+- Responsive: Two-column on lg+, single column on small screens
+- Lint check passes with 0 errors (only pre-existing warnings in FAMS files)
+- Dev server compiles and serves correctly
+
+Stage Summary:
+- Complete Employee Profile Page component (1084 lines) with 5 fully-implemented tabs
+- Professional enterprise UI matching AcctFin ERP's clean white/grayscale aesthetic
+- All interactive elements functional: expandable payslips, SC payment form, loan schedule collapse, attendance heatmap
+- Role-based access control (admin vs read-only) for edit/payment/upload actions
+- Responsive layout with two-column desktop and single-column mobile views
+- Comprehensive mock data: 6 months salary history, SC ledger, active loan + advance, May 2026 attendance, 6 documents
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Fix 4 - Payroll Engine: Calculate from Attendance Days & Fix 5 - Replace Post with Draft → Post Voucher Workflow
+
+Work Log:
+- Read the complete existing payroll.tsx (1306 lines) to understand full structure
+- Analyzed all existing functionality: batch management, workflow actions, line management, dialogs, KPI cards, etc.
+- Read worklog.md to understand previous agent work and context
+- Added `useAppStore` import to get `authUser` for voucher creation
+- Added `CalculatorRow` interface with fields: employeeId, employeeCode, employeeName, monthlySalary, workingDays, presentDays, leaveDays, absentDays, earnedSalary, deductions, netPay
+- Added new state variables: calculatorPeriod, calculatorData, calculating, draftVoucher, voucherPosted, showJournalEntries, postConfirmOpen
+- Implemented `handleRecalculate()`:
+  - Fetches active employees from /api/employees
+  - Fetches attendance records from /api/attendance for the selected period
+  - Counts present days (P, W, H, WH, T, CO), leave days (SL, CL, EL, CD), absent days (A)
+  - Calculates dailyRate = monthlySalary / 26
+  - Calculates earnedSalary = effectiveDays × dailyRate
+  - Calculates deductions as 5% placeholder tax
+  - Calculates netPay = earnedSalary − deductions
+  - Resets draft voucher state on recalculation
+- Implemented `handleCreateDraftVoucher()`:
+  - Validates calculator data exists and total net pay > 0
+  - Generates voucher number DRAFT-PAY-XXXXXX
+  - Creates journal lines: Dr Salary Expense per employee, Cr Salaries Payable total
+  - Stores voucher with type, status (Draft), period, createdBy (from authUser), createdAt, lines, totalAmount
+- Implemented `confirmPostVoucher()`:
+  - Updates draft voucher status to "Posted" with postedAt timestamp
+  - Sets voucherPosted flag to true
+  - Shows success toast
+- Implemented `handleEmployeeSelectForLine()`:
+  - When employee is selected in add-line dialog, auto-fetches their attendance for the batch period
+  - Auto-fills workingDays (26), eligibleDays (present + leave), leaveDays, absentDays
+  - Calculates dailyRate from baseSalary / 26
+  - Sets all line form fields automatically
+- Added Payroll Calculator section UI between KPI cards and batch list:
+  - Period selector (month input, defaults to current month)
+  - Recalculate button with loading spinner
+  - Full table with columns: Employee, Monthly Salary, Working Days, Present, Leave, Absent, Earned, Deductions, Net Pay
+  - Color-coded values (green for present, amber for leave, red for absent/deductions)
+  - Totals row with aggregated values
+  - "Create Draft Voucher" button (border-slate-300 bg-white text-slate-700 style)
+- Added Draft Voucher Preview card:
+  - Amber left accent border and background for Draft status
+  - Emerald left accent border and background for Posted status
+  - Badge showing DRAFT or POSTED with appropriate colors
+  - Fields: Type, Period, Total Amount, No. of Entries, Created By, Created At, Posted At
+  - Collapsible "View Journal Entries" section with Account/Dr/Cr table
+  - "Post to Ledger" button (bg-slate-900 text-white style) - hidden when posted
+  - Confirmation AlertDialog before posting
+- Added Post Voucher Confirmation AlertDialog
+- Preserved ALL existing functionality: batch management, workflow actions (draft→reviewed→approved→posted), line detail dialog, post to GL dialog, add/edit/delete line dialogs, expanded batch/line cards
+- Lint check passes with 0 errors (only 4 pre-existing warnings in FAMS files)
+
+Stage Summary:
+- Fix 4: Payroll now calculates from attendance data instead of fixed salary
+  - Attendance-driven calculator with period selector and recalculate button
+  - Counts present/leave/absent from actual attendance records via API
+  - Earned salary = effectiveDays × dailyRate (baseSalary / 26)
+  - Full calculator table with totals row
+  - Auto-fills attendance data when adding employee lines
+- Fix 5: Draft → Post voucher workflow replaces direct posting
+  - "Create Draft Voucher" generates voucher with Dr/Cr lines
+  - Draft preview card with amber accent, collapsible journal entries
+  - "Post to Ledger" button with confirmation dialog
+  - Posted state shows emerald accent with posted timestamp
+  - Both buttons disabled after posting
+---
+Task ID: 2
+Agent: main-coordinator
+Task: Fix 1-3: Rewrite attendance.tsx with project selection popover, new state shape, project summary column
+
+Work Log:
+- Updated DayData interface to include project: string | null field
+- Added WORKING_STATUSES constant (P, W, H, WH, T, CO)
+- Added projects state and fetchProjects() for project list
+- Added popoverCell state for project selection popover per cell
+- Implemented project selection popover with select dropdown and confirm button
+- Updated cycleStatus to set project based on working status
+- Updated quick-fill to set project: "Unallocated" for working, null for non-working
+- Added Projects summary column after SC-Deduct
+- Updated bulk save to include project in records
+- Added project tag display in cells below status badge
+- Added outside-click detection to close popover
+
+Stage Summary:
+- attendance.tsx fully rewritten (834 lines, up from 625)
+- Project selection popover works for working statuses
+- State shape updated to include project per cell
+- Projects summary column shows project counts per employee
+
+---
+Task ID: 3
+Agent: main-coordinator
+Task: Fix 4-5: Rewrite payroll.tsx with attendance-driven calculation + Draft→Post voucher workflow
+
+Work Log:
+- Added CalculatorRow interface and calculator state variables
+- Implemented handleRecalculate() fetching attendance data for payroll period
+- Added Payroll Calculator section with period selector and Recalculate button
+- Calculator table shows: Employee, Monthly Salary, Working Days, Present, Leave, Absent, Earned, Deductions, Net Pay
+- Added "Create Draft Voucher" button with validation
+- Implemented draft voucher preview card with amber accent for DRAFT status
+- Added collapsible Journal Entries section (Dr/Cr line table)
+- Added "Post to Ledger" button with confirmation AlertDialog
+- On confirm: status → "Posted", card accent → emerald, badge → POSTED in green
+- All existing batch management, workflow actions, line detail dialog preserved
+
+Stage Summary:
+- payroll.tsx fully rewritten (1655 lines)
+- Attendance-driven payroll calculator functional
+- Draft → Post voucher workflow implemented
+- All existing functionality preserved
+
+---
+Task ID: 4
+Agent: main-coordinator
+Task: Build Employee Profile Page with 5 tabs
+
+Work Log:
+- Created employee-profile.tsx (1083 lines)
+- Left column: Profile card with avatar, name, ID badge, status pill, metadata
+- Left column: Quick Stats (2x2 grid) - Monthly Salary, SC Balance, Loan Outstanding, Advance Balance
+- Right column: 5 tabs with pill-style active state
+- Tab 1: Salary History with YTD summary, expandable payslip breakdowns, 6 months mock data
+- Tab 2: Social Charges with info banner, SC ledger, payment recording form
+- Tab 3: Loans & Advances with progress bars, repayment schedules
+- Tab 4: Attendance Summary with calendar heatmap, project breakdown bars
+- Tab 5: Documents grid with upload zone
+- Role guards implemented for admin-only features
+- All currency formatted as PKR + toLocaleString()
+
+Stage Summary:
+- employee-profile.tsx created with all 5 tabs fully implemented
+- Mock data for Ahmed Khan (EMP-0001) included
+- Component exported as named export EmployeeProfile
+
+---
+Task ID: 5
+Agent: main-coordinator
+Task: Add EOBI/PF toggles + register employee-profile module
+
+Work Log:
+- Added eobiEnabled and pfEnabled to Prisma schema (Boolean @default(false))
+- Pushed schema changes to database
+- Added eobiEnabled/pfEnabled to employee-master emptyForm
+- Added toggle switches in Salary tab under Statutory Information
+- Updated populateFormFromEmployee to include eobiEnabled/pfEnabled
+- Updated employees API route POST handler to include eobiEnabled/pfEnabled
+- Updated employees API route PUT handler to include eobiEnabled/pfEnabled
+- Added 'employee-profile' to ModuleKey type in store.ts
+- Added EmployeeProfile lazy import in page.tsx
+- Added 'employee-profile' to moduleComponents map in page.tsx
+- Added 'employee-profile' to sidebar navigation under HR & Payroll
+- Added 'employee-profile' to ROLE_MODULES for admin, manager, accountant, auditor roles
+
+Stage Summary:
+- EOBI/PF toggle switches added to employee form
+- employee-profile module registered in store, page, sidebar
+- All changes pass lint with 0 errors

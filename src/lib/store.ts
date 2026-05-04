@@ -31,6 +31,7 @@ export type ModuleKey =
   | 'tax-slabs'
   | 'payroll-gl-mapping'
   | 'final-settlement'
+  | 'employee-profile'
 
 export interface AuthUser {
   id: string

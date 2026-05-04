@@ -55,7 +55,7 @@ const ROLE_MODULES: Record<UserRole, ModuleKey[]> = {
     'customers', 'suppliers', 'projects', 'donors', 'locations', 'clients',
     'budgets', 'taxation', 'aging', 'financial-year',
     'reports', 'fixed-assets', 'payroll',
-    'employees', 'project-assignments', 'allowances', 'attendance',
+    'employees', 'employee-profile', 'project-assignments', 'allowances', 'attendance',
     'loans', 'tax-slabs', 'payroll-gl-mapping', 'final-settlement',
     'user-management', 'import-export', 'audit-log', 'settings',
   ],
@@ -64,7 +64,7 @@ const ROLE_MODULES: Record<UserRole, ModuleKey[]> = {
     'customers', 'suppliers', 'projects', 'donors', 'locations', 'clients',
     'budgets', 'taxation', 'aging', 'financial-year',
     'reports', 'fixed-assets', 'payroll',
-    'employees', 'project-assignments', 'allowances', 'attendance',
+    'employees', 'employee-profile', 'project-assignments', 'allowances', 'attendance',
     'loans', 'final-settlement',
     'audit-log',
   ],
@@ -73,7 +73,7 @@ const ROLE_MODULES: Record<UserRole, ModuleKey[]> = {
     'customers', 'suppliers', 'projects', 'donors', 'locations', 'clients',
     'budgets', 'taxation', 'aging', 'financial-year',
     'reports', 'fixed-assets', 'payroll',
-    'employees', 'project-assignments', 'allowances', 'attendance',
+    'employees', 'employee-profile', 'project-assignments', 'allowances', 'attendance',
     'loans', 'payroll-gl-mapping',
   ],
   auditor: [
@@ -81,7 +81,7 @@ const ROLE_MODULES: Record<UserRole, ModuleKey[]> = {
     'customers', 'suppliers', 'projects', 'donors', 'locations', 'clients',
     'budgets', 'aging', 'financial-year',
     'reports', 'fixed-assets', 'payroll',
-    'employees', 'attendance', 'tax-slabs', 'payroll-gl-mapping',
+    'employees', 'employee-profile', 'attendance', 'tax-slabs', 'payroll-gl-mapping',
     'audit-log',
   ],
   viewer: [
@@ -152,6 +152,7 @@ const navigation: NavGroup[] = [
     label: 'HR & Payroll',
     items: [
       { key: 'employees', label: 'Employee Master', icon: UserCircle },
+      { key: 'employee-profile', label: 'Employee Profile', icon: UserCircle },
       { key: 'project-assignments', label: 'Project Assignments', icon: GitBranch },
       { key: 'allowances', label: 'Allowances & Benefits', icon: Gift },
       { key: 'attendance', label: 'Attendance', icon: CalendarCheck },

@@ -42,6 +42,7 @@ const LoansModule = lazy(() => import('@/components/modules/loans').then(m => ({
 const TaxSlabsModule = lazy(() => import('@/components/modules/tax-slabs').then(m => ({ default: m.TaxSlabsModule })))
 const PayrollGLMapping = lazy(() => import('@/components/modules/payroll-gl-mapping').then(m => ({ default: m.PayrollGLMapping })))
 const FinalSettlementModule = lazy(() => import('@/components/modules/final-settlement').then(m => ({ default: m.FinalSettlementModule })))
+const EmployeeProfile = lazy(() => import('@/components/modules/employee-profile').then(m => ({ default: m.EmployeeProfile })))
 
 const moduleComponents: Record<ModuleKey, React.LazyExoticComponent<React.ComponentType>> = {
   dashboard: Dashboard,
@@ -74,6 +75,7 @@ const moduleComponents: Record<ModuleKey, React.LazyExoticComponent<React.Compon
   'tax-slabs': TaxSlabsModule,
   'payroll-gl-mapping': PayrollGLMapping,
   'final-settlement': FinalSettlementModule,
+  'employee-profile': EmployeeProfile,
 }
 
 function ModuleLoader() {

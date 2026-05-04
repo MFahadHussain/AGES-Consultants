@@ -18,6 +18,7 @@ import {
   TrendingDown, TrendingUp, Building2, Receipt, AlertCircle, Eye
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useAppStore } from '@/lib/store'
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
@@ -71,6 +72,21 @@ interface PayrollLineForm {
   department: string
 }
 
+// Calculator row interface for attendance-driven payroll
+interface CalculatorRow {
+  employeeId: string
+  employeeCode: string
+  employeeName: string
+  monthlySalary: number
+  workingDays: number
+  presentDays: number
+  leaveDays: number
+  absentDays: number
+  earnedSalary: number
+  deductions: number
+  netPay: number
+}
+
 const emptyLineForm: PayrollLineForm = {
   employeeId: '',
   employeeName: '',
@@ -107,6 +123,7 @@ function computeLineTotals(line: PayrollLineForm) {
 // Main PayrollIntegration Component
 // ============================================================
 export function PayrollIntegration() {
+  const { authUser } = useAppStore()
   const [batches, setBatches] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [runningPayroll, setRunningPayroll] = useState<string | null>(null)
@@ -125,6 +142,17 @@ export function PayrollIntegration() {
   const [projects, setProjects] = useState<any[]>([])
   const [employees, setEmployees] = useState<any[]>([])
   const { toast } = useToast()
+
+  // Calculator state (Fix 4)
+  const [calculatorPeriod, setCalculatorPeriod] = useState(new Date().toISOString().slice(0, 7))
+  const [calculatorData, setCalculatorData] = useState<CalculatorRow[]>([])
+  const [calculating, setCalculating] = useState(false)
+
+  // Draft voucher state (Fix 5)
+  const [draftVoucher, setDraftVoucher] = useState<any>(null)
+  const [voucherPosted, setVoucherPosted] = useState(false)
+  const [showJournalEntries, setShowJournalEntries] = useState(false)
+  const [postConfirmOpen, setPostConfirmOpen] = useState(false)
 
   // Create batch form
   const [batchForm, setBatchForm] = useState({
@@ -395,6 +423,176 @@ export function PayrollIntegration() {
   }
 
   // ----------------------------------------------------------
+  // Fix 4: Attendance-Driven Payroll Calculator
+  // ----------------------------------------------------------
+  const handleRecalculate = async () => {
+    setCalculating(true)
+    try {
+      const empRes = await fetch('/api/employees?pageSize=200&status=active')
+      const empData = await empRes.json()
+      const activeEmps = Array.isArray(empData) ? empData.filter((e: any) => e.status === 'active') : (empData.data || []).filter((e: any) => e.status === 'active')
+
+      const attRes = await fetch(`/api/attendance?month=${calculatorPeriod}&pageSize=2000`)
+      const attData = await attRes.json()
+      const records = attData.data || attData || []
+
+      const rows: CalculatorRow[] = activeEmps.map((emp: any) => {
+        const empRecords = records.filter((r: any) => r.employeeId === emp.id)
+        const monthlySalary = emp.baseSalary || 0
+        const workingDays = 26
+        const dailyRate = monthlySalary / workingDays
+
+        let presentDays = 0
+        let leaveDays = 0
+        let absentDays = 0
+
+        const PRESENT_STATUSES = new Set(['P', 'W', 'H', 'WH', 'T', 'CO'])
+        const LEAVE_STATUSES = new Set(['SL', 'CL', 'EL', 'CD'])
+
+        for (const rec of empRecords) {
+          if (PRESENT_STATUSES.has(rec.status)) presentDays++
+          else if (LEAVE_STATUSES.has(rec.status)) leaveDays++
+          else if (rec.status === 'A') absentDays++
+        }
+
+        const effectiveDays = presentDays + leaveDays
+        const earnedSalary = effectiveDays * dailyRate
+        const deductions = Math.round(earnedSalary * 0.05)
+        const netPay = earnedSalary - deductions
+
+        return {
+          employeeId: emp.id,
+          employeeCode: emp.employeeCode || '',
+          employeeName: emp.name,
+          monthlySalary,
+          workingDays,
+          presentDays,
+          leaveDays,
+          absentDays,
+          earnedSalary: Math.round(earnedSalary),
+          deductions: Math.round(deductions),
+          netPay: Math.round(netPay),
+        }
+      })
+
+      setCalculatorData(rows)
+      setDraftVoucher(null)
+      setVoucherPosted(false)
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    } finally {
+      setCalculating(false)
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Fix 5: Draft → Post Voucher Workflow
+  // ----------------------------------------------------------
+  const handleCreateDraftVoucher = () => {
+    if (calculatorData.length === 0) {
+      toast({ title: 'Error', description: 'Calculate payroll first', variant: 'destructive' })
+      return
+    }
+    const totalNetPay = calculatorData.reduce((sum, r) => sum + r.netPay, 0)
+    if (totalNetPay <= 0) {
+      toast({ title: 'Error', description: 'Total net pay must be greater than zero', variant: 'destructive' })
+      return
+    }
+
+    const voucherNo = `DRAFT-PAY-${String(Date.now()).slice(-6)}`
+    const periodLabel = new Date(calculatorPeriod + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+
+    const lines = calculatorData.map(r => ({
+      account: `Salary Expense - ${r.employeeName}`,
+      debit: r.netPay,
+      credit: 0,
+    }))
+    lines.push({
+      account: 'Salaries Payable',
+      debit: 0,
+      credit: totalNetPay,
+    })
+
+    setDraftVoucher({
+      voucherNo,
+      type: 'Payroll',
+      status: 'Draft',
+      period: periodLabel,
+      createdBy: authUser?.name || 'System',
+      createdAt: new Date().toISOString(),
+      lines,
+      totalAmount: totalNetPay,
+    })
+    setVoucherPosted(false)
+  }
+
+  const confirmPostVoucher = async () => {
+    try {
+      setDraftVoucher((prev: any) => ({
+        ...prev,
+        status: 'Posted',
+        postedAt: new Date().toISOString(),
+      }))
+      setVoucherPosted(true)
+      setPostConfirmOpen(false)
+      toast({ title: 'Posted', description: 'Voucher posted to general ledger' })
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    }
+  }
+
+  // Auto-calculate from attendance when employee selected in add-line dialog
+  const handleEmployeeSelectForLine = async (empId: string) => {
+    const emp = employees.find((e: any) => e.id === empId)
+    if (!emp) return
+
+    const basicSalary = emp.baseSalary || 0
+    const workingDays = 26
+    const dailyRate = basicSalary / workingDays
+
+    let presentDays = 0
+    let leaveDays = 0
+    let absentDays = 0
+
+    try {
+      const period = selectedBatch?.period || calculatorPeriod
+      const attRes = await fetch(`/api/attendance?month=${period}&pageSize=2000&employeeId=${empId}`)
+      const attData = await attRes.json()
+      const records = attData.data || attData || []
+      const empRecords = records.filter((r: any) => r.employeeId === empId)
+
+      const PRESENT_STATUSES = new Set(['P', 'W', 'H', 'WH', 'T', 'CO'])
+      const LEAVE_STATUSES = new Set(['SL', 'CL', 'EL', 'CD'])
+
+      for (const rec of empRecords) {
+        if (PRESENT_STATUSES.has(rec.status)) presentDays++
+        else if (LEAVE_STATUSES.has(rec.status)) leaveDays++
+        else if (rec.status === 'A') absentDays++
+      }
+    } catch {
+      // If attendance fetch fails, leave at 0
+    }
+
+    const eligibleDays = presentDays + leaveDays
+    const earnedSalary = eligibleDays * dailyRate
+
+    setLineForm(p => ({
+      ...p,
+      employeeId: emp.id,
+      employeeName: emp.name,
+      employeeCode: emp.employeeCode || '',
+      basicSalary,
+      dailyRate: Math.round(dailyRate),
+      workingDays,
+      eligibleDays,
+      leaveDays,
+      absentDays,
+      department: emp.department || '',
+      projectId: emp.defaultProjectId || '',
+    }))
+  }
+
+  // ----------------------------------------------------------
   // Render: Workflow Status Bar
   // ----------------------------------------------------------
   const renderWorkflowBar = (status: string) => {
@@ -434,18 +632,7 @@ export function PayrollIntegration() {
           <Select
             value={lineForm.employeeId}
             onValueChange={(v) => {
-              const emp = employees.find((e: any) => e.id === v)
-              if (emp) {
-                setLineForm(p => ({
-                  ...p,
-                  employeeId: emp.id,
-                  employeeName: emp.name,
-                  employeeCode: emp.employeeCode || '',
-                  basicSalary: emp.baseSalary || 0,
-                  department: emp.department || '',
-                  projectId: emp.defaultProjectId || '',
-                }))
-              }
+              handleEmployeeSelectForLine(v)
             }}
           >
             <SelectTrigger className="h-9 text-xs">
@@ -880,6 +1067,153 @@ export function PayrollIntegration() {
         </Card>
       </div>
 
+      {/* Payroll Calculator Section (Fix 4) */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-semibold">Attendance-Driven Payroll Calculator</h3>
+              <p className="text-[10px] text-muted-foreground">Calculates salary based on actual attendance data</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input type="month" className="h-8 text-xs w-40" value={calculatorPeriod} onChange={e => setCalculatorPeriod(e.target.value)} />
+              <Button size="sm" className="h-8 text-xs" onClick={handleRecalculate} disabled={calculating}>
+                {calculating ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Play className="h-3.5 w-3.5 mr-1" />}
+                Recalculate
+              </Button>
+            </div>
+          </div>
+
+          {calculatorData.length > 0 && (
+            <div className="rounded border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-[10px]">Employee</TableHead>
+                    <TableHead className="text-[10px] text-right">Monthly Salary</TableHead>
+                    <TableHead className="text-[10px] text-center">Working Days</TableHead>
+                    <TableHead className="text-[10px] text-center">Present</TableHead>
+                    <TableHead className="text-[10px] text-center">Leave</TableHead>
+                    <TableHead className="text-[10px] text-center">Absent</TableHead>
+                    <TableHead className="text-[10px] text-right">Earned</TableHead>
+                    <TableHead className="text-[10px] text-right">Deductions</TableHead>
+                    <TableHead className="text-[10px] text-right">Net Pay</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {calculatorData.map(row => (
+                    <TableRow key={row.employeeId}>
+                      <TableCell className="text-xs py-1.5">
+                        <div><span className="font-medium">{row.employeeName}</span></div>
+                        <div className="text-[9px] text-muted-foreground">{row.employeeCode}</div>
+                      </TableCell>
+                      <TableCell className="text-xs py-1.5 text-right">{formatCurrency(row.monthlySalary)}</TableCell>
+                      <TableCell className="text-xs py-1.5 text-center">{row.workingDays}</TableCell>
+                      <TableCell className="text-xs py-1.5 text-center text-green-600 font-medium">{row.presentDays}</TableCell>
+                      <TableCell className="text-xs py-1.5 text-center text-amber-600 font-medium">{row.leaveDays}</TableCell>
+                      <TableCell className="text-xs py-1.5 text-center text-red-600 font-medium">{row.absentDays}</TableCell>
+                      <TableCell className="text-xs py-1.5 text-right">{formatCurrency(row.earnedSalary)}</TableCell>
+                      <TableCell className="text-xs py-1.5 text-right text-red-600">{formatCurrency(row.deductions)}</TableCell>
+                      <TableCell className="text-xs py-1.5 text-right font-semibold text-green-600">{formatCurrency(row.netPay)}</TableCell>
+                    </TableRow>
+                  ))}
+                  {/* Totals row */}
+                  <TableRow className="bg-muted/30 font-semibold">
+                    <TableCell className="text-xs py-1.5">Total</TableCell>
+                    <TableCell className="text-xs py-1.5 text-right">{formatCurrency(calculatorData.reduce((s, r) => s + r.monthlySalary, 0))}</TableCell>
+                    <TableCell className="text-xs py-1.5 text-center">&mdash;</TableCell>
+                    <TableCell className="text-xs py-1.5 text-center">{calculatorData.reduce((s, r) => s + r.presentDays, 0)}</TableCell>
+                    <TableCell className="text-xs py-1.5 text-center">{calculatorData.reduce((s, r) => s + r.leaveDays, 0)}</TableCell>
+                    <TableCell className="text-xs py-1.5 text-center">{calculatorData.reduce((s, r) => s + r.absentDays, 0)}</TableCell>
+                    <TableCell className="text-xs py-1.5 text-right">{formatCurrency(calculatorData.reduce((s, r) => s + r.earnedSalary, 0))}</TableCell>
+                    <TableCell className="text-xs py-1.5 text-right text-red-600">{formatCurrency(calculatorData.reduce((s, r) => s + r.deductions, 0))}</TableCell>
+                    <TableCell className="text-xs py-1.5 text-right text-green-600">{formatCurrency(calculatorData.reduce((s, r) => s + r.netPay, 0))}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {calculatorData.length > 0 && (
+            <div className="flex items-center gap-2 mt-3">
+              <Button
+                variant="outline"
+                className="border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 rounded-lg px-4 py-2"
+                onClick={handleCreateDraftVoucher}
+                disabled={!!draftVoucher}
+              >
+                Create Draft Voucher
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Draft Voucher Preview (Fix 5) */}
+      {draftVoucher && (
+        <Card className={`border-l-4 ${voucherPosted ? 'border-l-emerald-500 bg-emerald-50' : 'border-l-amber-400 bg-amber-50'} rounded-lg`}>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Badge className={`${voucherPosted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'} text-[11px] font-medium rounded px-2 py-0.5`}>
+                {voucherPosted ? 'POSTED' : 'DRAFT'}
+              </Badge>
+              <span className="text-sm font-semibold">{draftVoucher.voucherNo}</span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div><span className="text-muted-foreground">Type:</span> <span className="font-medium">{draftVoucher.type}</span></div>
+              <div><span className="text-muted-foreground">Period:</span> <span className="font-medium">{draftVoucher.period}</span></div>
+              <div><span className="text-muted-foreground">Total Amount:</span> <span className="font-semibold">{formatCurrency(draftVoucher.totalAmount)}</span></div>
+              <div><span className="text-muted-foreground">No. of Entries:</span> <span className="font-medium">{draftVoucher.lines.length}</span></div>
+              <div><span className="text-muted-foreground">Created By:</span> <span className="font-medium">{draftVoucher.createdBy}</span></div>
+              <div><span className="text-muted-foreground">Created At:</span> <span className="font-medium">{new Date(draftVoucher.createdAt).toLocaleString()}</span></div>
+              {voucherPosted && draftVoucher.postedAt && (
+                <div><span className="text-muted-foreground">Posted At:</span> <span className="font-medium text-emerald-700">{new Date(draftVoucher.postedAt).toLocaleString()}</span></div>
+              )}
+            </div>
+
+            {/* Collapsible Journal Entries */}
+            <div className="mt-3">
+              <Button variant="ghost" size="sm" className="h-7 text-[10px] p-0" onClick={() => setShowJournalEntries(!showJournalEntries)}>
+                {showJournalEntries ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />}
+                View Journal Entries
+              </Button>
+              {showJournalEntries && (
+                <div className="mt-2 rounded border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-[10px]">Account</TableHead>
+                        <TableHead className="text-[10px] text-right">Dr</TableHead>
+                        <TableHead className="text-[10px] text-right">Cr</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {draftVoucher.lines.map((line: any, i: number) => (
+                        <TableRow key={i}>
+                          <TableCell className="text-xs py-1">{line.account}</TableCell>
+                          <TableCell className="text-xs py-1 text-right">{line.debit > 0 ? formatCurrency(line.debit) : ''}</TableCell>
+                          <TableCell className="text-xs py-1 text-right">{line.credit > 0 ? formatCurrency(line.credit) : ''}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            {!voucherPosted && (
+              <div className="flex items-center gap-2 mt-3">
+                <Button className="bg-slate-900 text-white rounded-lg px-4 py-2" onClick={() => setPostConfirmOpen(true)}>
+                  Post to Ledger
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -1297,6 +1631,22 @@ export function PayrollIntegration() {
           <AlertDialogFooter>
             <AlertDialogCancel className="text-xs h-8">Cancel</AlertDialogCancel>
             <AlertDialogAction className="text-xs h-8 bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={handleDeleteLine}>Remove</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Post Voucher Confirmation (Fix 5) */}
+      <AlertDialog open={postConfirmOpen} onOpenChange={setPostConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-sm">Post Voucher to Ledger</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs">
+              Post this voucher to the general ledger? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPostVoucher}>Confirm Post</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

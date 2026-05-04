@@ -694,6 +694,8 @@ model Employee {
   // Statutory
   eobiNumber        String?
   socialSecurityNo  String?
+  eobiEnabled       Boolean  @default(false) // Whether EOBI deduction applies
+  pfEnabled         Boolean  @default(false) // Whether Provident Fund deduction applies
 
   // Qualification
   qualification1    String?
