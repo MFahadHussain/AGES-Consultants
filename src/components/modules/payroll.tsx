@@ -434,20 +434,22 @@ export function PayrollIntegration() {
 
       const attRes = await fetch(`/api/attendance?month=${calculatorPeriod}&pageSize=2000`)
       const attData = await attRes.json()
-      const records = attData.data || attData || []
+      const records = Array.isArray(attData?.data) ? attData.data : Array.isArray(attData) ? attData : []
+
+      const [cYear, cMonth] = calculatorPeriod.split('-').map(Number)
+      const workingDays = new Date(cYear, cMonth, 0).getDate()
 
       const rows: CalculatorRow[] = activeEmps.map((emp: any) => {
         const empRecords = records.filter((r: any) => r.employeeId === emp.id)
         const monthlySalary = emp.baseSalary || 0
-        const workingDays = 26
         const dailyRate = monthlySalary / workingDays
 
         let presentDays = 0
         let leaveDays = 0
         let absentDays = 0
 
-        const PRESENT_STATUSES = new Set(['P', 'W', 'H', 'WH', 'T', 'CO'])
-        const LEAVE_STATUSES = new Set(['SL', 'CL', 'EL', 'CD'])
+        const PRESENT_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO'])
+        const LEAVE_STATUSES = new Set(['SL', 'CL', 'EL'])
 
         for (const rec of empRecords) {
           if (PRESENT_STATUSES.has(rec.status)) presentDays++
@@ -547,7 +549,9 @@ export function PayrollIntegration() {
     if (!emp) return
 
     const basicSalary = emp.baseSalary || 0
-    const workingDays = 26
+    const period = selectedBatch?.period || calculatorPeriod
+    const [pYear, pMonth] = period.split('-').map(Number)
+    const workingDays = new Date(pYear, pMonth, 0).getDate()
     const dailyRate = basicSalary / workingDays
 
     let presentDays = 0
@@ -555,14 +559,13 @@ export function PayrollIntegration() {
     let absentDays = 0
 
     try {
-      const period = selectedBatch?.period || calculatorPeriod
       const attRes = await fetch(`/api/attendance?month=${period}&pageSize=2000&employeeId=${empId}`)
       const attData = await attRes.json()
-      const records = attData.data || attData || []
+      const records = Array.isArray(attData?.data) ? attData.data : Array.isArray(attData) ? attData : []
       const empRecords = records.filter((r: any) => r.employeeId === empId)
 
-      const PRESENT_STATUSES = new Set(['P', 'W', 'H', 'WH', 'T', 'CO'])
-      const LEAVE_STATUSES = new Set(['SL', 'CL', 'EL', 'CD'])
+      const PRESENT_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO'])
+      const LEAVE_STATUSES = new Set(['SL', 'CL', 'EL'])
 
       for (const rec of empRecords) {
         if (PRESENT_STATUSES.has(rec.status)) presentDays++

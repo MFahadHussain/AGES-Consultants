@@ -210,20 +210,20 @@ export async function POST(request: Request) {
         })
 
         // Count attendance statuses
-        const eligibleStatuses = ['P', 'W', 'H', 'T', 'WH']
-        const leaveStatuses = ['CL', 'SL', 'EL', 'CO']
+        const eligibleStatuses = ['P', 'W', 'H', 'T', 'WH', 'WW', 'CL', 'SL', 'EL']
+        const leaveStatuses = ['CL', 'SL']  // Only CL+SL trigger SC deduction (not EL, not CO)
         const absentStatuses = ['A', 'CD']
 
         const eligibleDays = attendanceRecords.filter(a => eligibleStatuses.includes(a.status)).length
         const leaveDays = attendanceRecords.filter(a => leaveStatuses.includes(a.status)).length
         const absentDays = attendanceRecords.filter(a => absentStatuses.includes(a.status)).length
-        const workingDays = eligibleDays + leaveDays + absentDays
+        const workingDays = daysInMonth  // Always days in month (28-31)
 
         // If no attendance records, assume full month present
         const finalEligibleDays = attendanceRecords.length > 0 ? eligibleDays : daysInMonth
         const finalLeaveDays = attendanceRecords.length > 0 ? leaveDays : 0
         const finalAbsentDays = attendanceRecords.length > 0 ? absentDays : 0
-        const finalWorkingDays = attendanceRecords.length > 0 ? workingDays : daysInMonth
+        const finalWorkingDays = daysInMonth  // Always days in month
 
         // c) Allowances
         const empAllowances = await db.employeeAllowance.findMany({

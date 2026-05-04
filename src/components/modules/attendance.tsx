@@ -19,6 +19,9 @@ type AttendanceStatus = (typeof VALID_STATUSES)[number]
 /** Billable statuses — require a projectId */
 const BILLABLE_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO'])
 
+/** Statuses that require/allow a project assignment — billable + paid leave */
+const PROJECT_REQUIRED_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO', 'CL', 'SL', 'EL'])
+
 /** Alias kept for backward compat in grid rendering */
 const WORKING_STATUSES = BILLABLE_STATUSES
 
@@ -304,15 +307,15 @@ export function AttendanceModule() {
           const dayMap: Record<number, DayData> = {}
           for (const day of data.calendar) {
             const recStatus = day.record?.status || ''
-            const isBillable = BILLABLE_STATUSES.has(recStatus)
+            const needsProject = PROJECT_REQUIRED_STATUSES.has(recStatus)
             // Use dailyProject data if available, else fall back to record.projectId
             const dpProjectId = day.dailyProject?.projectId || day.record?.projectId || null
             const projName = dpProjectId ? projectIdToName(dpProjectId) : null
 
             dayMap[day.day] = {
               status: recStatus,
-              project: isBillable ? (projName || 'Unallocated') : null,
-              projectId: isBillable ? (dpProjectId || null) : null,
+              project: needsProject ? (projName || 'Unallocated') : null,
+              projectId: needsProject ? (dpProjectId || null) : null,
               recordId: day.record?.id || null,
               changed: false,
             }
@@ -342,6 +345,7 @@ export function AttendanceModule() {
           const day = new Date(rec.date).getUTCDate()
           if (!newGrid[rec.employeeId]) newGrid[rec.employeeId] = {}
           const isBillable = BILLABLE_STATUSES.has(rec.status)
+          const needsProject = PROJECT_REQUIRED_STATUSES.has(rec.status)
           const projName = rec.projectId ? projectIdToName(rec.projectId) : null
 
           // Check if API provided dailyProject data
@@ -351,8 +355,8 @@ export function AttendanceModule() {
 
           newGrid[rec.employeeId][day] = {
             status: rec.status as AttendanceStatus,
-            project: isBillable ? (dpProjName || 'Unallocated') : null,
-            projectId: isBillable ? (dpProjectId || null) : null,
+            project: needsProject ? (dpProjName || 'Unallocated') : null,
+            projectId: needsProject ? (dpProjectId || null) : null,
             recordId: rec.id,
             changed: false,
           }
@@ -413,7 +417,7 @@ export function AttendanceModule() {
     let manuallyOverridden = false
     const existingDayData = empGrid[day]
 
-    if (isNextBillable) {
+    if (isNextBillable || PROJECT_REQUIRED_STATUSES.has(nextStatus)) {
       const employeeProjects = getEmployeeProjects(employeeId)
       const existingProject = existingDayData?.project
 
@@ -422,7 +426,9 @@ export function AttendanceModule() {
         projectValue = employeeProjects[0].project.name
         projectIdValue = employeeProjects[0].projectId
         autoAssigned = true
-        toast({ title: 'Auto-assigned', description: `Auto-assigned to ${employeeProjects[0].project.name}` })
+        if (isNextBillable) {
+          toast({ title: 'Auto-assigned', description: `Auto-assigned to ${employeeProjects[0].project.name}` })
+        }
       } else if (employeeProjects.length > 1) {
         // Will show popover — pre-filtered to only this employee's projects
         projectValue = existingProject && existingProject !== 'Unallocated'
@@ -433,10 +439,12 @@ export function AttendanceModule() {
         // NO PROJECT ASSIGNED — default to "Unallocated"
         projectValue = 'Unallocated'
         projectIdValue = null
-        toast({ title: 'Warning', description: 'No active project assignment found', variant: 'destructive' })
+        if (isNextBillable) {
+          toast({ title: 'Warning', description: 'No active project assignment found', variant: 'destructive' })
+        }
       }
     } else {
-      // Non-billable statuses: project should be null
+      // Truly non-project statuses (A, CD): project should be null
       projectValue = null
       projectIdValue = null
     }
@@ -457,8 +465,8 @@ export function AttendanceModule() {
     })
     setHasChanges(true)
 
-    // Open popover only for multi-project employees with billable status
-    if (isNextBillable) {
+    // Open popover only for multi-project employees with project-required status
+    if (isNextBillable || PROJECT_REQUIRED_STATUSES.has(nextStatus)) {
       const employeeProjects = getEmployeeProjects(employeeId)
       if (employeeProjects.length > 1) {
         setPopoverProject(projectValue || employeeProjects[0].project.name)
@@ -475,7 +483,7 @@ export function AttendanceModule() {
   const handleProjectChipClick = (e: React.MouseEvent, employeeId: string, day: number) => {
     e.stopPropagation()
     const dayData = gridData[employeeId]?.[day]
-    if (!dayData || !BILLABLE_STATUSES.has(dayData.status)) return
+    if (!dayData || !PROJECT_REQUIRED_STATUSES.has(dayData.status)) return
 
     const employeeProjects = getEmployeeProjects(employeeId)
     // Always allow override by showing popover with assigned projects
@@ -594,19 +602,20 @@ export function AttendanceModule() {
         if (dayData?.changed && dayData.status) {
           const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
           const isBillable = BILLABLE_STATUSES.has(dayData.status)
+          const needsProject = PROJECT_REQUIRED_STATUSES.has(dayData.status)
 
           // Resolve projectId: prefer stored projectId, else resolve from name
           let resolvedProjectId: string | null = dayData.projectId || null
-          if (!resolvedProjectId && isBillable && dayData.project && dayData.project !== 'Unallocated') {
+          if (!resolvedProjectId && needsProject && dayData.project && dayData.project !== 'Unallocated') {
             resolvedProjectId = projectNameToId(dayData.project)
           }
 
-          // Billable statuses require projectId; non-billable should clear it
+          // Project-required statuses need projectId; truly non-project statuses should clear it
           bulkRecords.push({
             employeeId,
             date: dateStr,
             status: dayData.status,
-            projectId: isBillable ? resolvedProjectId : null,
+            projectId: needsProject ? resolvedProjectId : null,
           })
         }
       }
@@ -876,7 +885,7 @@ export function AttendanceModule() {
 
                         // Count projects
                         const proj = empGrid[day]?.project
-                        if (proj && BILLABLE_STATUSES.has(s)) {
+                        if (proj && PROJECT_REQUIRED_STATUSES.has(s)) {
                           projectCounts[proj] = (projectCounts[proj] || 0) + 1
                         }
                       }
@@ -910,6 +919,7 @@ export function AttendanceModule() {
                           const project = dayData?.project
                           const colorClass = status ? (STATUS_COLORS[status] || 'bg-gray-50 text-gray-800') : ''
                           const isBillable = BILLABLE_STATUSES.has(status)
+                          const showsProject = isBillable || PROJECT_REQUIRED_STATUSES.has(status)
                           const isPopoverOpen = popoverCell?.empId === emp.id && popoverCell?.day === day
 
                           return (
@@ -917,13 +927,13 @@ export function AttendanceModule() {
                               key={day}
                               className={`p-0 text-center cursor-pointer select-none relative ${isWeekend ? 'bg-orange-50/30' : ''}`}
                               onClick={() => handleCellClick(emp.id, day)}
-                              title={status ? `${STATUS_LABELS[status]} (${status})${project && isBillable ? ` - ${project}` : ''}${changed ? ' - Modified' : ''}` : 'Click to set status'}
+                              title={status ? `${STATUS_LABELS[status]} (${status})${project && showsProject ? ` - ${project}` : ''}${changed ? ' - Modified' : ''}` : 'Click to set status'}
                             >
                               <div
                                 className={`flex flex-col items-center justify-center mx-0.5 my-0.5 transition-colors rounded-sm
                                   ${changed ? 'ring-2 ring-primary/40' : ''}
                                 `}
-                                style={{ minHeight: isBillable && project && project !== 'Unallocated' ? '40px' : '32px' }}
+                                style={{ minHeight: showsProject && project && project !== 'Unallocated' ? '40px' : '32px' }}
                               >
                                 <div
                                   className={`text-[10px] font-bold leading-tight
@@ -933,7 +943,7 @@ export function AttendanceModule() {
                                 >
                                   {status || '·'}
                                 </div>
-                                {isBillable && project && (() => {
+                                {showsProject && project && (() => {
                                   const shortName = getShortProjectName(project)
                                   const isAuto = dayData?.autoAssigned === true
                                   const isOverridden = dayData?.manuallyOverridden === true

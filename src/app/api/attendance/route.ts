@@ -9,8 +9,11 @@ import { db } from '@/lib/db'
 const VALID_STATUSES = ['P', 'W', 'H', 'CL', 'SL', 'EL', 'CO', 'T', 'WH', 'WW', 'CD', 'A'] as const
 type AttendanceStatus = (typeof VALID_STATUSES)[number]
 
-/** Status codes that are billable — require a project assignment */
+/** Status codes that are billable — used for SC calculation and isBillable flag */
 const BILLABLE_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO'])
+
+/** Status codes that require/allow a project assignment (billable + paid leave statuses) */
+const PROJECT_REQUIRED_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO', 'CL', 'SL', 'EL'])
 
 /** Status codes that earn Social Charges (SC) */
 const SC_EARN_STATUSES: Set<string> = new Set(['P', 'W', 'H', 'T', 'WH', 'WW'])
@@ -205,6 +208,7 @@ export async function GET(request: Request) {
           statusLabel: dayStatus ? STATUS_LABELS[dayStatus] || dayStatus : null,
           scCategory: dayStatus ? getScCategory(dayStatus) : null,
           isBillable: dayStatus ? BILLABLE_STATUSES.has(dayStatus) : false,
+          needsProject: dayStatus ? PROJECT_REQUIRED_STATUSES.has(dayStatus) : false,
         })
       }
 
@@ -242,6 +246,7 @@ export async function GET(request: Request) {
       statusLabel: STATUS_LABELS[rec.status] || rec.status,
       scCategory: getScCategory(rec.status),
       isBillable: BILLABLE_STATUSES.has(rec.status),
+      needsProject: PROJECT_REQUIRED_STATUSES.has(rec.status),
     }))
 
     return NextResponse.json({
@@ -328,11 +333,12 @@ export async function PUT(request: Request) {
 
     const status = data.status || existing.status
     const isBillable = BILLABLE_STATUSES.has(status)
+    const needsProject = PROJECT_REQUIRED_STATUSES.has(status)
 
-    // Billable status must have a projectId
-    if (isBillable && !data.projectId && !existing.projectId) {
+    // Statuses that require a project must have a projectId
+    if (needsProject && !data.projectId && !existing.projectId) {
       return NextResponse.json(
-        { error: 'Project is required for billable attendance status. Provide a projectId.' },
+        { error: 'Project is required for this attendance status. Provide a projectId.' },
         { status: 422 },
       )
     }
@@ -361,14 +367,14 @@ export async function PUT(request: Request) {
     const effectiveDate = data.date ? parseDate(data.date) : new Date(existing.date)
     const effectiveEmployeeId = data.employeeId || existing.employeeId
 
-    if (isBillable && effectiveProjectId) {
+    if (needsProject && effectiveProjectId) {
       await db.attendanceDailyProject.upsert({
         where: { employeeId_date: { employeeId: effectiveEmployeeId, date: effectiveDate } },
         create: { employeeId: effectiveEmployeeId, date: effectiveDate, status, projectId: effectiveProjectId },
         update: { projectId: effectiveProjectId, status },
       })
-    } else {
-      // Non-billable status: remove project link
+    } else if (!needsProject) {
+      // Non-project statuses (A, CD): remove project link
       await db.attendanceDailyProject.deleteMany({
         where: { employeeId: effectiveEmployeeId, date: effectiveDate },
       })
@@ -379,6 +385,7 @@ export async function PUT(request: Request) {
       statusLabel: STATUS_LABELS[updated.status] || updated.status,
       scCategory: getScCategory(updated.status),
       isBillable: BILLABLE_STATUSES.has(updated.status),
+      needsProject: PROJECT_REQUIRED_STATUSES.has(updated.status),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -485,11 +492,12 @@ async function handleSingleUpsert(data: Record<string, unknown>) {
 
   const status = data.status as string
   const isBillable = BILLABLE_STATUSES.has(status)
+  const needsProject = PROJECT_REQUIRED_STATUSES.has(status)
 
-  // Billable status must have a projectId
-  if (isBillable && !data.projectId) {
+  // Statuses that require a project must have a projectId
+  if (needsProject && !data.projectId) {
     return NextResponse.json(
-      { error: 'Project is required for billable attendance status. Provide a projectId.' },
+      { error: 'Project is required for this attendance status. Provide a projectId.' },
       { status: 422 },
     )
   }
@@ -526,7 +534,7 @@ async function handleSingleUpsert(data: Record<string, unknown>) {
   })
 
   // Upsert or delete AttendanceDailyProject
-  if (isBillable && data.projectId) {
+  if (needsProject && data.projectId) {
     await db.attendanceDailyProject.upsert({
       where: { employeeId_date: { employeeId: data.employeeId as string, date: attendanceDate } },
       create: {
@@ -537,8 +545,8 @@ async function handleSingleUpsert(data: Record<string, unknown>) {
       },
       update: { projectId: data.projectId as string, status },
     })
-  } else {
-    // Non-billable: remove any existing project link
+  } else if (!needsProject) {
+    // Non-project statuses (A, CD): remove any existing project link
     await db.attendanceDailyProject.deleteMany({
       where: { employeeId: data.employeeId as string, date: attendanceDate },
     })
@@ -550,6 +558,7 @@ async function handleSingleUpsert(data: Record<string, unknown>) {
       statusLabel: STATUS_LABELS[record.status] || record.status,
       scCategory: getScCategory(record.status),
       isBillable: BILLABLE_STATUSES.has(record.status),
+      needsProject: PROJECT_REQUIRED_STATUSES.has(record.status),
     },
     { status: 201 },
   )
@@ -572,15 +581,15 @@ async function handleBulkUpsert(records: Record<string, unknown>[], createdBy?: 
     return NextResponse.json({ error: 'Validation failed', details: errors }, { status: 400 })
   }
 
-  // Validate billable statuses have projectId
+  // Validate project-required statuses have projectId
   for (let i = 0; i < records.length; i++) {
     const status = records[i].status as string
-    if (BILLABLE_STATUSES.has(status) && !records[i].projectId) {
-      errors.push({ index: i, error: `Billable status "${status}" requires a projectId` })
+    if (PROJECT_REQUIRED_STATUSES.has(status) && !records[i].projectId) {
+      errors.push({ index: i, error: `Status "${status}" requires a projectId` })
     }
   }
   if (errors.length > 0) {
-    return NextResponse.json({ error: 'Billable statuses require projectId', details: errors }, { status: 422 })
+    return NextResponse.json({ error: 'Project-required statuses require projectId', details: errors }, { status: 422 })
   }
 
   const employeeIds = [...new Set(records.map(r => r.employeeId as string))]
@@ -611,6 +620,7 @@ async function handleBulkUpsert(records: Record<string, unknown>[], createdBy?: 
 
       const status = rec.status as string
       const isBillable = BILLABLE_STATUSES.has(status)
+      const needsProject = PROJECT_REQUIRED_STATUSES.has(status)
 
       const upserted = await db.attendance.upsert({
         where: { employeeId_date: { employeeId: rec.employeeId as string, date: attendanceDate } },
@@ -640,13 +650,14 @@ async function handleBulkUpsert(records: Record<string, unknown>[], createdBy?: 
       })
 
       // Sync AttendanceDailyProject
-      if (isBillable && rec.projectId) {
+      if (needsProject && rec.projectId) {
         await db.attendanceDailyProject.upsert({
           where: { employeeId_date: { employeeId: rec.employeeId as string, date: attendanceDate } },
           create: { employeeId: rec.employeeId as string, date: attendanceDate, status, projectId: rec.projectId as string },
           update: { projectId: rec.projectId as string, status },
         })
-      } else {
+      } else if (!needsProject) {
+        // Non-project statuses: remove any existing project link
         await db.attendanceDailyProject.deleteMany({
           where: { employeeId: rec.employeeId as string, date: attendanceDate },
         })
@@ -662,6 +673,7 @@ async function handleBulkUpsert(records: Record<string, unknown>[], createdBy?: 
           statusLabel: STATUS_LABELS[upserted.status] || upserted.status,
           scCategory: getScCategory(upserted.status),
           isBillable: BILLABLE_STATUSES.has(upserted.status),
+          needsProject: PROJECT_REQUIRED_STATUSES.has(upserted.status),
         },
       })
     } catch (err) {

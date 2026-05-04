@@ -18,7 +18,7 @@ const ELIGIBLE_STATUSES = new Set(['P', 'W', 'H', 'T', 'WH', 'WW', 'CL', 'SL', '
 const LEAVE_STATUSES = new Set(['CL', 'SL'])
 
 /** Statuses that are billable and require a project assignment */
-const BILLABLE_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO'])
+const BILLABLE_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO', 'CL', 'SL', 'EL'])
 
 // ── SC Rate Constants ──────────────────────────────────────────────────────
 
@@ -166,11 +166,13 @@ export async function calculateMonthlyPayroll(
   }
 
   // ── 6. Project-level cost distribution ──
-  const totalBillableDays = dailyProjects.length
+  // Filter daily project records to only billable statuses (includes CL/SL/EL)
+  const billableProjects = dailyProjects.filter(dp => BILLABLE_STATUSES.has(dp.status))
+  const totalBillableDays = billableProjects.length
 
   // Group daily project records by projectId
   const projectGroups: Record<string, number> = {}
-  for (const rec of dailyProjects) {
+  for (const rec of billableProjects) {
     projectGroups[rec.projectId] = (projectGroups[rec.projectId] || 0) + 1
   }
 

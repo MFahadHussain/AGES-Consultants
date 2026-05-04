@@ -1186,3 +1186,139 @@ Stage Summary:
 - Bulk save now resolves and sends projectId for billable statuses
 - Monthly view uses dailyProject API data for accurate project display
 - All existing functionality preserved (month navigation, employee filter, KPI cards, legend, quick-fill)
+
+---
+Task ID: 3+5
+Agent: Main Agent
+Task: Fix payroll calculation - paid days based on month (28-31), include CL/SL/EL project allocation
+
+Work Log:
+- Read worklog.md to understand previous agent work
+- Read and analyzed /src/app/api/payroll/route.ts (run-payroll action, lines 149-398)
+- Read and analyzed /src/lib/payroll/calculateMonthlyPayroll.ts (full file, 267 lines)
+- Fixed payroll route.ts run-payroll action:
+  - Changed eligibleStatuses from ['P', 'W', 'H', 'T', 'WH'] to ['P', 'W', 'H', 'T', 'WH', 'WW', 'CL', 'SL', 'EL'] — WW (weekend work), CL, SL, EL are now eligible for salary + SC earning
+  - Changed leaveStatuses from ['CL', 'SL', 'EL', 'CO'] to ['CL', 'SL'] — only CL+SL trigger SC deduction; EL is an eligible day that earns SC without deduction; CO removed from leave statuses
+  - Changed workingDays from `eligibleDays + leaveDays + absentDays` to `daysInMonth` — working days is always the total calendar days in the month (28-31)
+  - Changed finalWorkingDays from `attendanceRecords.length > 0 ? workingDays : daysInMonth` to `daysInMonth` — always days in month regardless of attendance
+- SC calculation now works correctly with the new statuses:
+  - workingRatio = finalEligibleDays / daysInMonth (CL+SL+EL+WW all count as eligible)
+  - leaveDeductionSC = dailyRate × finalLeaveDays (only CL+SL deducted, EL earns SC without deduction)
+- Fixed calculateMonthlyPayroll.ts:
+  - Updated BILLABLE_STATUSES from ['P', 'W', 'H', 'WH', 'WW', 'T', 'CO'] to ['P', 'W', 'H', 'WH', 'WW', 'T', 'CO', 'CL', 'SL', 'EL'] — CL/SL/EL days are now billable to projects
+  - Added filtering by BILLABLE_STATUSES in project-level cost distribution: daily project records are now filtered to only billable statuses before grouping by project
+  - ELIGIBLE_STATUSES was already correct: ['P', 'W', 'H', 'T', 'WH', 'WW', 'CL', 'SL', 'EL']
+  - LEAVE_STATUSES was already correct: ['CL', 'SL']
+- Lint passes with 0 errors (only pre-existing warnings in FAMS files)
+
+Stage Summary:
+- Paid days now always = Days in Month (28-31), not attendance-based count
+- CL, SL, EL days allow project selection and are included in project cost distribution
+- CL+SL are eligible days (earn salary + SC) but trigger SC deduction at daily rate
+- EL is an eligible day (earns salary + SC) and does NOT trigger SC deduction
+- WW (weekend work) is now recognized as an eligible day
+- Project allocation correctly filters by BILLABLE_STATUSES including CL/SL/EL
+
+---
+Task ID: 1
+Agent: attendance-api-fixer
+Task: Fix attendance API routes to support CL/SL/EL with project selection
+
+Work Log:
+- Read and analyzed `/src/app/api/attendance/route.ts` (686 lines) — identified BILLABLE_STATUSES used for both validation (requiring projectId) and AttendanceDailyProject sync
+- Read and analyzed `/src/app/api/attendance/bulk-fill/preview/route.ts` and `apply/route.ts` — both use separate BILLABLE_STATUSES constant
+- Added `PROJECT_REQUIRED_STATUSES` constant to attendance route: `new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO', 'CL', 'SL', 'EL'])` — includes leave statuses that should allow project selection
+- Kept `BILLABLE_STATUSES` unchanged (`['P', 'W', 'H', 'WH', 'WW', 'T', 'CO']`) for backward compatibility, SC calculation, and `isBillable` flag in responses
+- Updated `handleSingleUpsert`:
+  - Changed validation from `isBillable && !data.projectId` → `needsProject && !data.projectId`
+  - Changed AttendanceDailyProject sync: `if (needsProject && data.projectId)` → upsert; `else if (!needsProject)` → deleteMany (only truly non-project statuses like A, CD)
+  - Leave statuses (CL/SL/EL) with projectId now create AttendanceDailyProject records instead of deleting them
+  - Leave statuses without projectId no longer delete existing project links (the `else` branch only runs when `!needsProject`)
+- Updated `handleBulkUpsert`:
+  - Same validation change using PROJECT_REQUIRED_STATUSES
+  - Same sync logic change using `needsProject` instead of `isBillable`
+- Updated `PUT` handler:
+  - Same validation and sync changes
+  - Error message changed from "billable attendance status" to "this attendance status" for generality
+- Added `needsProject` field to all response objects (GET monthly, GET summary, PUT, POST single, POST bulk)
+- Updated `/src/app/api/attendance/bulk-fill/preview/route.ts`: Added CL, SL, EL to BILLABLE_STATUSES
+- Updated `/src/app/api/attendance/bulk-fill/apply/route.ts`: Added CL, SL, EL to BILLABLE_STATUSES
+- Lint check passes with 0 errors (only pre-existing warnings in FAMS files)
+
+Stage Summary:
+- CL, SL, EL now require/allow projectId selection (validated by PROJECT_REQUIRED_STATUSES)
+- CL, SL, EL with projectId create AttendanceDailyProject records (no longer deleted)
+- CL, SL, EL without projectId do NOT delete existing project links (preserved)
+- `isBillable` field in responses still based on original BILLABLE_STATUSES (backward compatible)
+- New `needsProject` field in responses indicates which statuses require/allow a project
+- Bulk-fill preview and apply now include CL/SL/EL days as targetable for project assignment
+- SC logic (earn/deduct) unchanged — leave statuses remain SC_DEDUCT_STATUSES
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Fix payroll component "records.filter is not a function" error and update working days calculation
+
+Work Log:
+- Read payroll.tsx component and identified all issues specified in the task
+- Fix 1: Changed `records.filter is not a function` error by replacing unsafe `attData.data || attData || []` with `Array.isArray(attData?.data) ? attData.data : Array.isArray(attData) ? attData : []` in two locations:
+  - handleRecalculate (line 437) — attendance data fetch for payroll calculator
+  - handleEmployeeSelectForLine (line 563) — attendance data fetch for line form
+- Fix 2: Replaced hardcoded `workingDays = 26` with dynamic calculation using `new Date(year, month, 0).getDate()` (returns 28-31 based on actual month):
+  - handleRecalculate: Added `const [cYear, cMonth] = calculatorPeriod.split('-').map(Number)` then `const workingDays = new Date(cYear, cMonth, 0).getDate()`
+  - handleEmployeeSelectForLine: Added `const period = selectedBatch?.period || calculatorPeriod` then `const [pYear, pMonth] = period.split('-').map(Number)` then `const workingDays = new Date(pYear, pMonth, 0).getDate()`
+- Fix 3: Updated PRESENT_STATUSES and LEAVE_STATUSES in both locations:
+  - PRESENT_STATUSES: Added 'WW' (was missing), kept 'P', 'W', 'H', 'WH', 'T', 'CO'
+  - LEAVE_STATUSES: Removed 'CD' from leave statuses, now only 'SL', 'CL', 'EL'
+- Fix 4: Removed redundant `const period` declaration inside try block of handleEmployeeSelectForLine that shadowed the outer `period` variable (same value, cleaner code)
+- Lint passes with 0 errors (only pre-existing warnings in FAMS files)
+
+Stage Summary:
+- Fixed: "records.filter is not a function" error by ensuring records is always an array via Array.isArray checks
+- Fixed: Working days now dynamically calculated from actual days in the month (28-31) instead of hardcoded 26
+- Fixed: PRESENT_STATUSES now includes 'WW' status, LEAVE_STATUSES no longer includes 'CD'
+- Fixed: Variable shadowing in handleEmployeeSelectForLine removed
+
+---
+Task ID: 2
+Agent: attendance-fix-agent
+Task: Fix attendance component to allow project selection for CL, SL, EL statuses
+
+Work Log:
+- Read worklog.md for context from previous agents
+- Read full attendance.tsx component (1310+ lines)
+- Identified that CL, SL, EL statuses were clearing project to null when selected, preventing project allocation for paid leave days
+- Added `PROJECT_REQUIRED_STATUSES` constant: `new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO', 'CL', 'SL', 'EL'])` — a superset of BILLABLE_STATUSES that includes paid leave statuses
+- Updated `handleCellClick`:
+  - Changed condition from `isNextBillable` to `isNextBillable || PROJECT_REQUIRED_STATUSES.has(nextStatus)` for project auto-assignment and popover logic
+  - Auto-assign toast and warning toast only shown for truly billable statuses (not CL/SL/EL) to reduce noise
+  - Comment updated to "Truly non-project statuses (A, CD)" for the else branch
+  - Popover opening logic also uses `PROJECT_REQUIRED_STATUSES` check
+- Updated `handleProjectChipClick`:
+  - Changed guard from `BILLABLE_STATUSES` to `PROJECT_REQUIRED_STATUSES` so project chip is clickable for CL/SL/EL
+- Updated grid rendering (cell display):
+  - Added `showsProject = isBillable || PROJECT_REQUIRED_STATUSES.has(status)` variable
+  - Used `showsProject` instead of `isBillable` for: title tooltip, min-height styling, project chip rendering condition
+- Updated project count in summary columns:
+  - Changed `if (proj && BILLABLE_STATUSES.has(s))` to `if (proj && PROJECT_REQUIRED_STATUSES.has(s))` so CL/SL/EL project assignments are counted
+- Updated `handleBulkSave`:
+  - Added `needsProject = PROJECT_REQUIRED_STATUSES.has(dayData.status)` check
+  - Project ID resolution uses `needsProject` instead of `isBillable`
+  - Bulk record projectId set using `needsProject ? resolvedProjectId : null`
+- Updated `fetchAttendanceData` (single employee view):
+  - Changed `isBillable` to `needsProject` using `PROJECT_REQUIRED_STATUSES` for project display logic
+- Updated `fetchAttendanceData` (all employees view):
+  - Added `needsProject = PROJECT_REQUIRED_STATUSES.has(rec.status)` alongside existing `isBillable`
+  - Project and projectId assignment uses `needsProject` instead of `isBillable`
+- Key design principle preserved: BILLABLE_STATUSES unchanged for SC calculations, SC_DEDUCT_STATUSES unchanged for display
+- Lint check passes with 0 errors (only pre-existing warnings in unrelated FAMS files)
+- Dev server responds with 200
+
+Stage Summary:
+- CL, SL, EL statuses now allow project selection (auto-assign or popover) just like billable statuses
+- Project chips render for CL/SL/EL cells in the attendance grid
+- Project counts in summary columns include CL/SL/EL project assignments
+- Bulk save correctly sends projectId for CL/SL/EL records
+- Fetch attendance data correctly populates project for CL/SL/EL from API
+- Auto-assign toast only fires for truly billable statuses (not leave) to reduce noise
+- BILLABLE_STATUSES and SC calculations remain unchanged
