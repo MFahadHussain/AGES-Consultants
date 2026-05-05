@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import {
   Eye, ChevronDown, ChevronRight, Calendar, MapPin, Landmark, Phone, Mail,
@@ -270,6 +271,8 @@ export function EmployeeProfile() {
   const [showScForm, setShowScForm] = useState(false)
   const [scPayment, setScPayment] = useState({amount:'',date:'',reference:''})
   const [scCoveredMonths, setScCoveredMonths] = useState<string[]>([])
+  const [scDraftGLLoading, setScDraftGLLoading] = useState(false)
+  const [scDraftGLVoucher, setScDraftGLVoucher] = useState<{voucherId:string;voucherNumber:string}|null>(null)
 
   // Loans & Advances
   const [loansStore, setLoansStore] = useState<Record<string,LoanData[]>>({})
@@ -733,6 +736,34 @@ export function EmployeeProfile() {
     setScPayment({amount:'',date:'',reference:''})
     setScCoveredMonths([])
     toast.success('SC Payment recorded successfully')
+  }
+
+  // SC Draft to GL handler
+  const handleScDraftToGL = async () => {
+    if (!empId) return
+    const scCalc = effectivePayroll
+    const scAmount = scCalc ? scCalc.finalSC : (scOutstanding > 0 ? scOutstanding : 0)
+    if (scAmount <= 0) {
+      toast.error('No social charges amount to post')
+      return
+    }
+    const month = payrollMonth || new Date().toISOString().slice(0, 7)
+    setScDraftGLLoading(true)
+    try {
+      const res = await fetch('/api/payroll/generate-gl-voucher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'sc-only', employeeId: empId, month, scAmount }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to create SC voucher')
+      setScDraftGLVoucher({ voucherId: data.vouchers?.[0]?.voucherId || data.voucherId, voucherNumber: data.vouchers?.[0]?.voucherNumber || data.voucherNumber || `JV-SC-${month.replace('-','')}-${emp?.employeeCode || 'EMP'}` })
+      toast.success('SC Draft Voucher created', { description: `Voucher for PKR ${scAmount.toLocaleString()} social charges` })
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to create SC draft voucher')
+    } finally {
+      setScDraftGLLoading(false)
+    }
   }
 
   // New Loan save
@@ -1612,12 +1643,23 @@ export function EmployeeProfile() {
           </div>
         </div>
 
-        {/* Record SC Payment */}
+        {/* Record SC Payment / Draft to GL */}
         {isAdmin && (
           <div>
-            <Button className="bg-slate-900 text-white rounded-lg px-4 py-2 h-9 text-xs hover:bg-slate-800" onClick={()=>setShowScForm(!showScForm)}>
-              {showScForm ? 'Cancel' : 'Record SC Payment'}
-            </Button>
+            <div className="flex items-center gap-3 flex-wrap">
+              <Button className="bg-slate-900 text-white rounded-lg px-4 py-2 h-9 text-xs hover:bg-slate-800" onClick={()=>setShowScForm(!showScForm)}>
+                {showScForm ? 'Cancel' : 'Record SC Payment'}
+              </Button>
+              <Button className="bg-emerald-700 text-white rounded-lg px-4 py-2 h-9 text-xs hover:bg-emerald-800 flex items-center gap-1.5" onClick={handleScDraftToGL} disabled={scDraftGLLoading}>
+                {scDraftGLLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin"/> : <FileText className="h-3.5 w-3.5"/>}
+                Draft SC to GL
+              </Button>
+              {scDraftGLVoucher && (
+                <Badge className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1">
+                  ✓ {scDraftGLVoucher.voucherNumber} created
+                </Badge>
+              )}
+            </div>
             <div className="overflow-hidden transition-all duration-200 ease-in-out" style={{maxHeight:showScForm?'400px':'0px',opacity:showScForm?1:0}}>
               <div className="bg-white border border-slate-200 rounded-xl p-5 mt-3 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

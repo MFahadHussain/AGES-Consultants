@@ -146,3 +146,109 @@ Stage Summary:
 - May 2026 batch removed from database
 - Employee profile null safety fixed
 - Lint passes with 0 errors
+
+---
+Task ID: 2
+Agent: backend-gl-voucher
+Task: Build GL voucher generation API endpoint with project-wise splitting
+
+Work Log:
+- Created `/home/z/my-project/src/app/api/payroll/generate-gl-voucher/route.ts`
+- Read existing payroll route (`buildGlEntries` function at line 1141) and `account-roles.ts` to understand patterns
+- Read Prisma schema for Voucher, VoucherEntry, PayrollBatchLine, Project models
+- Implemented 3 modes in a single POST endpoint:
+
+1. **Consolidated mode** (`mode: "consolidated"`):
+   - Reads batch with all approved lines
+   - Verifies batch status (approved/reviewed/draft-to-gl) and not already posted
+   - Validates financial year is open
+   - Calculates totals from approved lines
+   - Creates ONE voucher with number `JV-PAY-{YYYYMM}-001`, status `draft`
+   - Uses `buildGlEntries` pattern (PayrollAccountMapping + account role fallbacks)
+   - Returns voucher with full entry details including account names/codes
+
+2. **Project-wise mode** (`mode: "project-wise"`):
+   - Parses `projectAllocations` and `contractEarnings` JSON from each line
+   - Collects all unique projects across employees
+   - For each project, proportionally splits each employee's line amounts based on:
+     - Contract earnings data (most accurate: earnedSalary, scShare)
+     - Project allocation weight (fallback: salaryShare, scShare)
+     - Line-level projectId assignment (last resort: ratio = 1)
+   - Creates separate voucher per project with number `JV-PAY-{YYYYMM}-{PROJECT_CODE}`
+   - Each voucher entry has `projectId` set at line level
+   - Includes employee breakdown data showing contributions per project
+   - Uses `buildProjectGlEntries` with DR/CR pattern matching task spec:
+     - DR: Salary Expense, EOBI Expense Employer, PF Expense Employer, Gratuity Expense, SC Expense
+     - CR: Salaries Payable, EOBI Payable, PF Payable, Income Tax Payable, SC Payable, Loan/Advance Recovery Payable
+
+3. **SC-only mode** (`mode: "sc-only"`):
+   - Creates a simple 2-line voucher for social charges only
+   - DR: Social Charges Expense, CR: Social Charges Payable
+   - Voucher number: `JV-SC-{YYYYMM}-{empCode}`
+   - Used for employee profile SC posting
+
+- All amounts Math.round()'d to avoid floating point issues
+- Error handling with proper HTTP status codes
+- Uses `findAccountByRole` and `findFirstBankAccount` from `@/lib/account-roles`
+- Uses `PayrollAccountMapping` table with account role fallbacks
+- Lint: 0 errors, 4 pre-existing warnings (none from new file)
+- Dev server: running, HTTP 200
+
+Stage Summary:
+- New API endpoint `POST /api/payroll/generate-gl-voucher` fully implemented
+- Three modes: consolidated, project-wise, sc-only
+- Project-wise mode correctly splits amounts by allocation ratio per project
+- Employee breakdown data included in project-wise response
+- All GL entries follow existing buildGlEntries pattern
+- No existing files modified
+
+---
+Task ID: 3
+Agent: frontend-payroll-gl-voucher
+Task: Build complete GL Journal Voucher workflow UI in the payroll module
+
+Work Log:
+- Added 6 new GL voucher workflow state variables (glVoucherMode, glVoucherChoiceOpen, glVoucherConfirmOpen, generatedVouchers, glVoucherLoading, expandedVoucherEmp)
+- Replaced "Post to GL" button onClick on approved batches from `setPostDialogOpen(true)` to `setGlVoucherChoiceOpen(true)` to open the new choice modal
+- Updated workflow status bar "Post to GL" action to open choice modal instead of post dialog
+- Added `handleGenerateGLVoucher` handler that calls `/api/payroll/generate-gl-voucher` API with batchId, mode, and financialYearId
+- Added `handlePostVoucherToGL` handler that posts individual vouchers via PUT `/api/vouchers/{voucherId}`
+- Added `handlePostAllVouchersToGL` handler that posts all draft vouchers sequentially
+- Added GL Voucher Choice Modal with two card-style options (Single Voucher vs Project-wise Vouchers)
+- Added GL Voucher Confirmation AlertDialog before generating vouchers
+- Added Generated GL Voucher Cards display section with:
+  - Summary table for project-wise mode showing all vouchers with totals
+  - Individual voucher cards with full journal entry Dr/Cr table
+  - Employee breakdown expandable section for project vouchers
+  - Print button and "Post to GL →" button per voucher
+  - Balance validation with warning for unbalanced vouchers
+- Preserved all existing functionality (JournalVoucherCard, Draft to GL button, handlePostToGL, payroll calculations, attendance module)
+- Lint: 0 errors, 4 pre-existing warnings (from FAMS module)
+
+Stage Summary:
+- GL Voucher workflow UI fully implemented with choice modal, confirmation, and voucher display
+- "Post to GL" now opens a choice between consolidated and project-wise voucher generation
+- Generated vouchers display as interactive cards with Dr/Cr tables and post actions
+- Employee breakdown available for project-wise vouchers
+- All existing payroll functionality preserved
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Complete employee profile + add SC Draft to GL button + fix month filtering
+
+Work Log:
+- Fixed `getRecentMonths()` in employee-profile.tsx to include future months (12 past + 12 future)
+- Fixed default payroll month to always set to current month (not list index)
+- Added `Badge` import to employee-profile.tsx
+- Added `scDraftGLLoading` and `scDraftGLVoucher` state variables
+- Added `handleScDraftToGL` handler that calls `/api/payroll/generate-gl-voucher` with `mode: 'sc-only'`
+- Added "Draft SC to GL" button in Social Charges tab next to "Record SC Payment"
+- Button creates a draft GL voucher (DR SC Expense / CR SC Payable) for the calculated SC amount
+- Shows voucher number badge after successful creation
+- Lint: 0 errors
+
+Stage Summary:
+- Employee profile month dropdown now shows months beyond May 2026 (up to 12 months future)
+- SC "Draft SC to GL" button creates draft GL voucher for social charges
+- All lint checks pass, app running on port 3000

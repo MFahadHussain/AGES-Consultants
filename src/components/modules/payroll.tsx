@@ -306,6 +306,14 @@ export function PayrollIntegration() {
   const [draftToGLDialogOpen, setDraftToGLDialogOpen] = useState(false)
   const [processingAction, setProcessingAction] = useState<string | null>(null)
 
+  // GL Voucher workflow state
+  const [glVoucherMode, setGlVoucherMode] = useState<'consolidated' | 'project-wise' | null>(null)
+  const [glVoucherChoiceOpen, setGlVoucherChoiceOpen] = useState(false)
+  const [glVoucherConfirmOpen, setGlVoucherConfirmOpen] = useState(false)
+  const [generatedVouchers, setGeneratedVouchers] = useState<any[]>([])
+  const [glVoucherLoading, setGlVoucherLoading] = useState(false)
+  const [expandedVoucherEmp, setExpandedVoucherEmp] = useState<string | null>(null)
+
   // Create batch form
   const [batchForm, setBatchForm] = useState({
     name: '',
@@ -440,6 +448,62 @@ export function PayrollIntegration() {
       fetchData()
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    }
+  }
+
+  const handleGenerateGLVoucher = async () => {
+    if (!selectedBatch || !glVoucherMode) return
+    const fy = financialYears.find((f: any) => f.status === 'open')
+    if (!fy) { toast({ title: 'Error', description: 'No open financial year found', variant: 'destructive' }); return }
+
+    setGlVoucherLoading(true)
+    try {
+      const res = await fetch('/api/payroll/generate-gl-voucher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          batchId: selectedBatch.id,
+          mode: glVoucherMode,
+          financialYearId: fy.id,
+        }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Failed')
+
+      setGeneratedVouchers(result.vouchers || [])
+      setGlVoucherConfirmOpen(false)
+      setGlVoucherChoiceOpen(false)
+      toast({
+        title: 'Vouchers Generated',
+        description: `${result.vouchers?.length || 0} journal voucher(s) created in draft status`,
+      })
+      fetchData()
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    } finally {
+      setGlVoucherLoading(false)
+    }
+  }
+
+  const handlePostVoucherToGL = async (voucherId: string) => {
+    try {
+      const res = await fetch(`/api/vouchers/${voucherId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'post' }),
+      })
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed') }
+      toast({ title: 'Posted', description: 'Voucher posted to General Ledger' })
+      setGeneratedVouchers(prev => prev.map(v => v.voucherId === voucherId ? { ...v, status: 'posted' } : v))
+      fetchData()
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    }
+  }
+
+  const handlePostAllVouchersToGL = async () => {
+    for (const v of generatedVouchers.filter(v => v.status === 'draft')) {
+      await handlePostVoucherToGL(v.voucherId)
     }
   }
 
@@ -874,7 +938,7 @@ export function PayrollIntegration() {
                             e.stopPropagation()
                             if (sa.action === 'post-to-gl') {
                               setSelectedBatch(batches.find((b: any) => b.id === batchId) || null)
-                              setPostDialogOpen(true)
+                              setGlVoucherChoiceOpen(true)
                             } else {
                               handleWorkflowAction(sa.action, batchId)
                             }
@@ -2046,7 +2110,7 @@ export function PayrollIntegration() {
                 )}
                 {batch.status === 'approved' && (
                   <>
-                    <Button size="sm" className="h-7 text-[10px]" onClick={() => { setSelectedBatch(batch); setPostDialogOpen(true) }}>
+                    <Button size="sm" className="h-7 text-[10px]" onClick={() => { setSelectedBatch(batch); setGlVoucherChoiceOpen(true) }}>
                       <BookOpen className="h-3 w-3 mr-1" />Post to GL
                     </Button>
                     <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => { setSelectedBatch(batch); setDraftToGLDialogOpen(true) }}>
@@ -2415,6 +2479,196 @@ export function PayrollIntegration() {
       )
       })}
 
+      {/* Generated GL Voucher Cards */}
+      {generatedVouchers.length > 0 && (
+        <div className="space-y-4">
+          {/* Summary bar for project-wise */}
+          {generatedVouchers.length > 1 && (
+            <Card className="border-slate-300">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm">Project-wise Vouchers — {selectedBatch?.period}</CardTitle>
+                  <Button size="sm" className="h-7 text-[10px] bg-emerald-600 hover:bg-emerald-700" 
+                    onClick={handlePostAllVouchersToGL}
+                    disabled={generatedVouchers.every(v => v.status !== 'draft')}>
+                    Post All to GL
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-[10px]">Project</TableHead>
+                      <TableHead className="text-[10px] text-center">Employees</TableHead>
+                      <TableHead className="text-[10px] text-right">Total DR</TableHead>
+                      <TableHead className="text-[10px] text-right">Total CR</TableHead>
+                      <TableHead className="text-[10px] text-center">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {generatedVouchers.map(v => (
+                      <TableRow key={v.voucherId}>
+                        <TableCell className="text-xs font-medium">{v.project || 'All Projects'}</TableCell>
+                        <TableCell className="text-xs text-center">{v.employeeLines?.length || v.employeeCount || '—'}</TableCell>
+                        <TableCell className="text-xs text-right font-mono">{formatCurrency(v.totalDebit)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono">{formatCurrency(v.totalCredit)}</TableCell>
+                        <TableCell className="text-xs text-center">
+                          <Badge className={`text-[10px] ${v.status === 'draft' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'} border`}>
+                            {v.status === 'draft' ? '✓ Draft' : 'Posted'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="font-bold border-t-2">
+                      <TableCell className="text-xs">TOTAL</TableCell>
+                      <TableCell className="text-xs text-center">{generatedVouchers.reduce((s,v) => s + (v.employeeLines?.length || v.employeeCount || 0), 0)}</TableCell>
+                      <TableCell className="text-xs text-right font-mono">{formatCurrency(generatedVouchers.reduce((s,v) => s + v.totalDebit, 0))}</TableCell>
+                      <TableCell className="text-xs text-right font-mono">{formatCurrency(generatedVouchers.reduce((s,v) => s + v.totalCredit, 0))}</TableCell>
+                      <TableCell className="text-xs text-center">
+                        <Badge className="text-[10px] bg-emerald-100 text-emerald-700 border-emerald-200 border">
+                          {generatedVouchers.every(v => Math.abs(v.totalDebit - v.totalCredit) < 1) ? '✓ All Balanced' : '✗ Unbalanced'}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Individual Voucher Cards */}
+          {generatedVouchers.map(voucher => {
+            const isBalanced = Math.abs(voucher.totalDebit - voucher.totalCredit) < 1
+            const isPosted = voucher.status === 'posted'
+            const isProject = voucher.voucherType === 'Project'
+            const isExpanded = expandedVoucherEmp === voucher.voucherId
+
+            return (
+              <Card key={voucher.voucherId} className={`border-l-4 ${isPosted ? 'border-l-emerald-500' : 'border-l-amber-400'} border-slate-200`}>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{isProject ? '📂' : '📄'}</span>
+                      <div>
+                        <CardTitle className="text-sm font-bold">{voucher.voucherNumber}</CardTitle>
+                        <p className="text-[10px] text-muted-foreground">
+                          Payroll Journal Voucher · {voucher.period} · {isProject ? `Project: ${voucher.project}` : 'Consolidated'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isProject && (
+                        <Badge className="text-[10px] bg-blue-100 text-blue-700 border border-blue-200">Project</Badge>
+                      )}
+                      <Badge className={`text-[10px] border ${isPosted ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                        {isPosted ? 'POSTED' : 'DRAFT'}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  {/* Journal Entry Table */}
+                  <div className="rounded border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-slate-50">
+                          <TableHead className="text-[10px] h-8">Account</TableHead>
+                          <TableHead className="text-[10px] h-8 text-right">Debit (PKR)</TableHead>
+                          <TableHead className="text-[10px] h-8 text-right">Credit (PKR)</TableHead>
+                          <TableHead className="text-[10px] h-8">Note</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {voucher.entries?.map((entry: any, idx: number) => (
+                          <TableRow key={idx} className={entry.debit > 0 ? 'bg-red-50/30' : 'bg-green-50/30'}>
+                            <TableCell className="text-[11px] py-1.5 font-medium">
+                              {entry.accountName || entry.account || '—'}
+                              {entry.accountCode && <span className="text-muted-foreground ml-1 font-mono text-[9px]">({entry.accountCode})</span>}
+                            </TableCell>
+                            <TableCell className="text-[11px] py-1.5 text-right font-mono">{entry.debit > 0 ? formatCurrency(entry.debit) : '—'}</TableCell>
+                            <TableCell className="text-[11px] py-1.5 text-right font-mono">{entry.credit > 0 ? formatCurrency(entry.credit) : '—'}</TableCell>
+                            <TableCell className="text-[10px] py-1.5 text-muted-foreground">{entry.description || entry.note || ''}</TableCell>
+                          </TableRow>
+                        ))}
+                        {/* Totals */}
+                        <TableRow className="bg-slate-100 font-bold border-t-2 border-slate-300">
+                          <TableCell className="text-[11px] py-2">TOTAL</TableCell>
+                          <TableCell className="text-[11px] py-2 text-right font-mono">{formatCurrency(voucher.totalDebit)}</TableCell>
+                          <TableCell className="text-[11px] py-2 text-right font-mono">{formatCurrency(voucher.totalCredit)}</TableCell>
+                          <TableCell className="text-[11px] py-2">
+                            {isBalanced ? (
+                              <Badge className="text-[9px] bg-emerald-100 text-emerald-700 border-emerald-200 border">✓ Bal</Badge>
+                            ) : (
+                              <span className="text-[10px] text-red-600">✗ Unbalanced by {formatCurrency(Math.abs(voucher.totalDebit - voucher.totalCredit))}</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Employee Breakdown for project vouchers */}
+                  {isProject && voucher.employeeLines?.length > 0 && (
+                    <div className="mt-3">
+                      <Button variant="ghost" size="sm" className="h-6 text-[10px] p-0" 
+                        onClick={() => setExpandedVoucherEmp(isExpanded ? null : voucher.voucherId)}>
+                        {isExpanded ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />}
+                        Employee Breakdown
+                      </Button>
+                      {isExpanded && (
+                        <div className="mt-2 rounded border overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-[9px] h-7">Employee</TableHead>
+                                <TableHead className="text-[9px] h-7 text-center">Days</TableHead>
+                                <TableHead className="text-[9px] h-7 text-center">Ratio</TableHead>
+                                <TableHead className="text-[9px] h-7 text-right">Earned</TableHead>
+                                <TableHead className="text-[9px] h-7 text-right">SC</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {voucher.employeeLines.map((emp: any, idx: number) => (
+                                <TableRow key={idx}>
+                                  <TableCell className="text-[10px] py-1 font-medium">{emp.empName}</TableCell>
+                                  <TableCell className="text-[10px] py-1 text-center">{emp.days}d</TableCell>
+                                  <TableCell className="text-[10px] py-1 text-center">{emp.ratio}</TableCell>
+                                  <TableCell className="text-[10px] py-1 text-right">{formatCurrency(emp.earned)}</TableCell>
+                                  <TableCell className="text-[10px] py-1 text-right text-orange-600">{formatCurrency(emp.sc)}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2 mt-3">
+                    <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => window.print()}>
+                      🖨 Print
+                    </Button>
+                    {!isPosted && isBalanced && (
+                      <Button size="sm" className="h-7 text-[10px] bg-emerald-600 hover:bg-emerald-700" 
+                        onClick={() => handlePostVoucherToGL(voucher.voucherId)}>
+                        Post to GL →
+                      </Button>
+                    )}
+                    {!isBalanced && (
+                      <span className="text-[10px] text-red-600 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />Cannot post — voucher is unbalanced
+                      </span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
       {!loading && batches.length === 0 && (
         <div className="text-center py-12">
           <Receipt className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
@@ -2425,6 +2679,75 @@ export function PayrollIntegration() {
           </Button>
         </div>
       )}
+
+      {/* GL Voucher Choice Modal */}
+      <Dialog open={glVoucherChoiceOpen} onOpenChange={setGlVoucherChoiceOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-sm">Post to General Ledger</DialogTitle>
+            <DialogDescription className="text-xs">
+              {selectedBatch?.batchNumber} · {selectedBatch?.period} · {selectedBatch?.lines?.length || 0} employees
+              {selectedBatch && ` · Total Net Pay: ${formatCurrency(selectedBatch.totalNetPay)}`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <p className="text-sm font-medium">How would you like to post this payroll?</p>
+
+            <div className="grid grid-cols-2 gap-3">
+              {/* Consolidated Option */}
+              <button
+                className={`p-4 rounded-xl border-2 text-left transition-all ${glVoucherMode === 'consolidated' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}
+                onClick={() => setGlVoucherMode('consolidated')}
+              >
+                <div className="text-lg mb-1">📄</div>
+                <p className="text-sm font-semibold">Single Voucher</p>
+                <p className="text-[11px] text-muted-foreground mt-1">One consolidated JV for all employees and all projects</p>
+                <p className="text-[10px] font-mono text-muted-foreground mt-2">JV-PAY-{selectedBatch?.period?.replace('-', '')}-001</p>
+              </button>
+
+              {/* Project-wise Option */}
+              <button
+                className={`p-4 rounded-xl border-2 text-left transition-all ${glVoucherMode === 'project-wise' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}
+                onClick={() => setGlVoucherMode('project-wise')}
+              >
+                <div className="text-lg mb-1">📂</div>
+                <p className="text-sm font-semibold">Project-wise Vouchers</p>
+                <p className="text-[11px] text-muted-foreground mt-1">Separate JV per project</p>
+                <p className="text-[10px] font-mono text-muted-foreground mt-2">JV-PAY-{selectedBatch?.period?.replace('-', '')}-PROJ</p>
+              </button>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => { setGlVoucherChoiceOpen(false); setGlVoucherMode(null) }}>Cancel</Button>
+            <Button size="sm" disabled={!glVoucherMode || glVoucherLoading} onClick={() => setGlVoucherConfirmOpen(true)}>
+              {glVoucherLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <BookOpen className="h-3.5 w-3.5 mr-1" />}
+              Generate Voucher(s)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* GL Voucher Confirmation */}
+      <AlertDialog open={glVoucherConfirmOpen} onOpenChange={setGlVoucherConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-sm">Confirm GL Voucher Generation</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs">
+              This will create {glVoucherMode === 'consolidated' ? 'a single consolidated' : 'project-wise'} journal voucher(s) in draft status.
+              The batch status will be updated accordingly.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleGenerateGLVoucher} disabled={glVoucherLoading}>
+              {glVoucherLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+              Confirm & Generate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ============ DIALOGS ============ */}
 
