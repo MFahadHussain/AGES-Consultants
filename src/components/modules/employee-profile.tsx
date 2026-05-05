@@ -188,11 +188,19 @@ function calcEMI(principal: number, annualRate: number, tenure: number): number 
   return Math.round(principal * r * f / (f - 1))
 }
 
-/** Generate a list of recent months for dropdowns */
-function getRecentMonths(count: number = 12): string[] {
+/** Generate a list of months for dropdowns (past 12 + future 12) */
+function getRecentMonths(pastCount: number = 12, futureCount: number = 12): string[] {
   const months: string[] = []
   const now = new Date()
-  for (let i = 0; i < count; i++) {
+  // Future months first (closest to farthest), then current, then past months
+  for (let i = futureCount; i >= 1; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+    months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)
+  }
+  // Current month
+  months.push(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`)
+  // Past months
+  for (let i = 1; i <= pastCount; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)
   }
@@ -542,12 +550,14 @@ export function EmployeeProfile() {
     fetchSalaryHistory()
   }, [selectedId, attMonths[selectedId || '']])
 
-  // Set default payroll month
+  // Set default payroll month to current month
   useEffect(() => {
-    if (!payrollMonth && availableMonths.length > 0) {
-      setPayrollMonth(availableMonths[0])
+    if (!payrollMonth) {
+      const now = new Date()
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
+      setPayrollMonth(currentMonth)
     }
-  }, [availableMonths, payrollMonth])
+  }, [payrollMonth])
 
   // ---- Derived ----
   const emp = useMemo(() => employees.find(e => e.id === selectedId) || null, [employees, selectedId])
