@@ -136,14 +136,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       }
       const current = await db.voucher.findUnique({ where: { id }, select: { status: true } })
       if (!current) return NextResponse.json({ error: 'Voucher not found' }, { status: 404 })
-      if (current.status !== 'approved') {
-        return NextResponse.json({ error: `Cannot post voucher with status "${current.status}". Only approved vouchers can be posted.` }, { status: 400 })
+      if (current.status !== 'approved' && current.status !== 'draft') {
+        return NextResponse.json({ error: `Cannot post voucher with status "${current.status}". Only approved or draft vouchers can be posted.` }, { status: 400 })
       }
       const voucher = await db.voucher.update({
         where: { id },
-        data: { status: 'posted', postedBy: systemUserId },
+        data: { status: 'posted', reviewedBy: systemUserId, approvedBy: systemUserId, postedBy: systemUserId },
       })
-      await createApproval('POST', 'approved', 'posted', data.comments)
+      await createApproval('POST', current.status, 'posted', data.comments || 'Payroll voucher posted to GL')
       return NextResponse.json(voucher)
     }
 

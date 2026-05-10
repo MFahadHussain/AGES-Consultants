@@ -107,7 +107,7 @@ export async function GET(request: Request) {
         where: { id: voucherId },
         include: {
           entries: {
-            include: { account: { select: { id: true, accountName: true, accountCode: true } } },
+            include: { account: { select: { id: true, name: true, code: true } } },
             orderBy: { lineNumber: 'asc' },
           },
         },
@@ -818,7 +818,7 @@ export async function POST(request: Request) {
         where: { id: voucher.id },
         include: {
           entries: {
-            include: { account: { select: { id: true, accountName: true, accountCode: true } } },
+            include: { account: { select: { id: true, name: true, code: true } } },
             orderBy: { lineNumber: 'asc' },
           },
         },
@@ -827,8 +827,8 @@ export async function POST(request: Request) {
       const displayEntries = (voucherWithEntries?.entries || []).map(e => ({
         lineNumber: e.lineNumber,
         accountId: e.accountId,
-        accountCode: e.account?.accountCode || '',
-        accountName: e.account?.accountName || 'Unknown',
+        accountCode: e.account?.code || '',
+        accountName: e.account?.name || 'Unknown',
         debit: e.debit,
         credit: e.credit,
         description: e.description,

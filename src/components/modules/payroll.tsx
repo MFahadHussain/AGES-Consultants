@@ -934,6 +934,16 @@ export function PayrollIntegration() {
         })
         const glResult = await glRes.json()
         if (!glRes.ok) throw new Error(glResult.error || 'Failed to create GL voucher')
+
+        // Store generated vouchers for display
+        if (glResult.vouchers?.length > 0) {
+          setGeneratedVouchers(prev => {
+            // Remove any previous vouchers for the same project to avoid duplicates
+            const newVoucherProjectIds = new Set(glResult.vouchers.map((v: any) => v.voucherId))
+            const filtered = prev.filter(v => !newVoucherProjectIds.has(v.voucherId))
+            return [...filtered, ...glResult.vouchers]
+          })
+        }
       }
 
       toast({
@@ -3009,7 +3019,7 @@ export function PayrollIntegration() {
           </Card>
 
           {/* Voucher Cards for Draft-to-GL and Posted batches */}
-          {(batch.status === 'draft-to-gl' || batch.status === 'posted') && generatedVouchers.length > 0 && generatedVouchers.some(v => {
+          {generatedVouchers.length > 0 && generatedVouchers.some(v => {
             // Show vouchers that belong to this batch (all project-wise vouchers for the selected batch)
             return selectedBatch?.id === batch.id || generatedVouchers.length > 0
           }) && (

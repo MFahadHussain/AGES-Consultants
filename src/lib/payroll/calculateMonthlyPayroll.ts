@@ -264,6 +264,7 @@ export interface PayrollResult {
     fixedTax: number
     variableTax: number
     taxPaidYtd: number
+    monthlyTax: number
   }
   scBreakdown: {
     monthlySC: number
@@ -890,6 +891,7 @@ export async function calculateMonthlyPayroll(
     fixedTax: 0,
     variableTax: 0,
     taxPaidYtd: 0,
+    monthlyTax: 0,
   }
 
   if (employee.incomeTaxEnabled !== false && grossSalary > 0) {
@@ -968,6 +970,7 @@ export async function calculateMonthlyPayroll(
     taxBreakdown.fixedTax = slab.fixedTax
     taxBreakdown.variableTax = roundPKR(variableTax)
     taxBreakdown.taxPaidYtd = taxPaidYtd
+    taxBreakdown.monthlyTax = monthlyTax
   }
 
   // ── 17. Loan deduction ──

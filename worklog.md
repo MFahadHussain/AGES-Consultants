@@ -98,3 +98,27 @@ Stage Summary:
 - Each project voucher can be posted individually or all at once
 - Balance validation (Dr = Cr) shown per voucher and across all vouchers
 - Format: JV-PAY-YYYYMM-PROJCODE for all project-wise vouchers
+
+---
+Task ID: 3
+Agent: main
+Task: Fix project-wise voucher creation error, remove June data, fix NaN tax display
+
+Work Log:
+- Fixed critical Prisma error: Account model fields are `name` and `code`, not `accountName` and `accountCode`. Updated all Prisma select clauses in:
+  - /api/payroll/generate-gl-voucher/route.ts (3 occurrences)
+  - /api/payroll/route.ts (2 occurrences)
+- Fixed voucher posting: updated /api/vouchers/[id]/route.ts to allow posting from 'draft' status (not just 'approved'), so payroll-generated draft vouchers can be posted directly
+- Removed restrictive batch status check in generate-gl-voucher: now allows any batch status since line-level approval is checked independently
+- Fixed NaN in monthly tax: added `monthlyTax` field to taxBreakdown initialization and assignment in calculateMonthlyPayroll.ts
+- Deleted June 2026 payroll data (batch PAY-202606-001 and voucher JV-PAY-202606-AGES-H) from database
+- Updated voucher suffix format: removed hyphens and spaces from project codes, extended max length to 8 chars (e.g., AGES-HO → AGESHO)
+- Updated handlePayProject to store generated vouchers in state for display after creation
+- Updated voucher display condition to show when generatedVouchers exist regardless of batch status
+- Lint check: 0 errors, 4 pre-existing warnings
+
+Stage Summary:
+- Root cause of voucher creation error: Prisma select used non-existent field names `accountName`/`accountCode` instead of `name`/`code`
+- Root cause of NaN: `monthlyTax` was calculated but never assigned to `taxBreakdown` object
+- Root cause of posting failure: voucher `post` action required `approved` status but payroll creates `draft` vouchers
+- June data cleaned, voucher number format improved

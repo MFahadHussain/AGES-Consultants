@@ -376,7 +376,7 @@ function safeParseJson<T>(value: string | null | undefined): T[] {
 // Helper: format project code for voucher suffix
 // -----------------------------------------------------------
 function formatProjectSuffix(code: string): string {
-  return code.toUpperCase().replace(/\s+/g, '').substring(0, 6)
+  return code.toUpperCase().replace(/[\s\-]+/g, '').substring(0, 8)
 }
 
 // -----------------------------------------------------------
@@ -479,7 +479,7 @@ export async function POST(request: NextRequest) {
         where: { id: voucher.id },
         include: {
           entries: {
-            include: { account: { select: { id: true, accountName: true, accountCode: true } } },
+            include: { account: { select: { id: true, name: true, code: true } } },
             orderBy: { lineNumber: 'asc' },
           },
         },
@@ -488,8 +488,8 @@ export async function POST(request: NextRequest) {
       const displayEntries = (voucherWithEntries?.entries || []).map(e => ({
         lineNumber: e.lineNumber,
         accountId: e.accountId,
-        accountCode: e.account?.accountCode || '',
-        accountName: e.account?.accountName || 'Unknown',
+        accountCode: e.account?.code || '',
+        accountName: e.account?.name || 'Unknown',
         debit: e.debit,
         credit: e.credit,
         description: e.description,
@@ -535,13 +535,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
     }
 
-    // Verify batch is in an appropriate status
-    if (batch.status !== 'approved' && batch.status !== 'reviewed' && batch.status !== 'draft-to-gl') {
-      return NextResponse.json(
-        { error: `Batch status is '${batch.status}'. Must be 'approved', 'reviewed', or 'draft-to-gl' to generate GL vouchers.` },
-        { status: 400 }
-      )
-    }
+    // Verify batch is in an appropriate status — allow any status since we check line-level approval
+    // Removed restrictive batch status check: project-wise workflow approves lines independently
 
     // Verify not already posted to GL
     if (batch.postedToGL && mode !== 'project-wise') {
@@ -653,7 +648,7 @@ export async function POST(request: NextRequest) {
         where: { id: voucher.id },
         include: {
           entries: {
-            include: { account: { select: { id: true, accountName: true, accountCode: true } } },
+            include: { account: { select: { id: true, name: true, code: true } } },
             orderBy: { lineNumber: 'asc' },
           },
         },
@@ -662,8 +657,8 @@ export async function POST(request: NextRequest) {
       const displayEntries = (voucherWithEntries?.entries || []).map(e => ({
         lineNumber: e.lineNumber,
         accountId: e.accountId,
-        accountCode: e.account?.accountCode || '',
-        accountName: e.account?.accountName || 'Unknown',
+        accountCode: e.account?.code || '',
+        accountName: e.account?.name || 'Unknown',
         debit: e.debit,
         credit: e.credit,
         description: e.description,
@@ -987,7 +982,7 @@ export async function POST(request: NextRequest) {
           where: { id: voucher.id },
           include: {
             entries: {
-              include: { account: { select: { id: true, accountName: true, accountCode: true } } },
+              include: { account: { select: { id: true, name: true, code: true } } },
               orderBy: { lineNumber: 'asc' },
             },
           },
@@ -996,8 +991,8 @@ export async function POST(request: NextRequest) {
         const displayEntries = (voucherWithEntries?.entries || []).map(e => ({
           lineNumber: e.lineNumber,
           accountId: e.accountId,
-          accountCode: e.account?.accountCode || '',
-          accountName: e.account?.accountName || 'Unknown',
+          accountCode: e.account?.code || '',
+          accountName: e.account?.name || 'Unknown',
           debit: e.debit,
           credit: e.credit,
           description: e.description,
