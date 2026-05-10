@@ -128,7 +128,7 @@ function JournalVoucherCard({ batch, draftVoucher, setDraftVoucher }: { batch: a
   const fetchVoucherData = useCallback(async (voucherId: string) => {
     setLoadingVoucher(true)
     try {
-      const r = await fetch(`/api/payroll?voucherId=${voucherId}`)
+      const r = await fetch(`/api/vouchers/${voucherId}`)
       const data = await r.json()
       if (data.entries) {
         setFetchedVoucher({
@@ -140,8 +140,8 @@ function JournalVoucherCard({ batch, draftVoucher, setDraftVoucher }: { batch: a
           entries: data.entries.map((e: any) => ({
             lineNumber: e.lineNumber,
             accountId: e.accountId,
-            accountCode: e.account?.accountCode || '',
-            accountName: e.account?.accountName || 'Unknown',
+            accountCode: e.account?.code || '',
+            accountName: e.account?.name || 'Unknown',
             debit: e.debit,
             credit: e.credit,
             description: e.description,
@@ -179,7 +179,7 @@ function JournalVoucherCard({ batch, draftVoucher, setDraftVoucher }: { batch: a
   if (!voucherData) return null
 
   return (
-    <Card className="border-violet-200 bg-gradient-to-br from-violet-50/50 to-slate-50/50">
+    <Card className="voucher-print-area border-violet-200 bg-gradient-to-br from-violet-50/50 to-slate-50/50">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -187,8 +187,8 @@ function JournalVoucherCard({ batch, draftVoucher, setDraftVoucher }: { batch: a
             <CardTitle className="text-sm font-bold text-violet-900">JOURNAL VOUCHER</CardTitle>
           </div>
           <div className="flex items-center gap-2">
-            <Badge className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-200">
-              {voucherData.voucherStatus === 'draft' ? 'Draft' : voucherData.voucherStatus}
+            <Badge className={`text-[10px] border ${voucherData.voucherStatus === 'draft' ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200'}`}>
+              {voucherData.voucherStatus === 'draft' ? 'DRAFT' : voucherData.voucherStatus === 'posted' ? 'POSTED' : (voucherData.voucherStatus || '').toUpperCase()}
             </Badge>
           </div>
         </div>
@@ -198,6 +198,12 @@ function JournalVoucherCard({ batch, draftVoucher, setDraftVoucher }: { batch: a
         </div>
       </CardHeader>
       <CardContent>
+        {/* Print-only company header */}
+        <div className="print-only hidden" style={{textAlign: 'center', marginBottom: '20px'}}>
+          <h1 style={{fontSize: '18px', fontWeight: 'bold'}}>AcctFin ERP</h1>
+          <p>Journal Voucher - Payroll Posting</p>
+          <p>Voucher No: {voucherData.voucherNumber || `JV-PAY-${batch.batchNumber}`} | Date: {new Date().toLocaleDateString()}</p>
+        </div>
         <div className="rounded border overflow-hidden">
           <Table>
             <TableHeader>
@@ -246,6 +252,14 @@ function JournalVoucherCard({ batch, draftVoucher, setDraftVoucher }: { batch: a
           </div>
           <div className="text-[10px] text-muted-foreground">
             {voucherData.entries.length} entries | Approved lines: {voucherData.approvedLineCount || '—'}
+          </div>
+        </div>
+        {/* Print-only signature lines */}
+        <div className="print-only hidden" style={{marginTop: '30px'}}>
+          <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '40px'}}>
+            <div style={{textAlign: 'center'}}><div style={{borderTop: '1px solid #000', width: '150px', paddingTop: '4px'}}>Prepared By</div></div>
+            <div style={{textAlign: 'center'}}><div style={{borderTop: '1px solid #000', width: '150px', paddingTop: '4px'}}>Reviewed By</div></div>
+            <div style={{textAlign: 'center'}}><div style={{borderTop: '1px solid #000', width: '150px', paddingTop: '4px'}}>Approved By</div></div>
           </div>
         </div>
       </CardContent>
@@ -1500,6 +1514,20 @@ export function PayrollIntegration() {
   // ----------------------------------------------------------
   return (
     <div className="space-y-4">
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          .voucher-print-area, .voucher-print-area * { visibility: visible; }
+          .voucher-print-area { position: absolute; left: 0; top: 0; width: 100%; }
+          .no-print { display: none !important; }
+          .print-only { display: block !important; }
+          .print-only.hidden { display: block !important; }
+          table { border-collapse: collapse; }
+          table th, table td { border: 1px solid #000; padding: 4px 8px; }
+          .voucher-print-area + .voucher-print-area { page-break-before: always; }
+          @page { margin: 15mm; }
+        }
+      `}</style>
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card className="border-l-4 border-l-emerald-500">
@@ -2537,6 +2565,15 @@ export function PayrollIntegration() {
             </Card>
           )}
 
+          {/* Post All Vouchers to GL button */}
+          {generatedVouchers.length > 1 && generatedVouchers.some((v: any) => v.status === 'draft') && (
+            <div className="flex justify-end">
+              <Button size="sm" className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700" onClick={handlePostAllVouchersToGL}>
+                <BookOpen className="h-3.5 w-3.5 mr-1" />Post All Vouchers to GL
+              </Button>
+            </div>
+          )}
+
           {/* Individual Voucher Cards */}
           {generatedVouchers.map(voucher => {
             const isBalanced = Math.abs(voucher.totalDebit - voucher.totalCredit) < 1
@@ -2545,7 +2582,7 @@ export function PayrollIntegration() {
             const isExpanded = expandedVoucherEmp === voucher.voucherId
 
             return (
-              <Card key={voucher.voucherId} className={`border-l-4 ${isPosted ? 'border-l-emerald-500' : 'border-l-amber-400'} border-slate-200`}>
+              <Card key={voucher.voucherId} className={`voucher-print-area border-l-4 ${isPosted ? 'border-l-emerald-500' : 'border-l-amber-400'} border-slate-200`}>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -2568,6 +2605,12 @@ export function PayrollIntegration() {
                   </div>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
+                  {/* Print-only company header */}
+                  <div className="print-only hidden" style={{textAlign: 'center', marginBottom: '20px'}}>
+                    <h1 style={{fontSize: '18px', fontWeight: 'bold'}}>AcctFin ERP</h1>
+                    <p>Journal Voucher - Payroll Posting</p>
+                    <p>Voucher No: {voucher.voucherNumber} | Period: {voucher.period} | Date: {new Date().toLocaleDateString()}</p>
+                  </div>
                   {/* Journal Entry Table */}
                   <div className="rounded border overflow-hidden">
                     <Table>
@@ -2645,8 +2688,17 @@ export function PayrollIntegration() {
                     </div>
                   )}
 
+                  {/* Print-only signature lines */}
+                  <div className="print-only hidden" style={{marginTop: '30px'}}>
+                    <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '40px'}}>
+                      <div style={{textAlign: 'center'}}><div style={{borderTop: '1px solid #000', width: '150px', paddingTop: '4px'}}>Prepared By</div></div>
+                      <div style={{textAlign: 'center'}}><div style={{borderTop: '1px solid #000', width: '150px', paddingTop: '4px'}}>Reviewed By</div></div>
+                      <div style={{textAlign: 'center'}}><div style={{borderTop: '1px solid #000', width: '150px', paddingTop: '4px'}}>Approved By</div></div>
+                    </div>
+                  </div>
+
                   {/* Action Buttons */}
-                  <div className="flex items-center gap-2 mt-3">
+                  <div className="flex items-center gap-2 mt-3 no-print">
                     <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => window.print()}>
                       🖨 Print
                     </Button>

@@ -175,7 +175,7 @@ const SC_COMPONENT_COLORS: Record<string,{bg:string;text:string;border:string;ic
 
 // ── HELPERS ──────────────────────────────────────────────────────────
 
-function formatPKR(n: number): string { return 'PKR ' + n.toLocaleString('en-PK') }
+function formatPKR(n: number | undefined | null): string { return 'PKR ' + (n != null && !isNaN(n) ? n.toLocaleString('en-PK') : '0') }
 function formatDate(d: string | null): string {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('en-PK',{year:'numeric',month:'short',day:'numeric'})
@@ -750,14 +750,23 @@ export function EmployeeProfile() {
     const month = payrollMonth || new Date().toISOString().slice(0, 7)
     setScDraftGLLoading(true)
     try {
+      // Fetch open financial year
+      const fyRes = await fetch('/api/financial-year')
+      const fyData = await fyRes.json()
+      const openFy = Array.isArray(fyData) ? fyData.find((f: any) => f.status === 'open') : null
+      if (!openFy) {
+        toast.error('No open financial year found. Please create or open a financial year first.')
+        return
+      }
+
       const res = await fetch('/api/payroll/generate-gl-voucher', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'sc-only', employeeId: empId, month, scAmount }),
+        body: JSON.stringify({ mode: 'sc-only', employeeId: empId, month, scAmount, financialYearId: openFy.id }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to create SC voucher')
-      setScDraftGLVoucher({ voucherId: data.vouchers?.[0]?.voucherId || data.voucherId, voucherNumber: data.vouchers?.[0]?.voucherNumber || data.voucherNumber || `JV-SC-${month.replace('-','')}-${emp?.employeeCode || 'EMP'}` })
+      setScDraftGLVoucher({ voucherId: data.voucher?.voucherId || data.vouchers?.[0]?.voucherId || data.voucherId, voucherNumber: data.voucher?.voucherNumber || data.vouchers?.[0]?.voucherNumber || data.voucherNumber || `JV-SC-${month.replace('-','')}-${emp?.employeeCode || 'EMP'}` })
       toast.success('SC Draft Voucher created', { description: `Voucher for PKR ${scAmount.toLocaleString()} social charges` })
     } catch (e: any) {
       toast.error(e.message || 'Failed to create SC draft voucher')
@@ -1056,10 +1065,10 @@ export function EmployeeProfile() {
   // ========================================================================
   const renderProjectCostDistribution = (scCalc: PayrollResult, source: string) => {
     // Prefer multi-contract earnings view if available
-    const contractEarnings = (scCalc as any).contractEarnings as ContractEarningRow[] | undefined
-    const hasContracts = contractEarnings && contractEarnings.length > 0
+    const contractEarnings = ((scCalc as any).contractEarnings as ContractEarningRow[] | undefined) || []
+    const hasContracts = contractEarnings.length > 0
 
-    if (scCalc.projectAllocations.length === 0 && !hasContracts) {
+    if ((scCalc.projectAllocations || []).length === 0 && !hasContracts) {
       return (
         <div className="bg-slate-50 rounded-xl p-4 text-center text-[12px] text-slate-400">
           No project allocations for this period
@@ -1078,8 +1087,8 @@ export function EmployeeProfile() {
             </div>
             {/* Visual bar showing contract earnings distribution */}
             <div className="flex h-8 rounded-lg overflow-hidden bg-slate-100 mb-3">
-              {contractEarnings!.map((ce, i) => {
-                const totalEarned = contractEarnings!.reduce((s, c) => s + c.earnedSalary, 0)
+              {contractEarnings.map((ce, i) => {
+                const totalEarned = contractEarnings.reduce((s, c) => s + c.earnedSalary, 0)
                 const pct = totalEarned > 0 ? (ce.earnedSalary / totalEarned) * 100 : 0
                 return (
                   <div key={ce.projectId} className={`${PROJECT_BAR_COLORS[i % PROJECT_BAR_COLORS.length]} transition-all duration-500 flex items-center justify-center`}
@@ -1104,7 +1113,7 @@ export function EmployeeProfile() {
                   </tr>
                 </thead>
                 <tbody>
-                  {contractEarnings!.map((ce, i) => (
+                  {contractEarnings.map((ce, i) => (
                     <tr key={ce.projectId} className="border-b border-slate-50 hover:bg-slate-50/50">
                       <td className="py-1.5 px-2">
                         <span className="flex items-center gap-1.5">
@@ -1122,8 +1131,8 @@ export function EmployeeProfile() {
                   ))}
                   <tr className="bg-slate-50/80 border-t border-slate-200">
                     <td colSpan={5} className="py-1.5 px-2 text-right font-semibold text-slate-700">Total Combined</td>
-                    <td className="py-1.5 px-2 text-right font-bold text-emerald-700">{formatPKR(contractEarnings!.reduce((s,c) => s + c.earnedSalary, 0))}</td>
-                    <td className="py-1.5 px-2 text-right font-semibold text-slate-700">{formatPKR(contractEarnings!.reduce((s,c) => s + c.scShare, 0))}</td>
+                    <td className="py-1.5 px-2 text-right font-bold text-emerald-700">{formatPKR(contractEarnings.reduce((s,c) => s + c.earnedSalary, 0))}</td>
+                    <td className="py-1.5 px-2 text-right font-semibold text-slate-700">{formatPKR(contractEarnings.reduce((s,c) => s + c.scShare, 0))}</td>
                   </tr>
                 </tbody>
               </table>
@@ -1136,7 +1145,7 @@ export function EmployeeProfile() {
         )}
 
         {/* Fallback: Weight-based allocation view */}
-        {!hasContracts && scCalc.projectAllocations.length > 0 && (
+        {!hasContracts && (scCalc.projectAllocations || []).length > 0 && (
           <>
             <div className="bg-white border border-slate-200 rounded-xl p-4">
               <div className="flex items-center justify-between mb-2">
@@ -1144,7 +1153,7 @@ export function EmployeeProfile() {
                 <span className="text-[10px] text-slate-400">{source}</span>
               </div>
               <div className="flex h-6 rounded-full overflow-hidden bg-slate-100 mb-3">
-                {scCalc.projectAllocations.map((p, i) => (
+                {(scCalc.projectAllocations || []).map((p, i) => (
                   <div key={p.projectName} className={`${PROJECT_BAR_COLORS[i % PROJECT_BAR_COLORS.length]} transition-all duration-500 flex items-center justify-center`}
                     style={{width: `${Math.max(p.weight * 100, 3)}%`}}>
                     <span className="text-[9px] text-white font-semibold truncate px-1">{p.weightPct}</span>
@@ -1152,7 +1161,7 @@ export function EmployeeProfile() {
                 ))}
               </div>
               <div className="flex flex-wrap gap-2">
-                {scCalc.projectAllocations.map((p, i) => (
+                {(scCalc.projectAllocations || []).map((p, i) => (
                   <span key={p.projectName} className="flex items-center gap-1 text-[10px]">
                     <span className={`w-2.5 h-2.5 rounded-full ${PROJECT_BAR_COLORS[i % PROJECT_BAR_COLORS.length]}`}/>
                     <span className="text-slate-700 font-medium">{p.projectName}</span>
@@ -1174,7 +1183,7 @@ export function EmployeeProfile() {
                   </tr>
                 </thead>
                 <tbody>
-                  {scCalc.projectAllocations.map((p, i) => (
+                  {(scCalc.projectAllocations || []).map((p, i) => (
                     <tr key={p.projectName} className="border-b border-slate-50 hover:bg-slate-50/50">
                       <td className="py-2 px-3">
                         <span className="flex items-center gap-1.5">
@@ -1302,7 +1311,7 @@ export function EmployeeProfile() {
                       <span className="font-semibold">Per-Project SC:</span>
                       {apiPayrollResult.projectScDetails.map((psc: any, i: number) => (
                         <div key={i} className="pl-2 text-amber-700">
-                          {psc.projectName}: {formatPKR(psc.projectSC)} ({(psc.projectRatio * 100).toFixed(1)}% × {formatPKR(psc.projectScBase)})
+                          {psc.projectName}: {formatPKR(psc.projectSC)} ({((psc.projectRatio ?? 0) * 100).toFixed(1)}% × {formatPKR(psc.projectScBase)})
                         </div>
                       ))}
                     </div>
@@ -1318,11 +1327,11 @@ export function EmployeeProfile() {
                 </div>
                 <div className="bg-slate-50 rounded-lg p-2">
                   <span className="text-slate-500">Income Tax</span>
-                  <p className="font-semibold text-red-500">{formatPKR(apiPayrollResult.deductions.incomeTax)}</p>
+                  <p className="font-semibold text-red-500">{formatPKR(apiPayrollResult.deductions?.incomeTax)}</p>
                 </div>
                 <div className="bg-slate-50 rounded-lg p-2">
                   <span className="text-slate-500">Loan Deduction</span>
-                  <p className="font-semibold text-red-500">{formatPKR(apiPayrollResult.deductions.loanDeduction)}</p>
+                  <p className="font-semibold text-red-500">{formatPKR(apiPayrollResult.deductions?.loanDeduction)}</p>
                 </div>
                 <div className="bg-slate-50 rounded-lg p-2">
                   <span className="text-slate-500">Net Pay</span>
@@ -1399,10 +1408,10 @@ export function EmployeeProfile() {
                                 <div>
                                   <h5 className="text-[11px] font-semibold text-slate-700 mb-2 uppercase tracking-wider">Earnings</h5>
                                   <div className="space-y-1">
-                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Basic</span><span className="text-slate-900">{formatPKR(row.earnings.basic)}</span></div>
-                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Housing</span><span className="text-slate-900">{formatPKR(row.earnings.housing)}</span></div>
-                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Transport</span><span className="text-slate-900">{formatPKR(row.earnings.transport)}</span></div>
-                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Other Allowances</span><span className="text-slate-900">{formatPKR(row.earnings.other)}</span></div>
+                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Basic</span><span className="text-slate-900">{formatPKR(row.earnings?.basic)}</span></div>
+                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Housing</span><span className="text-slate-900">{formatPKR(row.earnings?.housing)}</span></div>
+                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Transport</span><span className="text-slate-900">{formatPKR(row.earnings?.transport)}</span></div>
+                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Other Allowances</span><span className="text-slate-900">{formatPKR(row.earnings?.other)}</span></div>
                                     <Separator className="my-1"/>
                                     <div className="flex justify-between text-[12px] font-semibold"><span>Total Earnings</span><span>{formatPKR(row.earnedSalary)}</span></div>
                                   </div>
@@ -1410,10 +1419,10 @@ export function EmployeeProfile() {
                                 <div>
                                   <h5 className="text-[11px] font-semibold text-slate-700 mb-2 uppercase tracking-wider">Deductions</h5>
                                   <div className="space-y-1">
-                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Absent Deduction</span><span className="text-red-500">{formatPKR(row.deductionBreakdown.absentDeduction)}</span></div>
-                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Tax</span><span className="text-red-500">{formatPKR(row.deductionBreakdown.tax)}</span></div>
-                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Loan EMI</span><span className="text-red-500">{formatPKR(row.deductionBreakdown.loanEmi)}</span></div>
-                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">SC Employee Share</span><span className="text-red-500">{formatPKR(row.deductionBreakdown.scEmployee)}</span></div>
+                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Absent Deduction</span><span className="text-red-500">{formatPKR(row.deductionBreakdown?.absentDeduction)}</span></div>
+                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Tax</span><span className="text-red-500">{formatPKR(row.deductionBreakdown?.tax)}</span></div>
+                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">Loan EMI</span><span className="text-red-500">{formatPKR(row.deductionBreakdown?.loanEmi)}</span></div>
+                                    <div className="flex justify-between text-[12px]"><span className="text-slate-500">SC Employee Share</span><span className="text-red-500">{formatPKR(row.deductionBreakdown?.scEmployee)}</span></div>
                                     <Separator className="my-1"/>
                                     <div className="flex justify-between text-[12px] font-semibold"><span>Total Deductions</span><span className="text-red-500">{formatPKR(row.totalDeductions)}</span></div>
                                   </div>
@@ -1492,8 +1501,8 @@ export function EmployeeProfile() {
                                         ))}
                                         <tr className="bg-slate-50/80 border-t border-slate-200">
                                           <td colSpan={5} className="py-1.5 px-2 text-right font-semibold text-slate-700">Total</td>
-                                          <td className="py-1.5 px-2 text-right font-semibold text-emerald-700">{formatPKR(row.contractEarnings.reduce((s,c) => s + c.earnedSalary, 0))}</td>
-                                          <td className="py-1.5 px-2 text-right font-semibold text-slate-700">{formatPKR(row.contractEarnings.reduce((s,c) => s + c.scShare, 0))}</td>
+                                          <td className="py-1.5 px-2 text-right font-semibold text-emerald-700">{formatPKR((row.contractEarnings || []).reduce((s,c) => s + c.earnedSalary, 0))}</td>
+                                          <td className="py-1.5 px-2 text-right font-semibold text-slate-700">{formatPKR((row.contractEarnings || []).reduce((s,c) => s + c.scShare, 0))}</td>
                                         </tr>
                                       </tbody>
                                     </table>
@@ -1517,7 +1526,7 @@ export function EmployeeProfile() {
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        {row.projectAllocations.map((pa, i) => (
+                                        {(row.projectAllocations || []).map((pa, i) => (
                                           <tr key={pa.projectId || i} className="border-b border-slate-50 last:border-0">
                                             <td className="py-1.5 px-2">
                                               <span className="flex items-center gap-1.5">
@@ -1588,7 +1597,7 @@ export function EmployeeProfile() {
         )}
 
         {/* Project-wise SC Distribution */}
-        {scCalc && scCalc.projectAllocations.length > 0 && (
+        {scCalc && (scCalc.projectAllocations || []).length > 0 && (
           <div>
             <h3 className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-1.5"><BarChart3 className="h-3.5 w-3.5"/>Project-wise SC Distribution — {fmtMonth(payrollMonth)}</h3>
             {renderProjectCostDistribution(scCalc, 'API Calculation')}

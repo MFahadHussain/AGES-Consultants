@@ -252,3 +252,90 @@ Stage Summary:
 - Employee profile month dropdown now shows months beyond May 2026 (up to 12 months future)
 - SC "Draft SC to GL" button creates draft GL voucher for social charges
 - All lint checks pass, app running on port 3000
+
+---
+Task ID: 4
+Agent: null-guards-agent
+Task: Add null guards to employee-profile.tsx
+
+Work Log:
+- Read full employee-profile.tsx (~2100 lines) and worklog.md to understand prior changes
+- **formatPKR** (line 178): Changed signature from `(n: number)` to `(n: number | undefined | null)` and added guard: outputs "PKR 0" when value is null/undefined/NaN instead of crashing with "PKR NaN"
+- **renderProjectCostDistribution** `scCalc.projectAllocations`: Replaced 5 occurrences of bare `scCalc.projectAllocations` with `(scCalc.projectAllocations || [])` to prevent TypeError when API returns undefined allocations
+- **renderSocialCharges** `scCalc.projectAllocations.length > 0`: Changed to `(scCalc.projectAllocations || []).length > 0`
+- **contractEarnings non-null assertions**: Replaced `contractEarnings!` with safe `contractEarnings` (after initializing with `|| []`) — removed 5 unsafe non-null assertion (`!`) usages in renderProjectCostDistribution
+- **Salary history contractEarnings.reduce**: Added `|| []` guards on 2 `.reduce()` calls for `row.contractEarnings` in payslip expanded view (lines 1495-1496)
+- **Salary history projectAllocations.map**: Added `|| []` guard on `row.projectAllocations.map()` in payslip expanded view
+- **Earnings nested access**: Changed `row.earnings.basic/housing/transport/other` to `row.earnings?.basic/housing/transport/other` (4 places)
+- **DeductionBreakdown nested access**: Changed `row.deductionBreakdown.absentDeduction/tax/loanEmi/scEmployee` to `row.deductionBreakdown?.absentDeduction/tax/loanEmi/scEmployee` (4 places)
+- **apiPayrollResult.deductions**: Added optional chaining `.deductions?.incomeTax` and `.deductions?.loanDeduction` to guard against undefined deductions object
+- **projectScDetails.projectRatio**: Added `?? 0` fallback to prevent NaN in `(psc.projectRatio * 100).toFixed(1)`
+- Ran `bun run lint` — 0 errors, 4 pre-existing warnings (from FAMS module, unrelated)
+
+Stage Summary:
+- formatPKR now safely handles NaN/undefined/null → outputs "PKR 0"
+- All projectAllocations accesses guarded with `|| []` pattern
+- All contractEarnings non-null assertions replaced with safe `|| []` defaults
+- All salary history nested property access (earnings, deductionBreakdown) uses optional chaining
+- apiPayrollResult.deductions uses optional chaining
+- projectScDetails.projectRatio has nullish coalescing fallback
+- Lint: 0 errors
+
+---
+Task ID: 5-6
+Agent: general-purpose
+Task: Improve GL Journal Voucher print layout and status badges
+
+Work Log:
+- Added @media print CSS block at top of component return statement with:
+  - `body * { visibility: hidden }` to hide all screen content
+  - `.voucher-print-area` visibility override to show only voucher cards
+  - `.no-print { display: none !important }` to hide action buttons in print
+  - `.print-only { display: block !important }` and `.print-only.hidden { display: block !important }` to show print-only elements
+  - Table border-collapse and 1px solid #000 borders for clean print output
+  - `@page { margin: 15mm }` for proper page margins
+  - `.voucher-print-area + .voucher-print-area { page-break-before: always }` for page breaks between vouchers
+- Added `voucher-print-area` class to both JournalVoucherCard and generated voucher Card components
+- Added `no-print` class to action buttons div (Print, Post to GL buttons) in generated voucher cards
+- Added print-only company header div (hidden on screen, shown in print) inside both card types:
+  - "AcctFin ERP" heading
+  - "Journal Voucher - Payroll Posting" subtitle
+  - Voucher No, Period, Date info line
+- Added print-only signature lines div (hidden on screen, shown in print) inside both card types:
+  - "Prepared By: ______", "Reviewed By: ______", "Approved By: ______" with border-top lines
+- Fixed JournalVoucherCard API URL from `/api/payroll?voucherId=${voucherId}` (non-existent endpoint) to `/api/vouchers/${voucherId}` (correct vouchers API)
+- Fixed JournalVoucherCard status badge: changed from always-emerald to conditional (amber for draft, emerald for posted, uppercase for others)
+- Verified generated voucher badges are correct: Draft=amber (bg-amber-100 text-amber-700), Posted=emerald (bg-emerald-100 text-emerald-700), Project=blue (bg-blue-100 text-blue-700)
+- Added "Post All Vouchers to GL" button (with BookOpen icon, emerald styling) above individual voucher cards, shown only when there are multiple vouchers with draft status
+- Lint: 0 errors, 4 pre-existing warnings (from FAMS module, unrelated)
+
+Stage Summary:
+- Print layout now properly shows only voucher content with company header and signature lines
+- JournalVoucherCard fetches from correct /api/vouchers/[id] endpoint
+- All status badges correctly color-coded: Draft=amber, Posted=emerald, Project=blue
+- "Post All Vouchers to GL" button available for batch posting of draft vouchers
+- Lint passes with 0 errors
+
+---
+Task ID: 7
+Agent: Main Agent
+Task: Additional fixes — financial year, account fields, account roles, May 2026 cleanup
+
+Work Log:
+- Fixed SC Draft to GL handler in employee-profile.tsx: Added financialYearId fetch before calling generate-gl-voucher API (API requires financialYearId for sc-only mode)
+- Fixed SC voucher response parsing: Changed from `data.vouchers?.[0]` to `data.voucher?.` to match actual API response structure
+- Fixed JournalVoucherCard account field mapping: Changed `e.account?.accountCode` to `e.account?.code` and `e.account?.accountName` to `e.account?.name` to match Account model schema
+- Added GRATUITY_PAYABLE and ESSI_PAYABLE account roles to account-roles.ts (needed by GL voucher generation)
+- Deleted May 2026 payroll batch (PAY-202605-001) and its associated data (1 batch line, 7 project cost ledger entries)
+- Verified SC calculation engine is correct: SC_EARN_STATUSES = ["P","W","H","WH","T","CO"], attendanceRatio = scEligDays/calendarDays, SC = monthlySalary × attendanceRatio × 20%
+
+Stage Summary:
+- All pending tasks completed:
+  1. SC fixes verified (already in place in calculateMonthlyPayroll.ts)
+  2. May 2026 payroll data removed from database
+  3. Employee profile null guards added
+  4. Social charges section with SC Draft to GL button completed (with financialYearId fix)
+  5. GL Journal Voucher workflow with print layout, status badges, and Post All button
+  6. Account roles updated with GRATUITY_PAYABLE and ESSI_PAYABLE
+  7. JournalVoucherCard API URL fixed and account fields corrected
+- Lint: 0 errors, 4 pre-existing warnings

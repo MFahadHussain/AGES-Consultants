@@ -40,6 +40,8 @@ const ACCOUNT_ROLES: Record<string, { accountType?: string; subType?: string; co
   INCOME_TAX_PAYABLE: { accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', nameContains: 'Income Tax', allowPosting: true },
   EOBI_PAYABLE:       { accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', nameContains: 'EOBI', allowPosting: true },
   PROVIDENT_FUND_PAYABLE: { accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', nameContains: 'Provident', allowPosting: true },
+  GRATUITY_PAYABLE:     { accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', nameContains: 'Gratuity', allowPosting: true },
+  ESSI_PAYABLE:         { accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', nameContains: 'ESSI', allowPosting: true },
 
   // FAMS - Asset accounts (new COA names)
   FA_ELECTRICAL_EQUIP:  { accountType: 'ASSET', subType: 'FIXED_ASSET', nameContains: 'Electrical Equipment', allowPosting: true },
