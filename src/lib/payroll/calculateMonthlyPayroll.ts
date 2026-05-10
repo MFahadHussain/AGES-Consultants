@@ -750,7 +750,7 @@ export async function calculateMonthlyPayroll(
     projectCode: ce.projectCode,
     days: ce.daysWorked,
     weight: totalBillableDays > 0 ? roundPKR((ce.daysWorked / totalBillableDays) * 10000) / 10000 : 0,
-    weightPct: totalBillableDays > 0 ? ((ce.daysWorked / totalBillableDays) * 100).toFixed(2) + '%' : '0%',
+    weightPct: totalBillableDays > 0 ? Math.round((ce.daysWorked / totalBillableDays) * 100) + '%' : '0%',
     salaryShare: ce.earnedSalary,
     scShare: ce.scShare,
     scBalance: ce.scBalance,

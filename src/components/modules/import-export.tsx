@@ -476,7 +476,7 @@ export function ImportExport() {
                       <div className="space-y-1">
                         <CheckCircle2 className="h-8 w-8 mx-auto text-green-500" />
                         <p className="text-xs font-medium text-green-700 dark:text-green-400">{selectedFile.name}</p>
-                        <p className="text-[10px] text-muted-foreground">{(selectedFile.size / 1024).toFixed(1)} KB • {parsedRows.length} rows</p>
+                        <p className="text-[10px] text-muted-foreground">{Math.round(selectedFile.size / 1024)} KB • {parsedRows.length} rows</p>
                         <Button
                           variant="ghost"
                           size="sm"

@@ -76,8 +76,8 @@ function formatCurrency(amount: number) {
 }
 
 function formatCompact(amount: number) {
-  if (Math.abs(amount) >= 1000000) return `${(amount / 1000000).toFixed(1)}M`
-  if (Math.abs(amount) >= 1000) return `${(amount / 1000).toFixed(0)}K`
+  if (Math.abs(amount) >= 1000000) return `${Math.round(amount / 1000000)}M`
+  if (Math.abs(amount) >= 1000) return `${Math.round(amount / 1000)}K`
   return amount.toString()
 }
 

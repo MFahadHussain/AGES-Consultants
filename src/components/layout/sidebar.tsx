@@ -227,12 +227,12 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'border-r bg-card transition-all duration-300 flex flex-col h-full',
+        'border-r bg-card transition-all duration-300 flex flex-col h-full overflow-hidden',
         sidebarOpen ? 'w-64' : 'w-16'
       )}
     >
       {/* Logo */}
-      <div className="flex items-center gap-2 px-4 py-4 border-b">
+      <div className="flex items-center gap-2 px-4 py-4 border-b shrink-0">
         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-primary-foreground font-bold text-sm shrink-0">
           AF
         </div>
@@ -260,54 +260,56 @@ export function Sidebar() {
       )}
 
       {/* Navigation */}
-      <ScrollArea className="flex-1 px-2 py-1">
-        {filteredNav.map(group => (
-          <div key={group.label} className="mb-1">
-            {sidebarOpen && (
-              <button
-                onClick={() => toggleGroup(group.label)}
-                className="flex items-center justify-between w-full px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {group.label}
-                {expandedGroups[group.label] ? (
-                  <ChevronDown className="h-3 w-3" />
-                ) : (
-                  <ChevronRight className="h-3 w-3" />
-                )}
-              </button>
-            )}
-            {(!sidebarOpen || expandedGroups[group.label]) && (
-              <div className="space-y-0.5">
-                {group.items.map(item => {
-                  const Icon = item.icon
-                  const isActive = activeModule === item.key
-                  return (
-                    <button
-                      key={item.key}
-                      onClick={() => setActiveModule(item.key)}
-                      className={cn(
-                        'flex items-center gap-2.5 w-full rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
-                        isActive
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                      )}
-                      title={!sidebarOpen ? item.label : undefined}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      {sidebarOpen && <span className="truncate">{item.label}</span>}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-            {sidebarOpen && group.label !== 'System' && <Separator className="my-2" />}
-          </div>
-        ))}
+      <ScrollArea className="flex-1 min-h-0 px-2 py-1">
+        <div className="space-y-1">
+          {filteredNav.map(group => (
+            <div key={group.label} className="mb-1">
+              {sidebarOpen && (
+                <button
+                  onClick={() => toggleGroup(group.label)}
+                  className="flex items-center justify-between w-full px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {group.label}
+                  {expandedGroups[group.label] ? (
+                    <ChevronDown className="h-3 w-3" />
+                  ) : (
+                    <ChevronRight className="h-3 w-3" />
+                  )}
+                </button>
+              )}
+              {(!sidebarOpen || expandedGroups[group.label]) && (
+                <div className="space-y-0.5">
+                  {group.items.map(item => {
+                    const Icon = item.icon
+                    const isActive = activeModule === item.key
+                    return (
+                      <button
+                        key={item.key}
+                        onClick={() => setActiveModule(item.key)}
+                        className={cn(
+                          'flex items-center gap-2.5 w-full rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+                          isActive
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                        )}
+                        title={!sidebarOpen ? item.label : undefined}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        {sidebarOpen && <span className="truncate">{item.label}</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+              {sidebarOpen && group.label !== 'System' && <Separator className="my-2" />}
+            </div>
+          ))}
+        </div>
       </ScrollArea>
 
       {/* Role Badge + Version */}
       {sidebarOpen && (
-        <div className="px-3 py-2 border-t">
+        <div className="px-3 py-2 border-t shrink-0">
           <div className="flex items-center gap-2 mb-1">
             <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${roleBadgeColor[role] || 'bg-slate-100 text-slate-500'}`}>
               {role.charAt(0).toUpperCase() + role.slice(1)}

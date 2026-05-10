@@ -94,7 +94,7 @@ export async function GET() {
       project: b.project?.name,
       totalBudget: b.totalAmount,
       totalSpent: b.lines.reduce((s, l) => s + l.actualAmount, 0),
-      utilization: b.totalAmount > 0 ? ((b.lines.reduce((s, l) => s + l.actualAmount, 0) / b.totalAmount) * 100).toFixed(1) : 0,
+      utilization: b.totalAmount > 0 ? Math.round((b.lines.reduce((s, l) => s + l.actualAmount, 0) / b.totalAmount) * 100) : 0,
     }))
 
     // Voucher status counts

@@ -1523,7 +1523,7 @@ export function FixedAssetsModule() {
                 <BarChart data={monthlyDepTrend}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `${(v / 1000000).toFixed(1)}M`} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `${Math.round(v / 1000000)}M`} />
                   <RechartsTooltip formatter={(value: number) => pkr(value)} />
                   <Bar dataKey="depreciation" fill="#16a34a" radius={[4, 4, 0, 0]} />
                 </BarChart>

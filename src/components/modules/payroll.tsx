@@ -17,7 +17,7 @@ import {
   Banknote, ArrowRight, CheckCircle, Plus, Pencil, Trash2, Users,
   ChevronDown, ChevronUp, Play, Send, Shield, BookOpen, Loader2,
   TrendingDown, TrendingUp, Building2, Receipt, AlertCircle, Eye,
-  FileText
+  FileText, FolderOpen, DollarSign
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/lib/store'
@@ -27,7 +27,7 @@ function formatCurrency(amount: number) {
 }
 
 function formatNumber(amount: number) {
-  return new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount)
+  return new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
 }
 
 // Status styles
@@ -319,6 +319,10 @@ export function PayrollIntegration() {
   const [selectedLineIds, setSelectedLineIds] = useState<Set<string>>(new Set())
   const [draftToGLDialogOpen, setDraftToGLDialogOpen] = useState(false)
   const [processingAction, setProcessingAction] = useState<string | null>(null)
+
+  // Project-wise payment state
+  const [projectPayView, setProjectPayView] = useState<string | null>(null) // batchId when active
+  const [payingProjectId, setPayingProjectId] = useState<string | null>(null)
 
   // GL Voucher workflow state
   const [glVoucherMode, setGlVoucherMode] = useState<'consolidated' | 'project-wise' | null>(null)
@@ -756,6 +760,140 @@ export function PayrollIntegration() {
     if (!projectId) return '-'
     const p = projects.find((pr: any) => pr.id === projectId)
     return p ? `${p.code} - ${p.name}` : projectId
+  }
+
+  const getProjectCode = (projectId: string | null) => {
+    if (!projectId) return 'N/A'
+    const p = projects.find((pr: any) => pr.id === projectId)
+    return p ? p.code : 'N/A'
+  }
+
+  // ----------------------------------------------------------
+  // Project-wise Payment: Grouping & Handler
+  // ----------------------------------------------------------
+  interface ProjectPayGroup {
+    projectId: string | null
+    projectName: string
+    projectCode: string
+    employeeCount: number
+    totalGross: number
+    totalDeductions: number
+    totalNetPay: number
+    totalSocialCharges: number
+    lineIds: string[]
+    allLinesApproved: boolean
+    anyLinesApproved: boolean
+    allLinesPaid: boolean
+  }
+
+  const computeProjectPayGroups = (batch: any): ProjectPayGroup[] => {
+    const lines = batch.lines || []
+    const groupMap = new Map<string, ProjectPayGroup>()
+
+    for (const line of lines) {
+      const key = line.projectId || '__unassigned__'
+      if (!groupMap.has(key)) {
+        const p = line.projectId ? projects.find((pr: any) => pr.id === line.projectId) : null
+        groupMap.set(key, {
+          projectId: line.projectId,
+          projectName: line.projectId ? (p ? p.name : line.projectId) : 'Unassigned',
+          projectCode: line.projectId ? (p ? p.code : 'N/A') : '—',
+          employeeCount: 0,
+          totalGross: 0,
+          totalDeductions: 0,
+          totalNetPay: 0,
+          totalSocialCharges: 0,
+          lineIds: [],
+          allLinesApproved: true,
+          anyLinesApproved: false,
+          allLinesPaid: false,
+        })
+      }
+
+      const group = groupMap.get(key)!
+      group.employeeCount++
+      group.totalGross += line.grossSalary || 0
+      group.totalDeductions += line.totalDeductions || 0
+      group.totalNetPay += line.netPay || 0
+      group.totalSocialCharges += line.socialCharges || 0
+      group.lineIds.push(line.id)
+
+      const lineStatus = line.lineStatus || 'draft'
+      if (lineStatus !== 'approved') group.allLinesApproved = false
+      if (lineStatus === 'approved') group.anyLinesApproved = true
+    }
+
+    // Determine paid status: all lines in group are approved
+    for (const group of groupMap.values()) {
+      group.allLinesPaid = group.allLinesApproved && group.employeeCount > 0
+    }
+
+    // Sort: assigned projects first, unassigned last
+    const groups = Array.from(groupMap.values())
+    groups.sort((a, b) => {
+      if (a.projectId === null) return 1
+      if (b.projectId === null) return -1
+      return a.projectName.localeCompare(b.projectName)
+    })
+
+    return groups
+  }
+
+  const handlePayProject = async (group: ProjectPayGroup, batchId: string) => {
+    const batch = batches.find((b: any) => b.id === batchId)
+    if (!batch) return
+
+    setPayingProjectId(group.projectId || '__unassigned__')
+    try {
+      // Step 1: If batch is in draft, review it first
+      if (batch.status === 'draft') {
+        const reviewRes = await fetch('/api/payroll', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'review', batchId }),
+        })
+        if (!reviewRes.ok) {
+          const err = await reviewRes.json()
+          throw new Error(err.error || 'Failed to review batch')
+        }
+      }
+
+      // Step 2: Approve lines for this project
+      const approveRes = await fetch('/api/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve-line', lineIds: group.lineIds }),
+      })
+      const approveResult = await approveRes.json()
+      if (!approveRes.ok) throw new Error(approveResult.error || 'Failed to approve lines')
+
+      // Step 3: Create a draft-to-GL voucher for this project's approved lines
+      const fy = financialYears.find((f: any) => f.status === 'open')
+      if (fy) {
+        const glRes = await fetch('/api/payroll', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'draft-to-gl',
+            batchId,
+            financialYearId: fy.id,
+            lineIds: group.lineIds,
+          }),
+        })
+        const glResult = await glRes.json()
+        if (!glRes.ok) throw new Error(glResult.error || 'Failed to create GL voucher')
+      }
+
+      toast({
+        title: 'Salary Paid — Project: ' + group.projectName,
+        description: `${group.employeeCount} employee(s) paid. Net Pay: ${formatCurrency(group.totalNetPay)}`,
+      })
+      fetchData()
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    } finally {
+      setPayingProjectId(null)
+    }
   }
 
   // ----------------------------------------------------------
@@ -1285,7 +1423,7 @@ export function PayrollIntegration() {
                   <div className="flex justify-between"><span className="text-muted-foreground">SC Eligible Days:</span><span>{scBreakdown.scEligDays ?? '-'} <span className="text-muted-foreground">(P + W + H + WH + T + CO)</span></span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Leave Days (paid, no SC):</span><span>{scBreakdown.leaveDaysPaid ?? scBreakdown.leaveDeduction > 0 ? '-' : '0'} <span className="text-muted-foreground">(SL + CL + EL)</span></span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Absent Days (info):</span><span>{selectedLine.absentDays}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Attendance Ratio:</span><span>{((scBreakdown.attendanceRatio ?? scBreakdown.workingRatio) * 100).toFixed(2)}%</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Attendance Ratio:</span><span>{Math.round((scBreakdown.attendanceRatio ?? scBreakdown.workingRatio) * 100)}%</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Monthly Salary:</span><span>{formatCurrency(selectedLine.grossSalary)}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">SC Base (salary × ratio):</span><span>{formatCurrency(scBreakdown.scBase ?? scBreakdown.earnedSC)}</span></div>
                   <Separator />
@@ -1304,7 +1442,7 @@ export function PayrollIntegration() {
                       {scBreakdown.projectScDetails.map((psc: any, idx: number) => (
                         <div key={idx} className="pl-2 border-l-2 border-muted space-y-0.5 mt-1">
                           <div className="flex justify-between"><span className="text-muted-foreground">{psc.projectName}:</span><span>{formatCurrency(psc.projectSC)}</span></div>
-                          <div className="text-[10px] text-muted-foreground">SC Days: {psc.projectScEligDays} | Ratio: {(psc.projectRatio * 100).toFixed(2)}% | Base: {formatCurrency(psc.projectScBase)}</div>
+                          <div className="text-[10px] text-muted-foreground">SC Days: {psc.projectScEligDays} | Ratio: {Math.round(psc.projectRatio * 100)}% | Base: {formatCurrency(psc.projectScBase)}</div>
                         </div>
                       ))}
                     </>
@@ -1402,7 +1540,7 @@ export function PayrollIntegration() {
                           <TableRow key={idx}>
                             <TableCell className="text-xs py-1 font-medium">{alloc.projectCode} — {alloc.projectName}</TableCell>
                             <TableCell className="text-xs py-1 text-center">{alloc.days}</TableCell>
-                            <TableCell className="text-xs py-1 text-right">{alloc.weightPct || ((alloc.weight || 0) * 100).toFixed(1) + '%'}</TableCell>
+                            <TableCell className="text-xs py-1 text-right">{alloc.weightPct || Math.round((alloc.weight || 0) * 100) + '%'}</TableCell>
                             <TableCell className="text-xs py-1 text-right">{formatCurrency(alloc.salaryShare)}</TableCell>
                             <TableCell className="text-xs py-1 text-right text-orange-600">{formatCurrency(alloc.scShare)}</TableCell>
                           </TableRow>
@@ -2117,6 +2255,11 @@ export function PayrollIntegration() {
                         <Send className="h-3 w-3 mr-1" />Submit for Review
                       </Button>
                     )}
+                    {batch.lines?.length > 0 && (
+                      <Button variant="outline" size="sm" className="h-7 text-[10px] border-emerald-300 text-emerald-700 hover:bg-emerald-50" onClick={() => setProjectPayView(projectPayView === batch.id ? null : batch.id)}>
+                        <FolderOpen className="h-3 w-3 mr-1" />Pay by Project
+                      </Button>
+                    )}
                     <Button variant="ghost" size="sm" className="h-7 text-[10px] text-red-600 hover:text-red-700" onClick={() => { setSelectedBatch(batch); setDeleteBatchDialogOpen(true) }}>
                       <Trash2 className="h-3 w-3 mr-1" />Delete
                     </Button>
@@ -2131,6 +2274,9 @@ export function PayrollIntegration() {
                       {processingAction === 'approve-all-lines' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Shield className="h-3 w-3 mr-1" />}
                       Approve All Lines
                     </Button>
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] border-emerald-300 text-emerald-700 hover:bg-emerald-50" onClick={() => setProjectPayView(projectPayView === batch.id ? null : batch.id)}>
+                      <FolderOpen className="h-3 w-3 mr-1" />Pay by Project
+                    </Button>
                     <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleWorkflowAction('send-back', batch.id)}>
                       <ArrowRight className="h-3 w-3 mr-1 rotate-180" />Send Back
                     </Button>
@@ -2143,6 +2289,9 @@ export function PayrollIntegration() {
                     </Button>
                     <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => { setSelectedBatch(batch); setDraftToGLDialogOpen(true) }}>
                       <FileText className="h-3 w-3 mr-1" />Draft to GL
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] border-emerald-300 text-emerald-700 hover:bg-emerald-50" onClick={() => setProjectPayView(projectPayView === batch.id ? null : batch.id)}>
+                      <FolderOpen className="h-3 w-3 mr-1" />Pay by Project
                     </Button>
                   </>
                 )}
@@ -2181,6 +2330,138 @@ export function PayrollIntegration() {
                 </div>
 
                 <Separator className="mb-4" />
+
+                {/* Project-wise Payment View */}
+                {projectPayView === batch.id && (() => {
+                  const projectGroups = computeProjectPayGroups(batch)
+                  const summaryTotals = projectGroups.reduce(
+                    (acc, g) => ({
+                      totalGross: acc.totalGross + g.totalGross,
+                      totalDeductions: acc.totalDeductions + g.totalDeductions,
+                      totalNetPay: acc.totalNetPay + g.totalNetPay,
+                      totalSocialCharges: acc.totalSocialCharges + g.totalSocialCharges,
+                      employeeCount: acc.employeeCount + g.employeeCount,
+                      projectsCount: acc.projectsCount + 1,
+                    }),
+                    { totalGross: 0, totalDeductions: 0, totalNetPay: 0, totalSocialCharges: 0, employeeCount: 0, projectsCount: 0 }
+                  )
+
+                  return (
+                    <div className="space-y-4 mb-4">
+                      {/* Header with close button */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FolderOpen className="h-4 w-4 text-emerald-600" />
+                          <h3 className="text-sm font-semibold">Project-wise Payment Breakdown</h3>
+                          <Badge variant="outline" className="text-[9px]">{projectGroups.length} project(s)</Badge>
+                        </div>
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setProjectPayView(null)}>
+                          <ChevronUp className="h-3 w-3 mr-1" />Close
+                        </Button>
+                      </div>
+
+                      {/* Summary Card */}
+                      <Card className="border-emerald-200 bg-gradient-to-r from-emerald-50/50 to-slate-50/50">
+                        <CardHeader className="pb-2">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="h-4 w-4 text-emerald-600" />
+                            <CardTitle className="text-xs font-bold text-emerald-900">Summary — All Projects</CardTitle>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                            <div className="text-center p-2 rounded bg-background border">
+                              <p className="text-[9px] text-muted-foreground">Projects</p>
+                              <p className="text-sm font-bold">{summaryTotals.projectsCount}</p>
+                            </div>
+                            <div className="text-center p-2 rounded bg-background border">
+                              <p className="text-[9px] text-muted-foreground">Employees</p>
+                              <p className="text-sm font-bold">{summaryTotals.employeeCount}</p>
+                            </div>
+                            <div className="text-center p-2 rounded bg-background border">
+                              <p className="text-[9px] text-muted-foreground">Total Gross</p>
+                              <p className="text-sm font-bold text-green-700">{formatCurrency(summaryTotals.totalGross)}</p>
+                            </div>
+                            <div className="text-center p-2 rounded bg-background border">
+                              <p className="text-[9px] text-muted-foreground">Total Deductions</p>
+                              <p className="text-sm font-bold text-red-700">{formatCurrency(summaryTotals.totalDeductions)}</p>
+                            </div>
+                            <div className="text-center p-2 rounded bg-background border">
+                              <p className="text-[9px] text-muted-foreground">Total Net Pay</p>
+                              <p className="text-sm font-bold text-green-700">{formatCurrency(summaryTotals.totalNetPay)}</p>
+                            </div>
+                            <div className="text-center p-2 rounded bg-background border">
+                              <p className="text-[9px] text-muted-foreground">Total Social Charges</p>
+                              <p className="text-sm font-bold text-orange-700">{formatCurrency(summaryTotals.totalSocialCharges)}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Project Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {projectGroups.map((group) => {
+                          const isPaying = payingProjectId === (group.projectId || '__unassigned__')
+                          return (
+                            <Card key={group.projectId || '__unassigned__'} className={`border-l-4 ${group.allLinesPaid ? 'border-l-emerald-500' : 'border-l-amber-400'} overflow-hidden`}>
+                              <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="min-w-0 flex-1">
+                                    <CardTitle className="text-xs font-bold truncate">{group.projectName}</CardTitle>
+                                    <p className="text-[9px] text-muted-foreground font-mono">{group.projectCode}</p>
+                                  </div>
+                                  <Badge className={`text-[9px] border ${group.allLinesPaid ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : group.anyLinesApproved ? 'bg-sky-100 text-sky-800 border-sky-200' : 'bg-amber-100 text-amber-800 border-amber-200'}`}>
+                                    {group.allLinesPaid ? 'Paid' : group.anyLinesApproved ? 'Partial' : 'Draft'}
+                                  </Badge>
+                                </div>
+                              </CardHeader>
+                              <CardContent className="p-3 pt-0">
+                                <div className="grid grid-cols-2 gap-2 mb-3">
+                                  <div className="text-center p-1.5 rounded bg-muted/50">
+                                    <p className="text-[8px] text-muted-foreground">Employees</p>
+                                    <p className="text-xs font-bold">{group.employeeCount}</p>
+                                  </div>
+                                  <div className="text-center p-1.5 rounded bg-muted/50">
+                                    <p className="text-[8px] text-muted-foreground">Gross</p>
+                                    <p className="text-[10px] font-bold text-green-700">{formatCurrency(group.totalGross)}</p>
+                                  </div>
+                                  <div className="text-center p-1.5 rounded bg-muted/50">
+                                    <p className="text-[8px] text-muted-foreground">Deductions</p>
+                                    <p className="text-[10px] font-bold text-red-700">{formatCurrency(group.totalDeductions)}</p>
+                                  </div>
+                                  <div className="text-center p-1.5 rounded bg-muted/50">
+                                    <p className="text-[8px] text-muted-foreground">Net Pay</p>
+                                    <p className="text-[10px] font-bold text-green-700">{formatCurrency(group.totalNetPay)}</p>
+                                  </div>
+                                  <div className="text-center p-1.5 rounded bg-muted/50 col-span-2">
+                                    <p className="text-[8px] text-muted-foreground">Social Charges</p>
+                                    <p className="text-[10px] font-bold text-orange-700">{formatCurrency(group.totalSocialCharges)}</p>
+                                  </div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  className={`w-full h-7 text-[10px] ${group.allLinesPaid ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-200' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`}
+                                  disabled={isPaying || group.allLinesPaid}
+                                  onClick={() => handlePayProject(group, batch.id)}
+                                >
+                                  {isPaying ? (
+                                    <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Processing...</>
+                                  ) : group.allLinesPaid ? (
+                                    <><CheckCircle className="h-3 w-3 mr-1" />Already Paid</>
+                                  ) : (
+                                    <><Banknote className="h-3 w-3 mr-1" />Pay Project — {formatCurrency(group.totalNetPay)}</>
+                                  )}
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          )
+                        })}
+                      </div>
+
+                      <Separator />
+                    </div>
+                  )
+                })()}
 
                 {/* Employee Lines Table */}
                 {batch.lines?.length > 0 ? (
@@ -2379,7 +2660,7 @@ export function PayrollIntegration() {
                                               <div className="grid grid-cols-3 gap-2 text-[10px]">
                                                 <div>SC Eligible Days: {sc.scEligDays ?? '-'}</div>
                                                 <div>Leave (no SC): {sc.leaveDaysPaid ?? 0}</div>
-                                                <div>Ratio: {((sc.attendanceRatio ?? sc.workingRatio) * 100).toFixed(1)}%</div>
+                                                <div>Ratio: {Math.round((sc.attendanceRatio ?? sc.workingRatio) * 100)}%</div>
                                                 <div>SC Base: {formatCurrency(sc.scBase ?? sc.earnedSC)}</div>
                                                 <div>Monthly SC: {formatCurrency(sc.monthlySC)}</div>
                                                 <div className="font-bold">Final SC: {formatCurrency(sc.finalSC)}</div>
@@ -2390,7 +2671,7 @@ export function PayrollIntegration() {
                                                   <p className="text-[9px] font-semibold">Per-Project:</p>
                                                   {sc.projectScDetails.map((psc: any, i: number) => (
                                                     <div key={i} className="text-[9px] text-muted-foreground">
-                                                      {psc.projectName}: {formatCurrency(psc.projectSC)} ({(psc.projectRatio * 100).toFixed(1)}%)
+                                                      {psc.projectName}: {formatCurrency(psc.projectSC)} ({Math.round(psc.projectRatio * 100)}%)
                                                     </div>
                                                   ))}
                                                 </div>
@@ -2460,7 +2741,7 @@ export function PayrollIntegration() {
                                                       <TableRow key={idx}>
                                                         <TableCell className="text-[10px] py-1 font-medium">{alloc.projectCode} — {alloc.projectName}</TableCell>
                                                         <TableCell className="text-[10px] py-1 text-center">{alloc.days}</TableCell>
-                                                        <TableCell className="text-[10px] py-1 text-right">{alloc.weightPct || ((alloc.weight || 0) * 100).toFixed(1) + '%'}</TableCell>
+                                                        <TableCell className="text-[10px] py-1 text-right">{alloc.weightPct || Math.round((alloc.weight || 0) * 100) + '%'}</TableCell>
                                                         <TableCell className="text-[10px] py-1 text-right">{formatCurrency(alloc.salaryShare)}</TableCell>
                                                         <TableCell className="text-[10px] py-1 text-right text-orange-600">{formatCurrency(alloc.scShare)}</TableCell>
                                                       </TableRow>

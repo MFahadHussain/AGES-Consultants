@@ -697,7 +697,7 @@ export function AttendanceModule() {
 
   const daysInMonth = getDaysInMonth(selectedMonth)
   const presentPct = displayStats.totalRecords > 0
-    ? ((displayStats.totalPresent / displayStats.totalRecords) * 100).toFixed(1)
+    ? Math.round((displayStats.totalPresent / displayStats.totalRecords) * 100)
     : '0'
 
   // ── Month navigation ──────────────────────────────────

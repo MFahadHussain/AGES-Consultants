@@ -175,7 +175,7 @@ const SC_COMPONENT_COLORS: Record<string,{bg:string;text:string;border:string;ic
 
 // ── HELPERS ──────────────────────────────────────────────────────────
 
-function formatPKR(n: number | undefined | null): string { return 'PKR ' + (n != null && !isNaN(n) ? n.toLocaleString('en-PK') : '0') }
+function formatPKR(n: number | undefined | null): string { return 'PKR ' + (n != null && !isNaN(n) ? Math.round(n).toLocaleString('en-PK') : '0') }
 function formatDate(d: string | null): string {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('en-PK',{year:'numeric',month:'short',day:'numeric'})
@@ -1093,7 +1093,7 @@ export function EmployeeProfile() {
                 return (
                   <div key={ce.projectId} className={`${PROJECT_BAR_COLORS[i % PROJECT_BAR_COLORS.length]} transition-all duration-500 flex items-center justify-center`}
                     style={{width: `${Math.max(pct, 3)}%`}}>
-                    <span className="text-[9px] text-white font-semibold truncate px-1">{pct.toFixed(1)}%</span>
+                    <span className="text-[9px] text-white font-semibold truncate px-1">{Math.round(pct)}%</span>
                   </div>
                 )
               })}
@@ -1285,7 +1285,7 @@ export function EmployeeProfile() {
                 </div>
                 <div className="bg-slate-50 rounded-lg p-2">
                   <span className="text-slate-500">Attendance Ratio</span>
-                  <p className="font-semibold text-slate-900">{((apiPayrollResult.attendanceRatio ?? apiPayrollResult.workingRatio) * 100).toFixed(2)}%</p>
+                  <p className="font-semibold text-slate-900">{Math.round((apiPayrollResult.attendanceRatio ?? apiPayrollResult.workingRatio) * 100)}%</p>
                 </div>
                 <div className="bg-slate-50 rounded-lg p-2">
                   <span className="text-slate-500">Final SC (to ledger)</span>
@@ -1311,7 +1311,7 @@ export function EmployeeProfile() {
                       <span className="font-semibold">Per-Project SC:</span>
                       {apiPayrollResult.projectScDetails.map((psc: any, i: number) => (
                         <div key={i} className="pl-2 text-amber-700">
-                          {psc.projectName}: {formatPKR(psc.projectSC)} ({((psc.projectRatio ?? 0) * 100).toFixed(1)}% × {formatPKR(psc.projectScBase)})
+                          {psc.projectName}: {formatPKR(psc.projectSC)} ({Math.round((psc.projectRatio ?? 0) * 100)}% × {formatPKR(psc.projectScBase)})
                         </div>
                       ))}
                     </div>
@@ -1630,7 +1630,7 @@ export function EmployeeProfile() {
                     <tr key={row.month} className={`border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${row.status==='Pending'?'bg-amber-50/40':row.status==='Partial'?'bg-blue-50/30':''}`}>
                       <td className="py-2.5 px-3 font-medium text-slate-900">{fmtMonth(row.month)}</td>
                       <td className="py-2.5 px-3 text-right text-slate-600">{formatPKR(row.grossSalary)}</td>
-                      <td className="py-2.5 px-3 text-center text-slate-600">{(row.scRate*100).toFixed(0)}%</td>
+                      <td className="py-2.5 px-3 text-center text-slate-600">{Math.round(row.scRate*100)}%</td>
                       <td className="py-2.5 px-3 text-right text-slate-900">{formatPKR(row.scAmount)}</td>
                       <td className="py-2.5 px-3 text-right text-slate-600">{formatPKR(row.paid)}</td>
                       <td className="py-2.5 px-3 text-right text-slate-600">{formatPKR(row.outstanding)}</td>

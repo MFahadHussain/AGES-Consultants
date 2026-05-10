@@ -33,7 +33,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 
 function formatCurrency(amount: number) {
-  return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)
+  return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(amount))
 }
 
 function formatPeriod(period: string) {

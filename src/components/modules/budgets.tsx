@@ -376,7 +376,7 @@ export function BudgetManagement() {
                             <TableCell className={`text-xs text-right font-semibold ${lineVariance < 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(lineVariance)}</TableCell>
                             <TableCell className="text-xs text-right">
                               <span className={`${lineUtilization > 100 ? 'text-red-600 font-bold' : lineUtilization > 80 ? 'text-amber-600 font-semibold' : ''}`}>
-                                {lineUtilization.toFixed(1)}%
+                                {Math.round(lineUtilization)}%
                               </span>
                             </TableCell>
                           </TableRow>

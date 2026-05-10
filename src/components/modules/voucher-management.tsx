@@ -88,8 +88,8 @@ function formatCurrency(amount: number) {
 
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / 1048576).toFixed(1) + ' MB'
+  if (bytes < 1048576) return Math.round(bytes / 1024) + ' KB'
+  return Math.round(bytes / 1048576) + ' MB'
 }
 
 function FileIcon({ mimeType }: { mimeType?: string | null }) {
