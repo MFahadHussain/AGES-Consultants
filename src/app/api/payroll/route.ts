@@ -618,7 +618,46 @@ export async function POST(request: Request) {
     }
 
     // ----------------------------------------------------------
-    // 9a. APPROVE LINE — Approve individual line(s)
+    // 9a. REVIEW LINE — Review individual line(s)
+    // ----------------------------------------------------------
+    if (action === 'review-line') {
+      const { lineId, lineIds } = data
+      const ids: string[] = lineIds || (lineId ? [lineId] : [])
+      if (ids.length === 0) return NextResponse.json({ error: 'lineId or lineIds required' }, { status: 400 })
+
+      const lines = await db.payrollBatchLine.findMany({ where: { id: { in: ids } } })
+      if (lines.length === 0) return NextResponse.json({ error: 'No lines found' }, { status: 404 })
+
+      const batchIds = [...new Set(lines.map(l => l.batchId))]
+      const batches = await db.payrollBatch.findMany({ where: { id: { in: batchIds } } })
+      for (const b of batches) {
+        if (b.status !== 'draft' && b.status !== 'reviewed') {
+          return NextResponse.json({ error: `Batch ${b.batchNumber} status is '${b.status}', must be 'draft' or 'reviewed' to review lines` }, { status: 400 })
+        }
+      }
+
+      await db.payrollBatchLine.updateMany({
+        where: { id: { in: ids } },
+        data: { lineStatus: 'reviewed' },
+      })
+
+      // Auto-advance batch to reviewed if still draft
+      for (const bid of batchIds) {
+        const batch = await db.payrollBatch.findUnique({ where: { id: bid } })
+        if (batch && batch.status === 'draft') {
+          await db.payrollBatch.update({
+            where: { id: bid },
+            data: { status: 'reviewed', reviewedBy: 'system' },
+          })
+        }
+        await recalcBatchTotals(bid)
+      }
+
+      return NextResponse.json({ message: `${ids.length} line(s) reviewed`, reviewedIds: ids })
+    }
+
+    // ----------------------------------------------------------
+    // 9b. APPROVE LINE — Approve individual line(s)
     // ----------------------------------------------------------
     if (action === 'approve-line') {
       const { lineId, lineIds } = data

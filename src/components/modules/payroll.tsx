@@ -41,6 +41,7 @@ const statusStyles: Record<string, string> = {
 
 const lineStatusStyles: Record<string, string> = {
   draft: 'bg-amber-100 text-amber-800 border-amber-200',
+  reviewed: 'bg-sky-100 text-sky-800 border-sky-200',
   approved: 'bg-emerald-100 text-emerald-800 border-emerald-200',
 }
 
@@ -53,14 +54,15 @@ const statusLabels: Record<string, string> = {
 }
 
 // Workflow steps — enhanced with action labels
-const workflowSteps = ['draft', 'reviewed', 'approved', 'posted']
+const workflowSteps = ['draft', 'reviewed', 'approved', 'draft-to-gl', 'posted']
 const workflowStepActions: Record<string, { label: string; action: string; icon: any }[]> = {
-  draft: [{ label: 'Review', action: 'review', icon: Send }],
+  draft: [{ label: 'Review', action: 'review-line', icon: Eye }],
   reviewed: [
     { label: 'Approve', action: 'approve', icon: Shield },
     { label: 'Send Back', action: 'send-back', icon: ArrowRight },
   ],
-  approved: [{ label: 'Post to GL', action: 'post-to-gl', icon: BookOpen }],
+  approved: [{ label: 'Draft to Voucher', action: 'draft-to-gl', icon: FileText }],
+  'draft-to-gl': [{ label: 'Post to GL', action: 'post-to-gl', icon: BookOpen }],
   posted: [],
 }
 
@@ -629,6 +631,30 @@ export function PayrollIntegration() {
     }
   }
 
+  const handleReviewSelectedLines = async () => {
+    if (selectedLineIds.size === 0) {
+      toast({ title: 'Error', description: 'No lines selected', variant: 'destructive' })
+      return
+    }
+    setProcessingAction('review-line')
+    try {
+      const res = await fetch('/api/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'review-line', lineIds: Array.from(selectedLineIds) }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Failed')
+      toast({ title: 'Reviewed', description: `${selectedLineIds.size} line(s) reviewed` })
+      setSelectedLineIds(new Set())
+      fetchData()
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    } finally {
+      setProcessingAction(null)
+    }
+  }
+
   const handleApproveSelectedLines = async () => {
     if (selectedLineIds.size === 0) {
       toast({ title: 'Error', description: 'No lines selected', variant: 'destructive' })
@@ -1058,8 +1084,7 @@ export function PayrollIntegration() {
   // ----------------------------------------------------------
   const renderWorkflowBar = (status: string, batchId: string) => {
     const currentIdx = workflowSteps.indexOf(status)
-    // For 'draft-to-gl' status, show as approved step
-    const effectiveIdx = status === 'draft-to-gl' ? workflowSteps.indexOf('approved') : currentIdx
+    const effectiveIdx = currentIdx >= 0 ? currentIdx : 0
     return (
       <div className="flex items-center gap-1 my-3 flex-wrap">
         {workflowSteps.map((step, idx) => {
@@ -1091,6 +1116,9 @@ export function PayrollIntegration() {
                             if (sa.action === 'post-to-gl') {
                               setSelectedBatch(batches.find((b: any) => b.id === batchId) || null)
                               setGlVoucherChoiceOpen(true)
+                            } else if (sa.action === 'draft-to-gl') {
+                              setSelectedBatch(batches.find((b: any) => b.id === batchId) || null)
+                              setDraftToGLDialogOpen(true)
                             } else {
                               handleWorkflowAction(sa.action, batchId)
                             }
@@ -1239,7 +1267,7 @@ export function PayrollIntegration() {
               <Eye className="h-4 w-4" />
               {selectedLine.employeeName} — {selectedLine.employeeCode}
               <Badge className={`text-[9px] border ml-2 ${lineStatusStyles[selectedLine.lineStatus || 'draft']}`}>
-                {selectedLine.lineStatus === 'approved' ? 'Approved' : 'Draft'}
+                {selectedLine.lineStatus === 'reviewed' ? 'Reviewed' : selectedLine.lineStatus === 'approved' ? 'Approved' : 'Draft'}
               </Badge>
             </DialogTitle>
             <DialogDescription className="text-xs">Detailed payroll breakdown</DialogDescription>
@@ -1249,7 +1277,7 @@ export function PayrollIntegration() {
             {/* Line Status & Compliance Indicators */}
             <div className="flex items-center gap-2 flex-wrap">
               <Badge className={`text-[10px] border ${lineStatusStyles[selectedLine.lineStatus || 'draft']}`}>
-                Line: {selectedLine.lineStatus === 'approved' ? 'Approved' : 'Draft'}
+                Line: {selectedLine.lineStatus === 'reviewed' ? 'Reviewed' : selectedLine.lineStatus === 'approved' ? 'Approved' : 'Draft'}
               </Badge>
               {selectedLine.eobiEmployee > 0 && (
                 <Badge className="text-[10px] bg-sky-50 text-sky-700 border border-sky-200">
@@ -2243,18 +2271,35 @@ export function PayrollIntegration() {
                     >
                       <Receipt className="h-3 w-3 mr-1" />Recalculate
                     </Button>
-                    <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleApproveAllLines(batch.id)} disabled={processingAction === 'approve-all-lines'}>
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] border-sky-300 text-sky-700 hover:bg-sky-50" onClick={async () => {
+                      setProcessingAction('review-line')
+                      try {
+                        const lineIds = batch.lines.map((l: any) => l.id)
+                        const res = await fetch('/api/payroll', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action: 'review-line', lineIds }),
+                        })
+                        const result = await res.json()
+                        if (!res.ok) throw new Error(result.error || 'Failed')
+                        toast({ title: 'Reviewed', description: result.message || 'All lines reviewed' })
+                        fetchData()
+                      } catch (e: any) {
+                        toast({ title: 'Error', description: e.message, variant: 'destructive' })
+                      } finally {
+                        setProcessingAction(null)
+                      }
+                    }} disabled={processingAction === 'review-line'}>
+                      {processingAction === 'review-line' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Eye className="h-3 w-3 mr-1" />}
+                      Review All
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] border-emerald-300 text-emerald-700 hover:bg-emerald-50" onClick={() => handleApproveAllLines(batch.id)} disabled={processingAction === 'approve-all-lines'}>
                       {processingAction === 'approve-all-lines' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Shield className="h-3 w-3 mr-1" />}
                       Approve All
                     </Button>
                     <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => openAddLineDialog(batch)}>
                       <Plus className="h-3 w-3 mr-1" />Add Line
                     </Button>
-                    {batch.lines?.length > 0 && (
-                      <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleWorkflowAction('review', batch.id)}>
-                        <Send className="h-3 w-3 mr-1" />Submit for Review
-                      </Button>
-                    )}
                     {batch.lines?.length > 0 && (
                       <Button variant="outline" size="sm" className="h-7 text-[10px] border-emerald-300 text-emerald-700 hover:bg-emerald-50" onClick={() => setProjectPayView(projectPayView === batch.id ? null : batch.id)}>
                         <FolderOpen className="h-3 w-3 mr-1" />Pay by Project
@@ -2267,12 +2312,35 @@ export function PayrollIntegration() {
                 )}
                 {batch.status === 'reviewed' && (
                   <>
-                    <Button size="sm" className="h-7 text-[10px]" onClick={() => handleWorkflowAction('approve', batch.id)}>
-                      <Shield className="h-3 w-3 mr-1" />Approve
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] border-sky-300 text-sky-700 hover:bg-sky-50" onClick={async () => {
+                      setProcessingAction('review-line')
+                      try {
+                        const lineIds = batch.lines.filter((l: any) => l.lineStatus === 'draft').map((l: any) => l.id)
+                        if (lineIds.length === 0) { toast({ title: 'Info', description: 'All lines already reviewed' }); return }
+                        const res = await fetch('/api/payroll', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action: 'review-line', lineIds }),
+                        })
+                        const result = await res.json()
+                        if (!res.ok) throw new Error(result.error || 'Failed')
+                        toast({ title: 'Reviewed', description: result.message || `${lineIds.length} line(s) reviewed` })
+                        fetchData()
+                      } catch (e: any) {
+                        toast({ title: 'Error', description: e.message, variant: 'destructive' })
+                      } finally {
+                        setProcessingAction(null)
+                      }
+                    }} disabled={processingAction === 'review-line'}>
+                      {processingAction === 'review-line' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Eye className="h-3 w-3 mr-1" />}
+                      Review Remaining
                     </Button>
-                    <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleApproveAllLines(batch.id)} disabled={processingAction === 'approve-all-lines'}>
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] border-emerald-300 text-emerald-700 hover:bg-emerald-50" onClick={() => handleApproveAllLines(batch.id)} disabled={processingAction === 'approve-all-lines'}>
                       {processingAction === 'approve-all-lines' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Shield className="h-3 w-3 mr-1" />}
                       Approve All Lines
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] border-violet-300 text-violet-700 hover:bg-violet-50" onClick={() => { setSelectedBatch(batch); setDraftToGLDialogOpen(true) }}>
+                      <FileText className="h-3 w-3 mr-1" />Draft to Voucher
                     </Button>
                     <Button variant="outline" size="sm" className="h-7 text-[10px] border-emerald-300 text-emerald-700 hover:bg-emerald-50" onClick={() => setProjectPayView(projectPayView === batch.id ? null : batch.id)}>
                       <FolderOpen className="h-3 w-3 mr-1" />Pay by Project
@@ -2287,8 +2355,8 @@ export function PayrollIntegration() {
                     <Button size="sm" className="h-7 text-[10px]" onClick={() => { setSelectedBatch(batch); setGlVoucherChoiceOpen(true) }}>
                       <BookOpen className="h-3 w-3 mr-1" />Post to GL
                     </Button>
-                    <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => { setSelectedBatch(batch); setDraftToGLDialogOpen(true) }}>
-                      <FileText className="h-3 w-3 mr-1" />Draft to GL
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] border-violet-300 text-violet-700 hover:bg-violet-50" onClick={() => { setSelectedBatch(batch); setDraftToGLDialogOpen(true) }}>
+                      <FileText className="h-3 w-3 mr-1" />Draft to Voucher
                     </Button>
                     <Button variant="outline" size="sm" className="h-7 text-[10px] border-emerald-300 text-emerald-700 hover:bg-emerald-50" onClick={() => setProjectPayView(projectPayView === batch.id ? null : batch.id)}>
                       <FolderOpen className="h-3 w-3 mr-1" />Pay by Project
@@ -2466,53 +2534,95 @@ export function PayrollIntegration() {
                 {/* Employee Lines Table */}
                 {batch.lines?.length > 0 ? (
                   <>
-                    {/* Bulk Action Toolbar */}
-                    <div className="flex items-center gap-2 mb-3 p-2 rounded-lg bg-muted/30 border flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          checked={batch.lines.length > 0 && batch.lines.every((l: any) => selectedLineIds.has(l.id))}
-                          onCheckedChange={() => toggleSelectAllLines(batch)}
-                          className="h-4 w-4"
-                        />
-                        <span className="text-[10px] font-medium text-muted-foreground">
-                          {selectedLineIds.size > 0
-                            ? `${selectedLineIds.size} of ${batch.lines.length} lines selected`
-                            : 'Select All'}
-                        </span>
+                    {/* Step-by-Step Workflow Toolbar */}
+                    <div className="mb-3 p-3 rounded-lg border bg-gradient-to-r from-slate-50 to-white">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Payroll Workflow</span>
+                        <span className="text-[9px] text-muted-foreground">— Select employees, then follow the steps</span>
                       </div>
-                      {selectedLineIds.size > 0 && (
-                        <>
-                          <Separator orientation="vertical" className="h-5" />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-[10px]"
-                            onClick={handleApproveSelectedLines}
-                            disabled={processingAction === 'approve-line'}
-                          >
-                            {processingAction === 'approve-line' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Shield className="h-3 w-3 mr-1" />}
-                            Approve Selected
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-[10px]"
-                            onClick={() => handleDraftToGL(Array.from(selectedLineIds))}
-                            disabled={processingAction === 'draft-to-gl'}
-                          >
-                            {processingAction === 'draft-to-gl' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <FileText className="h-3 w-3 mr-1" />}
-                            Draft Selected to GL
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-[10px] text-muted-foreground ml-auto"
-                            onClick={() => setSelectedLineIds(new Set())}
-                          >
-                            Deselect All
-                          </Button>
-                        </>
-                      )}
+                      {/* Step indicators */}
+                      <div className="flex items-center gap-1 mb-3 flex-wrap">
+                        {[
+                          { step: 1, label: 'Select', icon: Users, color: selectedLineIds.size > 0 ? 'bg-sky-100 text-sky-800 border-sky-300' : 'bg-muted text-muted-foreground border-muted' },
+                          { step: 2, label: 'Review', icon: Eye, color: batch.lines?.some((l: any) => l.lineStatus === 'reviewed' || l.lineStatus === 'approved') ? 'bg-sky-100 text-sky-800 border-sky-300' : 'bg-muted text-muted-foreground border-muted' },
+                          { step: 3, label: 'Approve', icon: Shield, color: batch.lines?.some((l: any) => l.lineStatus === 'approved') ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-muted text-muted-foreground border-muted' },
+                          { step: 4, label: 'Draft Voucher', icon: FileText, color: batch.status === 'draft-to-gl' || batch.status === 'posted' ? 'bg-violet-100 text-violet-800 border-violet-300' : 'bg-muted text-muted-foreground border-muted' },
+                          { step: 5, label: 'Post to GL', icon: BookOpen, color: batch.status === 'posted' ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-muted text-muted-foreground border-muted' },
+                        ].map((s, idx) => {
+                          const StepIcon = s.icon
+                          return (
+                            <Fragment key={s.step}>
+                              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium border ${s.color} transition-all`}>
+                                <span className="font-bold">{s.step}.</span>
+                                <StepIcon className="h-3 w-3" />
+                                <span>{s.label}</span>
+                              </div>
+                              {idx < 4 && <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />}
+                            </Fragment>
+                          )
+                        })}
+                      </div>
+                      {/* Action buttons row */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            checked={batch.lines.length > 0 && batch.lines.every((l: any) => selectedLineIds.has(l.id))}
+                            onCheckedChange={() => toggleSelectAllLines(batch)}
+                            className="h-4 w-4"
+                          />
+                          <span className="text-[10px] font-medium text-muted-foreground">
+                            {selectedLineIds.size > 0
+                              ? `${selectedLineIds.size} of ${batch.lines.length} selected`
+                              : 'Select All'}
+                          </span>
+                        </div>
+                        {selectedLineIds.size > 0 && (
+                          <>
+                            <Separator orientation="vertical" className="h-5" />
+                            {/* Step 2: Review Selected */}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-[10px] border-sky-300 text-sky-700 hover:bg-sky-50"
+                              onClick={handleReviewSelectedLines}
+                              disabled={processingAction === 'review-line'}
+                            >
+                              {processingAction === 'review-line' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Eye className="h-3 w-3 mr-1" />}
+                              Review Selected
+                            </Button>
+                            {/* Step 3: Approve Selected */}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-[10px] border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                              onClick={handleApproveSelectedLines}
+                              disabled={processingAction === 'approve-line'}
+                            >
+                              {processingAction === 'approve-line' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Shield className="h-3 w-3 mr-1" />}
+                              Approve Selected
+                            </Button>
+                            {/* Step 4: Draft to GL */}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-[10px] border-violet-300 text-violet-700 hover:bg-violet-50"
+                              onClick={() => handleDraftToGL(Array.from(selectedLineIds))}
+                              disabled={processingAction === 'draft-to-gl'}
+                            >
+                              {processingAction === 'draft-to-gl' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <FileText className="h-3 w-3 mr-1" />}
+                              Draft to Voucher
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-[10px] text-muted-foreground ml-auto"
+                              onClick={() => setSelectedLineIds(new Set())}
+                            >
+                              Deselect All
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
 
                     <ScrollArea className="w-full">
@@ -2564,7 +2674,7 @@ export function PayrollIntegration() {
                                   <TableCell className="text-xs py-1.5 font-medium">{line.employeeName}</TableCell>
                                   <TableCell className="py-1.5">
                                     <Badge className={`text-[9px] border px-1.5 py-0 ${lineStatusStyles[lineStatus] || 'bg-muted text-muted-foreground'}`}>
-                                      {lineStatus === 'approved' ? 'Approved' : 'Draft'}
+                                      {lineStatus === 'reviewed' ? 'Reviewed' : lineStatus === 'approved' ? 'Approved' : 'Draft'}
                                     </Badge>
                                   </TableCell>
                                   <TableCell className="text-xs py-1.5 text-muted-foreground">{line.employeeCode || '-'}</TableCell>
