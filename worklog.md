@@ -49,3 +49,52 @@ Stage Summary:
 - No more consolidated vs project-wise choice dialog
 - Each project voucher can be posted individually or all at once
 - Lint: 0 errors, 4 pre-existing warnings
+
+---
+Task ID: 2
+Agent: full-stack-developer
+Task: Implement Strict Project-wise Payroll Workflow
+
+Work Log:
+- Added handleSendBackSelectedLines handler for sending selected lines back to draft status from reviewed
+- Added handleReviewAllLines handler for reviewing all lines in a batch (replaces inline logic)
+- Phase 1: Restructured batch card action buttons to be step-aware:
+  - Draft: Run Payroll, Recalculate, Review All, Add Line, Delete (removed Approve All, Pay by Project)
+  - Reviewed: Approve All, Pay by Project, Send Back to Draft (removed Review Remaining, Draft to Voucher)
+  - Approved: Draft to Voucher (Project-wise), Pay by Project (unchanged)
+  - Draft-to-GL: Post All to GL button + voucher count badge (replaced static badge)
+  - Posted: "Posted to GL — Complete" badge
+- Phase 2: Enhanced employee lines table:
+  - Added step-aware workflow toolbar with current step label and highlighted step indicators
+  - Added step-aware action buttons (Review Selected in draft, Approve Selected + Send Back Selected in reviewed)
+  - Grouped employee rows by project with project header rows showing project code, name, employee count, and totals
+  - Added project badge column (monospace) in employee table
+  - Removed ESSI columns (simplified table), kept core columns
+  - Changed Actions column to show for both draft and reviewed status
+  - Updated colSpan values for expanded line details to match new column count (21/20)
+- Phase 3: Enhanced project-wise payment view:
+  - Added batch status badge in header
+  - Added workflow step indicator per project (Select→Review→Approve→Voucher→Posted)
+  - Added getProjectStep helper to determine current step per project group
+  - Added employee list within each project card (name, line status badge, net pay)
+  - Improved project identification with code badge + name
+  - Changed "Already Paid" to "Already Processed" for clarity
+- Phase 4: Improved generated vouchers display:
+  - Added comprehensive voucher card within batch card area for draft-to-gl and posted status
+  - Voucher summary table with: Voucher No, Project (code + name), Employees, Total DR, Total CR, Balance validation, Status, Action (Post button)
+  - Added totals row in summary table with balance validation across all vouchers
+  - Added "Post All to GL" button in voucher card header
+  - Added expandable individual voucher details (journal entries + employee breakdown)
+  - Replaced old bottom-level voucher section with legacy fallback (only shows when no batch context)
+  - Kept backward-compatible JournalVoucherCard when generatedVouchers is empty
+- Lint check: 0 errors, 4 pre-existing warnings (unrelated to changes)
+
+Stage Summary:
+- Strict 5-step workflow enforced: Draft → Reviewed → Approved → Draft-to-GL → Posted
+- Step-aware buttons: only show actions relevant to current workflow step
+- Employee table grouped by project with project headers and badges
+- Project payment view shows workflow step progress and employee lists per project
+- Voucher display moved into batch card area with summary table and expandable details
+- Each project voucher can be posted individually or all at once
+- Balance validation (Dr = Cr) shown per voucher and across all vouchers
+- Format: JV-PAY-YYYYMM-PROJCODE for all project-wise vouchers
