@@ -516,7 +516,7 @@ export async function POST(request: NextRequest) {
     // MODE: CONSOLIDATED or PROJECT-WISE
     // Both require a batchId and financialYearId
     // =========================================================
-    const { batchId, financialYearId } = data
+    const { batchId, financialYearId, lineIds } = data
 
     if (!batchId) {
       return NextResponse.json({ error: 'batchId is required' }, { status: 400 })
@@ -557,8 +557,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Financial year is closed' }, { status: 400 })
     }
 
-    // Get approved lines only
-    const approvedLines = batch.lines.filter(l => l.lineStatus === 'approved')
+    // Get approved lines only, optionally filtered by lineIds
+    const lineIdSet = lineIds?.length > 0 ? new Set(lineIds as string[]) : null
+    const approvedLines = batch.lines.filter(l =>
+      l.lineStatus === 'approved' && (!lineIdSet || lineIdSet.has(l.id))
+    )
     if (approvedLines.length === 0) {
       return NextResponse.json({ error: 'No approved lines found in batch' }, { status: 400 })
     }

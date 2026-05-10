@@ -327,9 +327,6 @@ export function PayrollIntegration() {
   const [payingProjectId, setPayingProjectId] = useState<string | null>(null)
 
   // GL Voucher workflow state
-  const [glVoucherMode, setGlVoucherMode] = useState<'consolidated' | 'project-wise' | null>(null)
-  const [glVoucherChoiceOpen, setGlVoucherChoiceOpen] = useState(false)
-  const [glVoucherConfirmOpen, setGlVoucherConfirmOpen] = useState(false)
   const [generatedVouchers, setGeneratedVouchers] = useState<any[]>([])
   const [glVoucherLoading, setGlVoucherLoading] = useState(false)
   const [expandedVoucherEmp, setExpandedVoucherEmp] = useState<string | null>(null)
@@ -471,37 +468,26 @@ export function PayrollIntegration() {
     }
   }
 
-  const handleGenerateGLVoucher = async () => {
-    if (!selectedBatch || !glVoucherMode) return
-    const fy = financialYears.find((f: any) => f.status === 'open')
-    if (!fy) { toast({ title: 'Error', description: 'No open financial year found', variant: 'destructive' }); return }
-
-    setGlVoucherLoading(true)
-    try {
-      const res = await fetch('/api/payroll/generate-gl-voucher', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          batchId: selectedBatch.id,
-          mode: glVoucherMode,
-          financialYearId: fy.id,
-        }),
-      })
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error || 'Failed')
-
-      setGeneratedVouchers(result.vouchers || [])
-      setGlVoucherConfirmOpen(false)
-      setGlVoucherChoiceOpen(false)
-      toast({
-        title: 'Vouchers Generated',
-        description: `${result.vouchers?.length || 0} journal voucher(s) created in draft status`,
-      })
+  const handlePostAllVouchersToGL = async () => {
+    let postedCount = 0
+    for (const v of generatedVouchers.filter(v => v.status === 'draft')) {
+      try {
+        const res = await fetch(`/api/vouchers/${v.voucherId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'post' }),
+        })
+        if (res.ok) {
+          postedCount++
+          setGeneratedVouchers(prev => prev.map(vs => vs.voucherId === v.voucherId ? { ...vs, status: 'posted' } : vs))
+        }
+      } catch {
+        // ignore individual errors
+      }
+    }
+    if (postedCount > 0) {
+      toast({ title: 'Posted to GL', description: `${postedCount} voucher(s) posted to General Ledger` })
       fetchData()
-    } catch (e: any) {
-      toast({ title: 'Error', description: e.message, variant: 'destructive' })
-    } finally {
-      setGlVoucherLoading(false)
     }
   }
 
@@ -521,11 +507,7 @@ export function PayrollIntegration() {
     }
   }
 
-  const handlePostAllVouchersToGL = async () => {
-    for (const v of generatedVouchers.filter(v => v.status === 'draft')) {
-      await handlePostVoucherToGL(v.voucherId)
-    }
-  }
+
 
   const handleAddLine = async () => {
     if (!selectedBatch || !lineForm.employeeName) {
@@ -699,15 +681,21 @@ export function PayrollIntegration() {
   }
 
   const handleDraftToGL = async (lineIds?: string[]) => {
-    setProcessingAction('draft-to-gl')
-    try {
-      const body: any = { action: 'draft-to-gl' }
-      if (selectedBatch) body.batchId = selectedBatch.id
-      if (lineIds && lineIds.length > 0) body.lineIds = lineIds
-      const fy = financialYears.find((f: any) => f.status === 'open')
-      if (fy) body.financialYearId = fy.id
+    if (!selectedBatch) return
+    const fy = financialYears.find((f: any) => f.status === 'open')
+    if (!fy) { toast({ title: 'Error', description: 'No open financial year found', variant: 'destructive' }); return }
 
-      const res = await fetch('/api/payroll', {
+    setProcessingAction('draft-to-gl')
+    setGlVoucherLoading(true)
+    try {
+      const body: any = {
+        batchId: selectedBatch.id,
+        mode: 'project-wise',
+        financialYearId: fy.id,
+      }
+      if (lineIds && lineIds.length > 0) body.lineIds = lineIds
+
+      const res = await fetch('/api/payroll/generate-gl-voucher', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -715,27 +703,19 @@ export function PayrollIntegration() {
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || 'Failed')
 
-      // Store voucher data for Journal Voucher card display
-      if (result.voucherEntries) {
-        setDraftVoucher({
-          voucherId: result.voucherId,
-          voucherNumber: result.voucherNumber,
-          voucherStatus: result.voucherStatus,
-          totalDebit: result.totalDebit,
-          totalCredit: result.totalCredit,
-          entries: result.voucherEntries,
-          approvedLineCount: result.approvedLineCount,
-        })
-      }
-
-      toast({ title: 'Draft Voucher Created', description: result.message || 'Approved lines posted to GL as draft voucher' })
+      setGeneratedVouchers(result.vouchers || [])
       setDraftToGLDialogOpen(false)
       setSelectedLineIds(new Set())
+      toast({
+        title: 'Project-wise Vouchers Created',
+        description: `${result.vouchers?.length || 0} draft voucher(s) created for each project`,
+      })
       fetchData()
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' })
     } finally {
       setProcessingAction(null)
+      setGlVoucherLoading(false)
     }
   }
 
@@ -893,15 +873,15 @@ export function PayrollIntegration() {
       const approveResult = await approveRes.json()
       if (!approveRes.ok) throw new Error(approveResult.error || 'Failed to approve lines')
 
-      // Step 3: Create a draft-to-GL voucher for this project's approved lines
+      // Step 3: Create a project-wise draft-to-GL voucher for this project's approved lines
       const fy = financialYears.find((f: any) => f.status === 'open')
       if (fy) {
-        const glRes = await fetch('/api/payroll', {
+        const glRes = await fetch('/api/payroll/generate-gl-voucher', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            action: 'draft-to-gl',
             batchId,
+            mode: 'project-wise',
             financialYearId: fy.id,
             lineIds: group.lineIds,
           }),
@@ -1114,8 +1094,8 @@ export function PayrollIntegration() {
                           onClick={(e) => {
                             e.stopPropagation()
                             if (sa.action === 'post-to-gl') {
-                              setSelectedBatch(batches.find((b: any) => b.id === batchId) || null)
-                              setGlVoucherChoiceOpen(true)
+                              // Post all draft vouchers to GL
+                              handlePostAllVouchersToGL()
                             } else if (sa.action === 'draft-to-gl') {
                               setSelectedBatch(batches.find((b: any) => b.id === batchId) || null)
                               setDraftToGLDialogOpen(true)
@@ -2340,7 +2320,7 @@ export function PayrollIntegration() {
                       Approve All Lines
                     </Button>
                     <Button variant="outline" size="sm" className="h-7 text-[10px] border-violet-300 text-violet-700 hover:bg-violet-50" onClick={() => { setSelectedBatch(batch); setDraftToGLDialogOpen(true) }}>
-                      <FileText className="h-3 w-3 mr-1" />Draft to Voucher
+                      <FileText className="h-3 w-3 mr-1" />Draft to Voucher (Project-wise)
                     </Button>
                     <Button variant="outline" size="sm" className="h-7 text-[10px] border-emerald-300 text-emerald-700 hover:bg-emerald-50" onClick={() => setProjectPayView(projectPayView === batch.id ? null : batch.id)}>
                       <FolderOpen className="h-3 w-3 mr-1" />Pay by Project
@@ -2352,11 +2332,8 @@ export function PayrollIntegration() {
                 )}
                 {batch.status === 'approved' && (
                   <>
-                    <Button size="sm" className="h-7 text-[10px]" onClick={() => { setSelectedBatch(batch); setGlVoucherChoiceOpen(true) }}>
-                      <BookOpen className="h-3 w-3 mr-1" />Post to GL
-                    </Button>
                     <Button variant="outline" size="sm" className="h-7 text-[10px] border-violet-300 text-violet-700 hover:bg-violet-50" onClick={() => { setSelectedBatch(batch); setDraftToGLDialogOpen(true) }}>
-                      <FileText className="h-3 w-3 mr-1" />Draft to Voucher
+                      <FileText className="h-3 w-3 mr-1" />Draft to Voucher (Project-wise)
                     </Button>
                     <Button variant="outline" size="sm" className="h-7 text-[10px] border-emerald-300 text-emerald-700 hover:bg-emerald-50" onClick={() => setProjectPayView(projectPayView === batch.id ? null : batch.id)}>
                       <FolderOpen className="h-3 w-3 mr-1" />Pay by Project
@@ -2610,7 +2587,7 @@ export function PayrollIntegration() {
                               disabled={processingAction === 'draft-to-gl'}
                             >
                               {processingAction === 'draft-to-gl' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <FileText className="h-3 w-3 mr-1" />}
-                              Draft to Voucher
+                              Draft to Voucher (Project-wise)
                             </Button>
                             <Button
                               variant="ghost"
@@ -3123,75 +3100,6 @@ export function PayrollIntegration() {
         </div>
       )}
 
-      {/* GL Voucher Choice Modal */}
-      <Dialog open={glVoucherChoiceOpen} onOpenChange={setGlVoucherChoiceOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-sm">Post to General Ledger</DialogTitle>
-            <DialogDescription className="text-xs">
-              {selectedBatch?.batchNumber} · {selectedBatch?.period} · {selectedBatch?.lines?.length || 0} employees
-              {selectedBatch && ` · Total Net Pay: ${formatCurrency(selectedBatch.totalNetPay)}`}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <p className="text-sm font-medium">How would you like to post this payroll?</p>
-
-            <div className="grid grid-cols-2 gap-3">
-              {/* Consolidated Option */}
-              <button
-                className={`p-4 rounded-xl border-2 text-left transition-all ${glVoucherMode === 'consolidated' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}
-                onClick={() => setGlVoucherMode('consolidated')}
-              >
-                <div className="text-lg mb-1">📄</div>
-                <p className="text-sm font-semibold">Single Voucher</p>
-                <p className="text-[11px] text-muted-foreground mt-1">One consolidated JV for all employees and all projects</p>
-                <p className="text-[10px] font-mono text-muted-foreground mt-2">JV-PAY-{selectedBatch?.period?.replace('-', '')}-001</p>
-              </button>
-
-              {/* Project-wise Option */}
-              <button
-                className={`p-4 rounded-xl border-2 text-left transition-all ${glVoucherMode === 'project-wise' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}
-                onClick={() => setGlVoucherMode('project-wise')}
-              >
-                <div className="text-lg mb-1">📂</div>
-                <p className="text-sm font-semibold">Project-wise Vouchers</p>
-                <p className="text-[11px] text-muted-foreground mt-1">Separate JV per project</p>
-                <p className="text-[10px] font-mono text-muted-foreground mt-2">JV-PAY-{selectedBatch?.period?.replace('-', '')}-PROJ</p>
-              </button>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => { setGlVoucherChoiceOpen(false); setGlVoucherMode(null) }}>Cancel</Button>
-            <Button size="sm" disabled={!glVoucherMode || glVoucherLoading} onClick={() => setGlVoucherConfirmOpen(true)}>
-              {glVoucherLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <BookOpen className="h-3.5 w-3.5 mr-1" />}
-              Generate Voucher(s)
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* GL Voucher Confirmation */}
-      <AlertDialog open={glVoucherConfirmOpen} onOpenChange={setGlVoucherConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-sm">Confirm GL Voucher Generation</AlertDialogTitle>
-            <AlertDialogDescription className="text-xs">
-              This will create {glVoucherMode === 'consolidated' ? 'a single consolidated' : 'project-wise'} journal voucher(s) in draft status.
-              The batch status will be updated accordingly.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleGenerateGLVoucher} disabled={glVoucherLoading}>
-              {glVoucherLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
-              Confirm & Generate
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       {/* ============ DIALOGS ============ */}
 
       {/* Create Batch Dialog */}
@@ -3321,7 +3229,7 @@ export function PayrollIntegration() {
               Draft to General Ledger
             </AlertDialogTitle>
             <AlertDialogDescription className="text-xs">
-              This will create a <strong>draft voucher</strong> in the General Ledger from the approved lines in batch &ldquo;{selectedBatch?.name || selectedBatch?.batchNumber}&rdquo;. The draft voucher can be reviewed and posted later from the GL module.
+              This will create <strong>project-wise draft vouchers</strong> in the General Ledger from the approved lines in batch &ldquo;{selectedBatch?.name || selectedBatch?.batchNumber}&rdquo;. A separate journal voucher will be generated for each project. Each draft voucher can be reviewed and posted individually to GL.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {selectedBatch && (
@@ -3335,14 +3243,14 @@ export function PayrollIntegration() {
           <div className="flex items-start gap-2 p-2 rounded bg-violet-50 border border-violet-200">
             <AlertCircle className="h-4 w-4 text-violet-600 shrink-0 mt-0.5" />
             <p className="text-[10px] text-violet-800">
-              A draft voucher will be created with journal entries for salary expenses, deductions, and employer charges. You can review and finalize it in the General Ledger module.
+              Project-wise draft vouchers will be created — one journal voucher per project, with salary expenses, deductions, and employer charges allocated proportionally. You can review and post each voucher to GL individually.
             </p>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => handleDraftToGL()} disabled={processingAction === 'draft-to-gl'}>
               {processingAction === 'draft-to-gl' ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <FileText className="h-3.5 w-3.5 mr-1" />}
-              Create Draft Voucher
+              Create Project-wise Vouchers
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

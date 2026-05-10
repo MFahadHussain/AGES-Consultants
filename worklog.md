@@ -1,50 +1,51 @@
-# Worklog - Task 2: Decimal Removal Agent
+---
+Task ID: 2
+Agent: full-stack-developer
+Task: Implement project-wise voucher workflow in payroll module
 
-## Summary
-Removed all decimal displays from AcctFin ERP software. All numeric values now display as whole numbers using `Math.round()` instead of `.toFixed(N)` where N > 0, and all formatting functions use `maximumFractionDigits: 0`.
+Work Log:
+- Modified handleDraftToGL to call /api/payroll/generate-gl-voucher API with mode: 'project-wise' instead of /api/payroll with action: 'draft-to-gl'
+- Removed GL Voucher Choice dialog (consolidated vs project-wise selection) entirely
+- Removed GL Voucher Confirmation dialog entirely
+- Removed unused state variables: glVoucherMode, glVoucherChoiceOpen, glVoucherConfirmOpen
+- Removed handleGenerateGLVoucher function (replaced by updated handleDraftToGL)
+- Updated handlePostAllVouchersToGL to show toast with count and refresh data after posting
+- Updated Draft to GL dialog description to clearly state project-wise voucher creation
+- Updated Draft to GL dialog info box with project-wise messaging
+- Updated Draft to GL dialog button text from "Create Draft Voucher" to "Create Project-wise Vouchers"
+- Updated all "Draft to Voucher" button labels to show "Draft to Voucher (Project-wise)"
+- Removed "Post to GL" button from approved batch status (consolidated path removed)
+- Updated workflow bar "Post to GL" action to call handlePostAllVouchersToGL directly
+- Updated handlePayProject to use /api/payroll/generate-gl-voucher with mode: 'project-wise'
+- Lint check passed with 0 errors (only pre-existing warnings unrelated to changes)
 
-## Changes Made
+Stage Summary:
+- Vouchers are now always created project-wise — no more consolidated vs project-wise choice
+- Workflow is streamlined: Select → Review → Approve → Draft Voucher (project-wise) → Post to GL
+- Each project voucher can be posted individually or all at once via workflow bar
+- All references to glVoucherMode, glVoucherChoiceOpen, glVoucherConfirmOpen, and handleGenerateGLVoucher have been removed
 
-### File 1: `src/components/modules/payroll.tsx`
-1. **Line 30**: `formatNumber` function changed `maximumFractionDigits: 2` → `maximumFractionDigits: 0`
-2. **Line 1288**: `((scBreakdown.attendanceRatio ?? scBreakdown.workingRatio) * 100).toFixed(2)` → `Math.round((scBreakdown.attendanceRatio ?? scBreakdown.workingRatio) * 100)`
-3. **Line 1307**: `(psc.projectRatio * 100).toFixed(2)` → `Math.round(psc.projectRatio * 100)`
-4. **Line 1405**: `((alloc.weight || 0) * 100).toFixed(1) + '%'` → `Math.round((alloc.weight || 0) * 100) + '%'`
-5. **Line 2382**: `((sc.attendanceRatio ?? sc.workingRatio) * 100).toFixed(1)` → `Math.round((sc.attendanceRatio ?? sc.workingRatio) * 100)`
-6. **Line 2393**: `(psc.projectRatio * 100).toFixed(1)` → `Math.round(psc.projectRatio * 100)`
-7. **Line 2463**: `((alloc.weight || 0) * 100).toFixed(1) + '%'` → `Math.round((alloc.weight || 0) * 100) + '%'`
+---
+Task ID: 2
+Agent: main
+Task: Implement project-wise voucher workflow in payroll module
 
-### File 2: `src/components/modules/employee-profile.tsx`
-1. **Line 178**: `formatPKR` now wraps value in `Math.round(n)` before `.toLocaleString('en-PK')`
-2. **Line 1096**: `pct.toFixed(1)` → `Math.round(pct)`
-3. **Line 1288**: `((apiPayrollResult.attendanceRatio ?? apiPayrollResult.workingRatio) * 100).toFixed(2)` → `Math.round(...)`
-4. **Line 1314**: `((psc.projectRatio ?? 0) * 100).toFixed(1)` → `Math.round(...)`
-5. **Line 1633**: `(row.scRate*100).toFixed(0)` → `Math.round(row.scRate*100)` (consistency)
+Work Log:
+- Modified handleDraftToGL to call /api/payroll/generate-gl-voucher with mode: 'project-wise' instead of /api/payroll with action: 'draft-to-gl'
+- Added lineIds parameter support to generate-gl-voucher API endpoint
+- Removed GL Voucher Choice dialog (consolidated vs project-wise selection)
+- Removed glVoucherMode, glVoucherChoiceOpen, glVoucherConfirmOpen state variables
+- Removed handleGenerateGLVoucher function (no longer needed)
+- Updated Draft to GL dialog to show project-wise messaging and "Create Project-wise Vouchers" button
+- Updated all "Draft to Voucher" buttons to show "Draft to Voucher (Project-wise)" label
+- Updated workflow bar: "Post to GL" now directly calls handlePostAllVouchersToGL()
+- Updated approved batch status buttons: removed separate "Post to GL" button, kept "Draft to Voucher (Project-wise)"
+- Updated handlePostAllVouchersToGL to show toast with posted count
+- Updated handlePayProject to use generate-gl-voucher API with mode: 'project-wise'
 
-### File 3: `src/components/modules/dashboard.tsx`
-1. **Line 79**: `(amount / 1000000).toFixed(1)` → `Math.round(amount / 1000000)`
-2. **Line 80**: `(amount / 1000).toFixed(0)` → `Math.round(amount / 1000)` (consistency)
-
-### File 4: `src/components/modules/fixed-assets.tsx`
-1. **Line 1526**: `(v / 1000000).toFixed(1)` → `Math.round(v / 1000000)`
-
-### File 5: `src/components/modules/attendance.tsx`
-1. **Line 700**: `((displayStats.totalPresent / displayStats.totalRecords) * 100).toFixed(1)` → `Math.round(...)`
-
-### File 6: `src/components/modules/budgets.tsx`
-1. **Line 379**: `lineUtilization.toFixed(1)` → `Math.round(lineUtilization)`
-
-### File 7: `src/app/api/fams/journals/export/route.ts`
-1. **Line 56**: `Math.round(journal.drAmount).toFixed(2)` → `String(Math.round(journal.drAmount))`
-2. **Line 59**: `Math.round(journal.crAmount).toFixed(2)` → `String(Math.round(journal.crAmount))`
-
-### File 8: `src/app/api/dashboard/route.ts`
-1. **Line 97**: `((...).toFixed(1)` → `Math.round(...)`
-
-### File 9: `src/lib/payroll/calculateMonthlyPayroll.ts`
-1. **Line 753**: `((ce.daysWorked / totalBillableDays) * 100).toFixed(2) + '%'` → `Math.round((ce.daysWorked / totalBillableDays) * 100) + '%'`
-
-## Verification
-- Ran `bun run lint` — 0 errors, 4 pre-existing warnings (unrelated to this task)
-- All `.toFixed(N)` calls with N > 0 have been replaced with `Math.round()`
-- All formatting functions now use `maximumFractionDigits: 0`
+Stage Summary:
+- Streamlined workflow: Select → Review → Approve → Draft to Voucher (always project-wise) → Post to GL
+- Vouchers are now always created project-wise (one per project)
+- No more consolidated vs project-wise choice dialog
+- Each project voucher can be posted individually or all at once
+- Lint: 0 errors, 4 pre-existing warnings
