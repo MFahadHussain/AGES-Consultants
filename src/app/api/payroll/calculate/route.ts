@@ -8,6 +8,7 @@ import { validateBeforePayrollRun } from '@/lib/payroll/preRunValidation'
 //
 // Body:
 //   { employeeId: string, month: string }          — single employee
+//   { employeeIds: string[], month: string }        — multiple employees
 //   { month: string, allEmployees?: boolean }       — all active employees
 //   { employeeId: string, month: string, skipValidation?: boolean }
 //
@@ -32,6 +33,36 @@ export async function POST(request: Request) {
     const mon = Number(match[2])
     const monthDate = new Date(Date.UTC(year, mon - 1, 1))
 
+    // Helper: calculate payroll for a list of employee IDs
+    const calculateForEmployees = async (empIds: string[]) => {
+      const results: Record<string, unknown> = {}
+      const errors: Record<string, string> = {}
+
+      for (const id of empIds) {
+        try {
+          if (!skipValidation) {
+            const validation = await validateBeforePayrollRun(id, monthDate)
+            if (!validation.isValid) {
+              errors[id] = validation.issues.join('; ')
+              continue
+            }
+          }
+          results[id] = await calculateMonthlyPayroll(id, monthDate)
+        } catch (err) {
+          errors[id] = err instanceof Error ? err.message : String(err)
+        }
+      }
+
+      return NextResponse.json({
+        month: monthStr,
+        totalEmployees: empIds.length,
+        successful: Object.keys(results).length,
+        failed: Object.keys(errors).length,
+        results,
+        errors,
+      })
+    }
+
     if (employeeId) {
       // Single employee calculation
       if (!skipValidation) {
@@ -52,6 +83,12 @@ export async function POST(request: Request) {
       return NextResponse.json(result)
     }
 
+    // Support employeeIds (array) for multi-employee calculation
+    const { employeeIds } = body
+    if (employeeIds && Array.isArray(employeeIds) && employeeIds.length > 0) {
+      return calculateForEmployees(employeeIds as string[])
+    }
+
     if (allEmployees) {
       // All employees — need to import db
       const { db } = await import('@/lib/db')
@@ -60,36 +97,11 @@ export async function POST(request: Request) {
         select: { id: true, name: true, employeeCode: true },
       })
 
-      const results: Record<string, unknown> = {}
-      const errors: Record<string, string> = {}
-
-      for (const emp of employees) {
-        try {
-          if (!skipValidation) {
-            const validation = await validateBeforePayrollRun(emp.id, monthDate)
-            if (!validation.isValid) {
-              errors[emp.id] = validation.issues.join('; ')
-              continue
-            }
-          }
-          results[emp.id] = await calculateMonthlyPayroll(emp.id, monthDate)
-        } catch (err) {
-          errors[emp.id] = err instanceof Error ? err.message : String(err)
-        }
-      }
-
-      return NextResponse.json({
-        month: monthStr,
-        totalEmployees: employees.length,
-        successful: Object.keys(results).length,
-        failed: Object.keys(errors).length,
-        results,
-        errors,
-      })
+      return calculateForEmployees(employees.map(e => e.id))
     }
 
     return NextResponse.json(
-      { error: 'Provide either employeeId or allEmployees=true' },
+      { error: 'Provide either employeeId, employeeIds[], or allEmployees=true' },
       { status: 400 },
     )
   } catch (error) {

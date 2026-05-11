@@ -37,7 +37,7 @@ const ACCOUNT_ROLES: Record<string, { accountType?: string; subType?: string; co
   // Payroll Liabilities
   SALARY_PAYABLE:     { accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', nameContains: 'Salary Payable', allowPosting: true },
   SOCIAL_CHARGES_PAYABLE: { accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', nameContains: 'Social Charges Payable', allowPosting: true },
-  INCOME_TAX_PAYABLE: { accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', nameContains: 'Income Tax', allowPosting: true },
+  INCOME_TAX_PAYABLE: { accountType: 'LIABILITY', subType: 'TAX_PAYABLE', nameContains: 'WHT Payable Employees', allowPosting: true },
   EOBI_PAYABLE:       { accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', nameContains: 'EOBI', allowPosting: true },
   PROVIDENT_FUND_PAYABLE: { accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', nameContains: 'Provident', allowPosting: true },
   GRATUITY_PAYABLE:     { accountType: 'LIABILITY', subType: 'PAYROLL_LIABILITY', nameContains: 'Gratuity', allowPosting: true },
@@ -131,8 +131,8 @@ const ACCOUNT_ROLES: Record<string, { accountType?: string; subType?: string; co
   PROVISION_TAXATION:   { accountType: 'LIABILITY', subType: 'TAX_PAYABLE', nameContains: 'Provision for Taxation', allowPosting: true },
 
   // Expense categories
-  SALARY_EXPENSE:       { accountType: 'EXPENSE', subType: 'SALARY', allowPosting: true },
-  SOCIAL_CHARGES:       { accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', allowPosting: true },
+  SALARY_EXPENSE:       { accountType: 'EXPENSE', subType: 'SALARY', nameContains: 'Salary', allowPosting: true },
+  SOCIAL_CHARGES:       { accountType: 'EXPENSE', subType: 'SOCIAL_CHARGES', nameContains: 'Social', allowPosting: true },
   TRAVEL_EXPENSE:       { accountType: 'EXPENSE', subType: 'TRAVEL', allowPosting: true },
   RENT_EXPENSE:         { accountType: 'EXPENSE', subType: 'RENT_EXPENSE', allowPosting: true },
   UTILITY_EXPENSE:      { accountType: 'EXPENSE', subType: 'UTILITY_EXPENSE', allowPosting: true },

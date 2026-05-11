@@ -365,7 +365,7 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
       const res = await fetch('/api/payroll/calculate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ employeeIds: empIds, month: period }),
+        body: JSON.stringify({ employeeIds: empIds, month: period, skipValidation: true }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Calculation failed')

@@ -104,3 +104,43 @@ Work Log:
 Stage Summary:
 - SC calculation engine is correct and consistent
 - No additional fixes needed
+
+---
+Task ID: 8
+Agent: main
+Task: Fix voucher generation error — "Provide either employeeId or allEmployees=true"
+
+Work Log:
+- Identified root cause: /api/payroll/calculate route only supported `employeeId` (singular) and `allEmployees`, not `employeeIds` (array)
+- The salary-voucher-creation component was calling calculate with `employeeIds` array parameter
+- Added `employeeIds[]` support to the calculate route with new `calculateForEmployees` helper
+- Added `skipValidation: true` to the preview call in salary-voucher-creation component
+- Discovered critical secondary issue: account resolution fallback patterns ('5001', '5010', '2100', '2110', '2120') don't match the actual hierarchical CoA structure
+- The actual CoA uses codes like '05-01-01-0003', '03-02-02-0001', '03-02-07-0001'
+- Rewrote `resolveAccount` function with 5-level fallback chain including hierarchical code prefix and name pattern matching
+- Updated all resolveCached calls with correct hierarchical codes and name patterns:
+  - Salary Expense: 05-01-01 / 'Salary'
+  - SC Expense: 05-02 / 'Social Charges'
+  - Salary Payable: 03-02-02 / 'Salary Payable'
+  - SC Payable: 03-02-03 / 'Social Charges Payable'
+  - Tax Payable: 03-02-07 / 'WHT Payable Employees'
+- Fixed INCOME_TAX_PAYABLE role in account-roles.ts to match 'WHT Payable Employees' instead of 'Income Tax'
+- Added nameContains to SALARY_EXPENSE and SOCIAL_CHARGES roles for better matching
+- Fixed employee accounting config in database (was incorrectly mapping all payable accounts to Salary Payable Partners)
+- Corrected employee Assad Ali Khan's config:
+  - Salary Expense → 05-01-01-0003 Technical Staff Salary
+  - SC Expense → 05-02-01-0003 EOBI - Technical Staff
+  - Salary Payable → 03-02-02-0003 Salary Payable Technical Staff
+  - SC Payable → 03-02-03-0003 Social Charges Payable - Technical Staff
+  - Tax Payable → 03-02-07-0001 WHT Payable Employees
+- Populated PayrollAccountMapping entries with actual account IDs
+- Created missing SOCIAL_CHARGES_PAYABLE mapping entry
+- Updated schema comments and UI example labels to reference hierarchical codes
+- Removed `mode: 'insensitive'` from Prisma contains query (SQLite doesn't support it)
+
+Stage Summary:
+- Voucher generation should now work correctly
+- Account resolution properly handles the hierarchical CoA (05-XX-XX-XXXX format)
+- Employee accounting config is correctly mapped
+- PayrollAccountMapping entries have actual account IDs set
+- /api/payroll/calculate now supports employeeIds[] for multi-employee preview

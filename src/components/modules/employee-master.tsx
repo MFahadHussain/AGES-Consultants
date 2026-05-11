@@ -840,11 +840,11 @@ export function EmployeeMaster() {
     const liabilityAccounts = accounts.filter(a => a.accountType === 'LIABILITY')
 
     const accountingFields = [
-      { field: 'salaryExpenseAccountId' as const, label: 'Salary Expense Account', example: '5001 · Project Salary Cost', filter: expenseAccounts },
-      { field: 'scExpenseAccountId' as const, label: 'SC Expense Account', example: '5010 · Employer SC Cost', filter: expenseAccounts },
-      { field: 'salaryPayableAccountId' as const, label: 'Salary Payable Account', example: '2100 · Employee Salary Payable', filter: liabilityAccounts },
-      { field: 'scPayableAccountId' as const, label: 'SC Payable Account', example: '2110 · SC Payable to Authority', filter: liabilityAccounts },
-      { field: 'taxPayableAccountId' as const, label: 'Tax Payable Account', example: '2120 · Income Tax Payable', filter: liabilityAccounts },
+      { field: 'salaryExpenseAccountId' as const, label: 'Salary Expense Account', example: '05-01-01-XXXX · Project Salary Cost', filter: expenseAccounts },
+      { field: 'scExpenseAccountId' as const, label: 'SC Expense Account', example: '05-02-XX-XXXX · Employer SC Cost', filter: expenseAccounts },
+      { field: 'salaryPayableAccountId' as const, label: 'Salary Payable Account', example: '03-02-02-XXXX · Employee Salary Payable', filter: liabilityAccounts },
+      { field: 'scPayableAccountId' as const, label: 'SC Payable Account', example: '03-02-03-XXXX · SC Payable to Authority', filter: liabilityAccounts },
+      { field: 'taxPayableAccountId' as const, label: 'Tax Payable Account', example: '03-02-07-XXXX · Income Tax (WHT) Payable', filter: liabilityAccounts },
     ]
 
     const missingAccounts = accountingFields.filter(f => !form[f.field])

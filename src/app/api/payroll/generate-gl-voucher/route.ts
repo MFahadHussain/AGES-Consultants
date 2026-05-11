@@ -127,13 +127,18 @@ function formatProjectSuffix(code: string): string {
  * 1. Employee-specific account mapping
  * 2. PayrollAccountMapping table
  * 3. findAccountByRole (account-roles)
- * 4. Look up by account code pattern
+ * 4. Look up by account code prefix (hierarchical CoA)
+ * 5. Look up by account name pattern
+ *
+ * The CoA uses hierarchical codes like "05-01-01-0002", "03-02-02-0001".
+ * Fallback patterns must match these, not simple codes like "5001".
  */
 async function resolveAccount(
   employeeAccountId: string | null,
   componentType: string,
   roleKey: string,
-  fallbackCodePattern: string
+  fallbackCodePrefix: string,
+  fallbackNamePattern: string
 ): Promise<string | null> {
   // 1. Employee-specific account
   if (employeeAccountId) return employeeAccountId
@@ -142,18 +147,39 @@ async function resolveAccount(
   const mapping = await db.payrollAccountMapping.findFirst({
     where: { componentType, isActive: true },
   })
+  if (mapping?.debitAccountId) return mapping.debitAccountId
   if (mapping?.creditAccountId) return mapping.creditAccountId
 
   // 3. Account role lookup
   const roleAccount = await findAccountByRole(roleKey)
   if (roleAccount?.id) return roleAccount.id
 
-  // 4. Code pattern fallback
-  const codeAccount = await db.account.findFirst({
-    where: { code: { startsWith: fallbackCodePattern }, isActive: true },
-    select: { id: true },
+  // 4. Code prefix fallback (hierarchical CoA e.g. "05-01-01" matches "05-01-01-0002")
+  //    Prefer the most specific (longest) code that starts with the prefix and is a leaf account
+  const codeAccounts = await db.account.findMany({
+    where: { code: { startsWith: fallbackCodePrefix }, isActive: true },
+    select: { id: true, code: true },
+    orderBy: { code: 'desc' },
   })
-  if (codeAccount?.id) return codeAccount.id
+  if (codeAccounts.length > 0) {
+    // Prefer leaf accounts (those with 4+ segments like "05-01-01-0002") over parent accounts
+    const leaf = codeAccounts.find(a => a.code.split('-').length >= 4)
+    if (leaf) return leaf.id
+    // Fall back to the first (most specific) matching account
+    return codeAccounts[0].id
+  }
+
+  // 5. Name pattern fallback (case-insensitive contains)
+  if (fallbackNamePattern) {
+    const nameAccount = await db.account.findFirst({
+      where: {
+        name: { contains: fallbackNamePattern },
+        isActive: true,
+      },
+      select: { id: true },
+    })
+    if (nameAccount?.id) return nameAccount.id
+  }
 
   return null
 }
@@ -378,12 +404,13 @@ async function generateSalaryVouchers(
     empAccountId: string | null,
     componentType: string,
     roleKey: string,
-    fallbackCode: string
+    fallbackCodePrefix: string,
+    fallbackNamePattern: string
   ): Promise<string | null> => {
-    const cacheKey = `${empAccountId || 'none'}|${componentType}|${roleKey}|${fallbackCode}`
+    const cacheKey = `${empAccountId || 'none'}|${componentType}|${roleKey}|${fallbackCodePrefix}|${fallbackNamePattern}`
     if (accountCache.has(cacheKey)) return accountCache.get(cacheKey)!
 
-    const result = await resolveAccount(empAccountId, componentType, roleKey, fallbackCode)
+    const result = await resolveAccount(empAccountId, componentType, roleKey, fallbackCodePrefix, fallbackNamePattern)
     accountCache.set(cacheKey, result)
     return result
   }
@@ -392,7 +419,7 @@ async function generateSalaryVouchers(
     // ── Validation ──
     if (!emp.salaryExpenseAccountId) {
       // Check if we can resolve via fallback chain
-      const resolved = await resolveCached(null, 'SALARY_EXPENSE', 'SALARY_EXPENSE', '5001')
+      const resolved = await resolveCached(null, 'SALARY_EXPENSE', 'SALARY_EXPENSE', '05-01-01', 'Salary')
       if (!resolved) {
         validationErrors.push({
           employeeId: emp.employeeId,
@@ -406,7 +433,7 @@ async function generateSalaryVouchers(
 
     // Resolve tax payable account
     const taxPayableAccount = await resolveCached(
-      emp.taxPayableAccountId, 'INCOME_TAX_PAYABLE', 'INCOME_TAX_PAYABLE', '2120'
+      emp.taxPayableAccountId, 'INCOME_TAX_PAYABLE', 'INCOME_TAX_PAYABLE', '03-02-07', 'WHT Payable Employees'
     )
     if (!taxPayableAccount && emp.tax > 0) {
       validationErrors.push({
@@ -500,16 +527,16 @@ async function generateSalaryVouchers(
 
       // ── Resolve accounts ──
       const salaryExpenseAccount = await resolveCached(
-        emp.salaryExpenseAccountId, 'SALARY_EXPENSE', 'SALARY_EXPENSE', '5001'
+        emp.salaryExpenseAccountId, 'SALARY_EXPENSE', 'SALARY_EXPENSE', '05-01-01', 'Salary'
       )
       const scExpenseAccount = await resolveCached(
-        emp.scExpenseAccountId, 'SOCIAL_CHARGES', 'SOCIAL_CHARGES', '5010'
+        emp.scExpenseAccountId, 'SOCIAL_CHARGES', 'SOCIAL_CHARGES', '05-02', 'Social Charges'
       )
       const salaryPayableAccount = await resolveCached(
-        emp.salaryPayableAccountId, 'SALARY_PAYABLE', 'SALARY_PAYABLE', '2100'
+        emp.salaryPayableAccountId, 'SALARY_PAYABLE', 'SALARY_PAYABLE', '03-02-02', 'Salary Payable'
       )
       const scPayableAccount = await resolveCached(
-        emp.scPayableAccountId, 'SOCIAL_CHARGES_PAYABLE', 'SOCIAL_CHARGES_PAYABLE', '2110'
+        emp.scPayableAccountId, 'SOCIAL_CHARGES_PAYABLE', 'SOCIAL_CHARGES_PAYABLE', '03-02-03', 'Social Charges Payable'
       )
       // taxPayableAccount already resolved above, but resolve per-project with cache
 

@@ -739,15 +739,15 @@ model Employee {
   paymentType       String   @default("monthly") // monthly, daily, hourly
 
   // Accounting Configuration (for voucher generation)
-  salaryExpenseAccountId  String?  // FK to Account — e.g., 5001 · Project Salary Cost
+  salaryExpenseAccountId  String?  // FK to Account — e.g., 05-01-01-XXXX · Project Salary Cost
   salaryExpenseAccount    Account? @relation("EmpSalaryExpense", fields: [salaryExpenseAccountId], references: [id])
-  scExpenseAccountId      String?  // FK to Account — e.g., 5010 · Employer SC Cost
+  scExpenseAccountId      String?  // FK to Account — e.g., 05-02-XX-XXXX · Employer SC Cost
   scExpenseAccount        Account? @relation("EmpScExpense", fields: [scExpenseAccountId], references: [id])
-  salaryPayableAccountId  String?  // FK to Account — e.g., 2100 · Employee Salary Payable
+  salaryPayableAccountId  String?  // FK to Account — e.g., 03-02-02-XXXX · Employee Salary Payable
   salaryPayableAccount    Account? @relation("EmpSalaryPayable", fields: [salaryPayableAccountId], references: [id])
-  scPayableAccountId      String?  // FK to Account — e.g., 2110 · SC Payable to Authority
+  scPayableAccountId      String?  // FK to Account — e.g., 03-02-03-XXXX · SC Payable to Authority
   scPayableAccount        Account? @relation("EmpScPayable", fields: [scPayableAccountId], references: [id])
-  taxPayableAccountId     String?  // FK to Account — e.g., 2120 · Income Tax Payable
+  taxPayableAccountId     String?  // FK to Account — e.g., 03-02-07-XXXX · Income Tax (WHT) Payable
   taxPayableAccount       Account? @relation("EmpTaxPayable", fields: [taxPayableAccountId], references: [id])
 
   // System
