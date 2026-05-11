@@ -144,3 +144,31 @@ Stage Summary:
 - Employee accounting config is correctly mapped
 - PayrollAccountMapping entries have actual account IDs set
 - /api/payroll/calculate now supports employeeIds[] for multi-employee preview
+
+---
+Task ID: 9
+Agent: main
+Task: Replace simple Draft-to-GL AlertDialog with Create Salary Voucher flow in payroll batches
+
+Work Log:
+- Created new component: /src/components/modules/create-salary-voucher-dialog.tsx
+- Implemented 4-step flow: Select → Preview → Generate → Results
+- Step 1: Select employees and projects from approved batch lines with checkboxes
+- Step 2: Preview with project-grouped breakdown, validation errors, grand totals, and 5-line voucher structure explanation
+- Step 3: Confirmation with financial summary before generating
+- Step 4: Results showing generated vouchers with View/Post/Print actions, bulk Post All and Print All
+- Updated payroll.tsx to use CreateSalaryVoucherDialog instead of simple AlertDialog
+- Changed "Draft to Voucher (Project-wise)" button to "Create Salary Voucher"
+- Updated workflow step labels (Draft Voucher → Create Voucher)
+- Updated "Pay by Project" handler to open new dialog with pre-selected project lines
+- Added auto-approve logic: when paying from reviewed batch, lines are approved first
+- Removed old draft-to-gl AlertDialog (redundant with new dialog)
+- Cleaned up unused state variables (draftToGLDialogOpen, glVoucherLoading, payingProjectId)
+- Kept handleDraftToGL function removed (no longer needed)
+
+Stage Summary:
+- Payroll batches now have a proper "Create Salary Voucher" flow matching the standalone salary voucher creation screen
+- 4-step dialog: Select employees/projects → Preview voucher entries → Confirm → View results
+- Supports pre-selection from "Pay by Project" quick action
+- Generates 5-line SV vouchers per employee per project via /api/payroll/generate-gl-voucher
+- Post individual or all vouchers to GL, print, view details
