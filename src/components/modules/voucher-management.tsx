@@ -790,6 +790,7 @@ export function VoucherManagement() {
 
       {/* Vouchers Table */}
       <Card><CardContent className="p-0">
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader><TableRow>
             <TableHead className="text-[10px]">Voucher #</TableHead>
@@ -838,6 +839,7 @@ export function VoucherManagement() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </CardContent></Card>
 
       {/* Pagination */}
@@ -992,6 +994,7 @@ export function VoucherManagement() {
               )}
 
               {/* Entries Table */}
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader><TableRow>
                   <TableHead className="text-[10px]">#</TableHead><TableHead className="text-[10px]">Account</TableHead>
@@ -1015,6 +1018,7 @@ export function VoucherManagement() {
                   </TableRow>
                 </TableBody>
               </Table>
+              </div>
 
               {/* Approval Timeline */}
               {detailVoucher.approvals?.length > 0 && (

@@ -19,9 +19,10 @@ import {
   Search, Filter, X, ChevronLeft, ChevronRight, Building2,
   GraduationCap, Briefcase, Heart, DollarSign, Shield, User,
   Phone, Mail, MapPin, Calendar, CreditCard, FileText, AlertTriangle,
-  Loader2
+  Loader2, BookOpen
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { AccountCombobox, AccountOption } from '@/components/ui/account-combobox'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -135,6 +136,11 @@ const emptyForm = {
   defaultAllocationMethod: 'days',
   taxFilingStatus: '',
   taxCity: '',
+  salaryExpenseAccountId: '',
+  scExpenseAccountId: '',
+  salaryPayableAccountId: '',
+  scPayableAccountId: '',
+  taxPayableAccountId: '',
 }
 
 // ---------------------------------------------------------------------------
@@ -147,6 +153,7 @@ export function EmployeeMaster() {
   // Data state
   const [employees, setEmployees] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
+  const [accounts, setAccounts] = useState<AccountOption[]>([])
   const [departments, setDepartments] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [total, setTotal] = useState(0)
@@ -243,13 +250,36 @@ export function EmployeeMaster() {
     }
   }, [])
 
+  const fetchAccounts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/accounts?isActive=true')
+      if (!res.ok) return
+      const data = await res.json()
+      // Filter to only posting-allowed accounts
+      const filtered = (data || []).filter((a: any) => a.allowPosting === true && a.isActive === true)
+      setAccounts(filtered.map((a: any) => ({
+        id: a.id,
+        code: a.code,
+        name: a.name,
+        accountType: a.accountType,
+        subType: a.subType || undefined,
+        level: a.level,
+        allowPosting: a.allowPosting,
+        isActive: a.isActive,
+      })))
+    } catch {
+      // Silently fail
+    }
+  }, [])
+
   useEffect(() => {
     queueMicrotask(() => {
       fetchData()
       fetchSummary()
       fetchProjects()
+      fetchAccounts()
     })
-  }, [fetchData, fetchSummary, fetchProjects])
+  }, [fetchData, fetchSummary, fetchProjects, fetchAccounts])
 
   useEffect(() => {
     fetchData()
@@ -329,6 +359,11 @@ export function EmployeeMaster() {
       defaultAllocationMethod: emp.defaultAllocationMethod || 'days',
       taxFilingStatus: emp.taxFilingStatus || '',
       taxCity: emp.taxCity || '',
+      salaryExpenseAccountId: emp.salaryExpenseAccountId || '',
+      scExpenseAccountId: emp.scExpenseAccountId || '',
+      salaryPayableAccountId: emp.salaryPayableAccountId || '',
+      scPayableAccountId: emp.scPayableAccountId || '',
+      taxPayableAccountId: emp.taxPayableAccountId || '',
     })
   }
 
@@ -799,6 +834,84 @@ export function EmployeeMaster() {
     </div>
   )
 
+  const renderAccountingTab = () => {
+    // Filter accounts by type for grouping
+    const expenseAccounts = accounts.filter(a => a.accountType === 'EXPENSE')
+    const liabilityAccounts = accounts.filter(a => a.accountType === 'LIABILITY')
+
+    const accountingFields = [
+      { field: 'salaryExpenseAccountId' as const, label: 'Salary Expense Account', example: '5001 · Project Salary Cost', filter: expenseAccounts },
+      { field: 'scExpenseAccountId' as const, label: 'SC Expense Account', example: '5010 · Employer SC Cost', filter: expenseAccounts },
+      { field: 'salaryPayableAccountId' as const, label: 'Salary Payable Account', example: '2100 · Employee Salary Payable', filter: liabilityAccounts },
+      { field: 'scPayableAccountId' as const, label: 'SC Payable Account', example: '2110 · SC Payable to Authority', filter: liabilityAccounts },
+      { field: 'taxPayableAccountId' as const, label: 'Tax Payable Account', example: '2120 · Income Tax Payable', filter: liabilityAccounts },
+    ]
+
+    const missingAccounts = accountingFields.filter(f => !form[f.field])
+
+    return (
+      <div className="space-y-3">
+        <div>
+          <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5" />Debit Accounts (Expense)</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {accountingFields.filter(f => f.filter === expenseAccounts).map(({ field, label, example, filter }) => (
+              <div key={field}>
+                <Label className="text-xs">{label}</Label>
+                <AccountCombobox
+                  accounts={filter}
+                  value={form[field] || ''}
+                  onChange={(id: string) => updateForm(field, id)}
+                  placeholder={`e.g. ${example}`}
+                  className="h-8 text-xs"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+        <Separator />
+        <div>
+          <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5" />Credit Accounts (Payable)</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {accountingFields.filter(f => f.filter === liabilityAccounts).map(({ field, label, example, filter }) => (
+              <div key={field}>
+                <Label className="text-xs">{label}</Label>
+                <AccountCombobox
+                  accounts={filter}
+                  value={form[field] || ''}
+                  onChange={(id: string) => updateForm(field, id)}
+                  placeholder={`e.g. ${example}`}
+                  className="h-8 text-xs"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+        {missingAccounts.length > 0 && (
+          <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Accounts Not Configured</p>
+              <p className="text-[10px] text-amber-600">Employee cannot be included in salary voucher generation until all 5 accounts are configured.</p>
+              <p className="text-[10px] text-amber-500 mt-1">Missing: {missingAccounts.map(f => f.label).join(', ')}</p>
+            </div>
+          </div>
+        )}
+        {missingAccounts.length === 0 && (
+          <div className="flex items-center gap-2 p-3 rounded-md bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+            <Shield className="h-3.5 w-3.5 text-green-600" />
+            <span className="text-[10px] text-green-700 dark:text-green-300 font-medium">All accounting accounts configured — employee is ready for salary voucher generation</span>
+          </div>
+        )}
+        <div className="p-3 rounded-md bg-muted/50">
+          <div className="flex items-center gap-2 mb-1">
+            <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-[10px] text-muted-foreground font-medium">These accounts override the default Payroll Account Mapping when generating salary vouchers for this employee</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // ---------------------------------------------------------------------------
   // View Detail Renderer
   // ---------------------------------------------------------------------------
@@ -835,6 +948,7 @@ export function EmployeeMaster() {
             <TabsTrigger value="employment" className="text-[10px] flex-1 h-7"><Briefcase className="h-3 w-3 mr-1" />Employment</TabsTrigger>
             <TabsTrigger value="banking" className="text-[10px] flex-1 h-7"><CreditCard className="h-3 w-3 mr-1" />Banking</TabsTrigger>
             <TabsTrigger value="salary" className="text-[10px] flex-1 h-7"><DollarSign className="h-3 w-3 mr-1" />Salary</TabsTrigger>
+            <TabsTrigger value="accounting" className="text-[10px] flex-1 h-7"><BookOpen className="h-3 w-3 mr-1" />Accounting</TabsTrigger>
             <TabsTrigger value="other" className="text-[10px] flex-1 h-7"><FileText className="h-3 w-3 mr-1" />Other</TabsTrigger>
           </TabsList>
 
@@ -902,6 +1016,36 @@ export function EmployeeMaster() {
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-medium border bg-slate-50 text-slate-600 border-slate-200">{emp.taxCity}</span>
                 )}
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="accounting" className="mt-3">
+            <div className="space-y-3">
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Debit Accounts (Expense)</p>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                  <DetailRow icon={BookOpen} label="Salary Expense" value={emp.salaryExpenseAccount ? `${emp.salaryExpenseAccount.code} · ${emp.salaryExpenseAccount.name}` : '—'} />
+                  <DetailRow icon={BookOpen} label="SC Expense" value={emp.scExpenseAccount ? `${emp.scExpenseAccount.code} · ${emp.scExpenseAccount.name}` : '—'} />
+                </div>
+              </div>
+              <Separator />
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Credit Accounts (Payable)</p>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                  <DetailRow icon={BookOpen} label="Salary Payable" value={emp.salaryPayableAccount ? `${emp.salaryPayableAccount.code} · ${emp.salaryPayableAccount.name}` : '—'} />
+                  <DetailRow icon={BookOpen} label="SC Payable" value={emp.scPayableAccount ? `${emp.scPayableAccount.code} · ${emp.scPayableAccount.name}` : '—'} />
+                  <DetailRow icon={BookOpen} label="Tax Payable" value={emp.taxPayableAccount ? `${emp.taxPayableAccount.code} · ${emp.taxPayableAccount.name}` : '—'} />
+                </div>
+              </div>
+              {(!emp.salaryExpenseAccountId || !emp.scExpenseAccountId || !emp.salaryPayableAccountId || !emp.scPayableAccountId || !emp.taxPayableAccountId) && (
+                <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Accounts Not Configured</p>
+                    <p className="text-[10px] text-amber-600">Employee cannot be included in salary voucher generation until all 5 accounts are configured.</p>
+                  </div>
+                </div>
+              )}
             </div>
           </TabsContent>
 
@@ -1196,6 +1340,7 @@ export function EmployeeMaster() {
               <TabsTrigger value="banking" className="text-[10px] flex-1 h-7 min-w-0"><CreditCard className="h-3 w-3 mr-1" />Banking</TabsTrigger>
               <TabsTrigger value="qualification" className="text-[10px] flex-1 h-7 min-w-0"><GraduationCap className="h-3 w-3 mr-1" />Qualification</TabsTrigger>
               <TabsTrigger value="salary" className="text-[10px] flex-1 h-7 min-w-0"><DollarSign className="h-3 w-3 mr-1" />Salary</TabsTrigger>
+              <TabsTrigger value="accounting" className="text-[10px] flex-1 h-7 min-w-0"><BookOpen className="h-3 w-3 mr-1" />Accounting{(!form.salaryExpenseAccountId || !form.scExpenseAccountId || !form.salaryPayableAccountId || !form.scPayableAccountId || !form.taxPayableAccountId) && <AlertTriangle className="h-3 w-3 ml-1 text-amber-500" />}</TabsTrigger>
               <TabsTrigger value="nok" className="text-[10px] flex-1 h-7 min-w-0"><Heart className="h-3 w-3 mr-1" />Next of Kin</TabsTrigger>
             </TabsList>
 
@@ -1205,6 +1350,7 @@ export function EmployeeMaster() {
               <TabsContent value="banking" className="mt-0">{renderBankingTab()}</TabsContent>
               <TabsContent value="qualification" className="mt-0">{renderQualificationTab()}</TabsContent>
               <TabsContent value="salary" className="mt-0">{renderSalaryTab()}</TabsContent>
+              <TabsContent value="accounting" className="mt-0">{renderAccountingTab()}</TabsContent>
               <TabsContent value="nok" className="mt-0">{renderNextOfKinTab()}</TabsContent>
             </ScrollArea>
           </Tabs>
@@ -1216,7 +1362,7 @@ export function EmployeeMaster() {
               className="text-xs"
               disabled={formTab === 'personal'}
               onClick={() => {
-                const tabs = ['personal', 'employment', 'banking', 'qualification', 'salary', 'nok']
+                const tabs = ['personal', 'employment', 'banking', 'qualification', 'salary', 'accounting', 'nok']
                 const idx = tabs.indexOf(formTab)
                 if (idx > 0) setFormTab(tabs[idx - 1])
               }}
@@ -1230,7 +1376,7 @@ export function EmployeeMaster() {
                   size="sm"
                   className="text-xs"
                   onClick={() => {
-                    const tabs = ['personal', 'employment', 'banking', 'qualification', 'salary', 'nok']
+                    const tabs = ['personal', 'employment', 'banking', 'qualification', 'salary', 'accounting', 'nok']
                     const idx = tabs.indexOf(formTab)
                     if (idx < tabs.length - 1) setFormTab(tabs[idx + 1])
                   }}
@@ -1264,6 +1410,7 @@ export function EmployeeMaster() {
               <TabsTrigger value="banking" className="text-[10px] flex-1 h-7 min-w-0"><CreditCard className="h-3 w-3 mr-1" />Banking</TabsTrigger>
               <TabsTrigger value="qualification" className="text-[10px] flex-1 h-7 min-w-0"><GraduationCap className="h-3 w-3 mr-1" />Qualification</TabsTrigger>
               <TabsTrigger value="salary" className="text-[10px] flex-1 h-7 min-w-0"><DollarSign className="h-3 w-3 mr-1" />Salary</TabsTrigger>
+              <TabsTrigger value="accounting" className="text-[10px] flex-1 h-7 min-w-0"><BookOpen className="h-3 w-3 mr-1" />Accounting{(!form.salaryExpenseAccountId || !form.scExpenseAccountId || !form.salaryPayableAccountId || !form.scPayableAccountId || !form.taxPayableAccountId) && <AlertTriangle className="h-3 w-3 ml-1 text-amber-500" />}</TabsTrigger>
               <TabsTrigger value="nok" className="text-[10px] flex-1 h-7 min-w-0"><Heart className="h-3 w-3 mr-1" />Next of Kin</TabsTrigger>
             </TabsList>
 
@@ -1273,6 +1420,7 @@ export function EmployeeMaster() {
               <TabsContent value="banking" className="mt-0">{renderBankingTab()}</TabsContent>
               <TabsContent value="qualification" className="mt-0">{renderQualificationTab()}</TabsContent>
               <TabsContent value="salary" className="mt-0">{renderSalaryTab()}</TabsContent>
+              <TabsContent value="accounting" className="mt-0">{renderAccountingTab()}</TabsContent>
               <TabsContent value="nok" className="mt-0">{renderNextOfKinTab()}</TabsContent>
             </ScrollArea>
           </Tabs>

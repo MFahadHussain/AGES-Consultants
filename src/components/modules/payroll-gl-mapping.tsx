@@ -223,6 +223,7 @@ export function PayrollGLMapping() {
       {/* Mappings Table */}
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader><TableRow>
               <TableHead className="text-[10px]">Component Type</TableHead>
@@ -266,6 +267,7 @@ export function PayrollGLMapping() {
               ))}
             </TableBody>
           </Table>
+          </div>
           {mappings.length === 0 && <p className="text-xs text-muted-foreground text-center py-6">No mappings found. Click &ldquo;Seed Defaults&rdquo; to create default mappings.</p>}
         </CardContent>
       </Card>

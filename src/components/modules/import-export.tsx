@@ -833,7 +833,7 @@ export function ImportExport() {
                     <p className="text-[10px] mt-1">Exported files will appear here for quick re-download</p>
                   </div>
                 ) : (
-                  <div className="rounded-md border overflow-hidden">
+                  <div className="rounded-md border overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-muted/50">
@@ -890,7 +890,7 @@ export function ImportExport() {
               <CardDescription className="text-xs">Complete log of all import and export operations</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="max-h-[500px] overflow-y-auto">
+              <div className="max-h-[500px] overflow-x-auto overflow-y-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

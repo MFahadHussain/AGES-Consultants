@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/lib/store'
+import { SalaryVoucherCreation } from '@/components/modules/salary-voucher-creation'
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
@@ -206,7 +207,7 @@ function JournalVoucherCard({ batch, draftVoucher, setDraftVoucher }: { batch: a
           <p>Journal Voucher - Payroll Posting</p>
           <p>Voucher No: {voucherData.voucherNumber || `JV-PAY-${batch.batchNumber}`} | Date: {new Date().toLocaleDateString()}</p>
         </div>
-        <div className="rounded border overflow-hidden">
+        <div className="rounded border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="bg-violet-100/50">
@@ -281,6 +282,7 @@ function computeLineTotals(line: PayrollLineForm) {
 // ============================================================
 export function PayrollIntegration() {
   const { authUser } = useAppStore()
+  const [showSalaryVoucherCreation, setShowSalaryVoucherCreation] = useState(false)
   const [batches, setBatches] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [runningPayroll, setRunningPayroll] = useState<string | null>(null)
@@ -1388,7 +1390,7 @@ export function PayrollIntegration() {
             {allowanceDetails.length > 0 && (
               <div>
                 <p className="text-xs font-semibold mb-2">Allowance Details</p>
-                <div className="rounded border overflow-hidden">
+                <div className="rounded border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1542,7 +1544,7 @@ export function PayrollIntegration() {
               return (
                 <div>
                   <p className="text-xs font-semibold mb-2">Multi-Contract Earnings</p>
-                  <div className="rounded border overflow-hidden">
+                  <div className="rounded border overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1588,7 +1590,7 @@ export function PayrollIntegration() {
               return (
                 <div>
                   <p className="text-xs font-semibold mb-2">Project Allocation Breakdown</p>
-                  <div className="rounded border overflow-hidden">
+                  <div className="rounded border overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1663,7 +1665,7 @@ export function PayrollIntegration() {
             {/* Journal Entry Preview */}
             <div>
               <p className="text-xs font-semibold mb-2">Journal Entry Preview</p>
-              <div className="rounded border overflow-hidden">
+              <div className="rounded border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1714,6 +1716,11 @@ export function PayrollIntegration() {
   // ----------------------------------------------------------
   // Main Render
   // ----------------------------------------------------------
+  // Salary Voucher Creation mode
+  if (showSalaryVoucherCreation) {
+    return <SalaryVoucherCreation onBack={() => setShowSalaryVoucherCreation(false)} />
+  }
+
   return (
     <div className="space-y-4">
       <style>{`
@@ -1730,6 +1737,21 @@ export function PayrollIntegration() {
           @page { margin: 15mm; }
         }
       `}</style>
+      {/* Create Salary Vouchers button */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          <Banknote className="h-5 w-5 text-primary" />
+          Payroll Management
+        </h2>
+        <Button
+          size="sm"
+          onClick={() => setShowSalaryVoucherCreation(true)}
+          className="bg-emerald-600 hover:bg-emerald-700"
+        >
+          <FileText className="h-4 w-4 mr-1.5" />
+          Create Salary Vouchers
+        </Button>
+      </div>
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card className="border-l-4 border-l-emerald-500">
@@ -1849,7 +1871,7 @@ export function PayrollIntegration() {
               </div>
 
               {/* Employee breakdown table */}
-              <div className="rounded border overflow-hidden">
+              <div className="rounded border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1920,6 +1942,7 @@ export function PayrollIntegration() {
                           <span className="text-xs font-medium">{row.employee?.name} <span className="text-muted-foreground">({row.employee?.employeeCode})</span></span>
                           <span className="text-[10px] text-muted-foreground">Monthly: {formatCurrency(row.monthlySalary || 0)}</span>
                         </div>
+                        <div className="overflow-x-auto">
                         <Table>
                           <TableHeader>
                             <TableRow>
@@ -1942,6 +1965,7 @@ export function PayrollIntegration() {
                             ))}
                           </TableBody>
                         </Table>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -2001,7 +2025,7 @@ export function PayrollIntegration() {
                 View Journal Entries
               </Button>
               {showJournalEntries && (
-                <div className="mt-2 rounded border overflow-hidden">
+                <div className="mt-2 rounded border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -2123,7 +2147,7 @@ export function PayrollIntegration() {
                       </div>
 
                       {expandedProject === proj.projectId && (
-                        <div className="border-t">
+                        <div className="border-t overflow-x-auto">
                           <Table>
                             <TableHeader>
                               <TableRow>
@@ -2175,7 +2199,7 @@ export function PayrollIntegration() {
                     <Users className="h-3.5 w-3.5" />
                     Employee Cost Summary
                   </h4>
-                  <div className="rounded border overflow-hidden max-h-72 overflow-y-auto">
+                  <div className="rounded border overflow-x-auto max-h-72 overflow-y-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -2544,7 +2568,7 @@ export function PayrollIntegration() {
                                   </div>
                                 </div>
                                 {/* Employee list within this project */}
-                                <div className="mb-2 max-h-32 overflow-y-auto rounded border">
+                                <div className="mb-2 max-h-32 overflow-x-auto overflow-y-auto rounded border">
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
@@ -2959,7 +2983,7 @@ export function PayrollIntegration() {
                                           return (
                                             <div className="p-2 rounded border bg-background">
                                               <p className="text-[10px] font-semibold mb-1">Project Allocation Breakdown</p>
-                                              <div className="rounded border overflow-hidden mt-1">
+                                              <div className="rounded border overflow-x-auto mt-1">
                                                 <Table>
                                                   <TableHeader>
                                                     <TableRow>
@@ -3048,7 +3072,7 @@ export function PayrollIntegration() {
               </CardHeader>
               <CardContent className="p-3 pt-0">
                 {/* Voucher summary table */}
-                <div className="rounded border overflow-hidden mb-4">
+                <div className="rounded border overflow-x-auto mb-4">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-violet-50">
@@ -3166,7 +3190,7 @@ export function PayrollIntegration() {
                         {isExpanded && (
                           <CardContent className="p-3 pt-0">
                             {/* Journal Entry Table */}
-                            <div className="rounded border overflow-hidden mb-2">
+                            <div className="rounded border overflow-x-auto mb-2">
                               <Table>
                                 <TableHeader>
                                   <TableRow className="bg-slate-50">
@@ -3205,7 +3229,7 @@ export function PayrollIntegration() {
                             </div>
                             {/* Employee Breakdown for project vouchers */}
                             {isProject && voucher.employeeLines?.length > 0 && (
-                              <div className="rounded border overflow-hidden mb-2">
+                              <div className="rounded border overflow-x-auto mb-2">
                                 <p className="text-[9px] font-semibold p-1.5 bg-muted/30">Employee Breakdown</p>
                                 <Table>
                                   <TableHeader>
@@ -3309,7 +3333,7 @@ export function PayrollIntegration() {
                   </div>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
-                  <div className="rounded border overflow-hidden">
+                  <div className="rounded border overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-slate-50">
@@ -3354,7 +3378,7 @@ export function PayrollIntegration() {
                         Employee Breakdown
                       </Button>
                       {isExpanded && (
-                        <div className="mt-2 rounded border overflow-hidden">
+                        <div className="mt-2 rounded border overflow-x-auto">
                           <Table>
                             <TableHeader>
                               <TableRow>

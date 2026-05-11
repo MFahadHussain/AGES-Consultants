@@ -630,7 +630,7 @@ export function BankReconciliation() {
                   </Button>
                 </div>
               </div>
-              <div className="max-h-80 overflow-y-auto">
+              <div className="max-h-80 overflow-x-auto overflow-y-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -684,7 +684,7 @@ export function BankReconciliation() {
                   </Button>
                 </div>
               </div>
-              <div className="max-h-80 overflow-y-auto">
+              <div className="max-h-80 overflow-x-auto overflow-y-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

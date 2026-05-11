@@ -175,6 +175,7 @@ export function Taxation() {
         <TabsContent value="rates" className="mt-3">
           <Card>
             <CardContent className="p-0">
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader><TableRow>
                   <TableHead className="text-[10px]">Name</TableHead>
@@ -209,6 +210,7 @@ export function Taxation() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -274,6 +276,7 @@ export function Taxation() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader><TableRow>
                   <TableHead className="text-[10px]">Tax Rate</TableHead>
@@ -311,6 +314,7 @@ export function Taxation() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

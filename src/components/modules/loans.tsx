@@ -309,6 +309,7 @@ export function LoansModule() {
 
               {/* Installments Table */}
               {isExpanded && loan.installments?.length > 0 && (
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader><TableRow>
                     <TableHead className="text-[10px]">#</TableHead>
@@ -333,6 +334,7 @@ export function LoansModule() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>

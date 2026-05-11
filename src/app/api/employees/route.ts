@@ -54,6 +54,11 @@ export async function GET(request: Request) {
           defaultProject: {
             select: { id: true, code: true, name: true },
           },
+          salaryExpenseAccount: { select: { id: true, code: true, name: true } },
+          scExpenseAccount: { select: { id: true, code: true, name: true } },
+          salaryPayableAccount: { select: { id: true, code: true, name: true } },
+          scPayableAccount: { select: { id: true, code: true, name: true } },
+          taxPayableAccount: { select: { id: true, code: true, name: true } },
         },
         orderBy: { employeeCode: 'asc' },
         skip,
@@ -179,6 +184,13 @@ export async function POST(request: Request) {
       baseSalary: body.baseSalary ?? 0,
       paymentType: body.paymentType || 'monthly',
 
+      // Accounting Configuration
+      salaryExpenseAccountId: body.salaryExpenseAccountId || null,
+      scExpenseAccountId: body.scExpenseAccountId || null,
+      salaryPayableAccountId: body.salaryPayableAccountId || null,
+      scPayableAccountId: body.scPayableAccountId || null,
+      taxPayableAccountId: body.taxPayableAccountId || null,
+
       isFinancialUsed: false,
       createdBy: body.createdBy || null,
     }
@@ -203,6 +215,11 @@ export async function POST(request: Request) {
         defaultProject: {
           select: { id: true, code: true, name: true },
         },
+        salaryExpenseAccount: { select: { id: true, code: true, name: true } },
+        scExpenseAccount: { select: { id: true, code: true, name: true } },
+        salaryPayableAccount: { select: { id: true, code: true, name: true } },
+        scPayableAccount: { select: { id: true, code: true, name: true } },
+        taxPayableAccount: { select: { id: true, code: true, name: true } },
         salaryHistory: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -364,6 +381,13 @@ export async function PUT(request: Request) {
     // Salary
     if (body.paymentType !== undefined) updateData.paymentType = body.paymentType
 
+    // Accounting Configuration
+    if (body.salaryExpenseAccountId !== undefined) updateData.salaryExpenseAccountId = body.salaryExpenseAccountId || null
+    if (body.scExpenseAccountId !== undefined) updateData.scExpenseAccountId = body.scExpenseAccountId || null
+    if (body.salaryPayableAccountId !== undefined) updateData.salaryPayableAccountId = body.salaryPayableAccountId || null
+    if (body.scPayableAccountId !== undefined) updateData.scPayableAccountId = body.scPayableAccountId || null
+    if (body.taxPayableAccountId !== undefined) updateData.taxPayableAccountId = body.taxPayableAccountId || null
+
     // Handle baseSalary change — create salary history entry
     if (body.baseSalary !== undefined && body.baseSalary !== existing.baseSalary) {
       updateData.baseSalary = body.baseSalary
@@ -392,6 +416,11 @@ export async function PUT(request: Request) {
         defaultProject: {
           select: { id: true, code: true, name: true },
         },
+        salaryExpenseAccount: { select: { id: true, code: true, name: true } },
+        scExpenseAccount: { select: { id: true, code: true, name: true } },
+        salaryPayableAccount: { select: { id: true, code: true, name: true } },
+        scPayableAccount: { select: { id: true, code: true, name: true } },
+        taxPayableAccount: { select: { id: true, code: true, name: true } },
         salaryHistory: {
           orderBy: { createdAt: 'desc' },
           take: 5,

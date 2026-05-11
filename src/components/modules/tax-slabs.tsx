@@ -219,6 +219,7 @@ export function TaxSlabsModule() {
       {/* Slabs Table */}
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader><TableRow>
               <TableHead className="text-[10px]">Fiscal Year</TableHead>
@@ -254,6 +255,7 @@ export function TaxSlabsModule() {
               ))}
             </TableBody>
           </Table>
+          </div>
           {slabs.length === 0 && <p className="text-xs text-muted-foreground text-center py-6">No tax slabs found. Click &ldquo;New Slab&rdquo; to create one.</p>}
         </CardContent>
       </Card>
@@ -345,7 +347,7 @@ export function TaxSlabsModule() {
                 <div className="flex justify-between text-xs"><span className="text-muted-foreground">Total Tax:</span><span className="font-bold text-red-600">{formatCurrency(calcResult.totalTax)}</span></div>
                 <div className="flex justify-between text-xs"><span className="text-muted-foreground">Effective Rate:</span><span className="font-medium">{calcResult.effectiveRate}%</span></div>
                 {calcResult.breakdown?.length > 0 && (
-                  <div className="mt-2">
+                  <div className="mt-2 overflow-x-auto">
                     <p className="text-[10px] font-semibold mb-1">Slab Breakdown:</p>
                     <Table>
                       <TableHeader><TableRow>

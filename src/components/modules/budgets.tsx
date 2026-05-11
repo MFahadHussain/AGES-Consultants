@@ -302,6 +302,7 @@ export function BudgetManagement() {
                     </div>
                   </div>
                   {budget.lines?.length > 0 && (
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -334,6 +335,7 @@ export function BudgetManagement() {
                         })}
                       </TableBody>
                     </Table>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -351,6 +353,7 @@ export function BudgetManagement() {
               {budgets.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-8">No budgets to compare</p>
               ) : (
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -385,6 +388,7 @@ export function BudgetManagement() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>

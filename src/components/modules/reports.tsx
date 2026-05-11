@@ -496,6 +496,7 @@ function StandardReports() {
   const renderTrialBalance = () => {
     if (!reportData?.data) return <p className="text-xs text-muted-foreground text-center py-8">No data</p>
     return (
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -528,6 +529,7 @@ function StandardReports() {
           </TableRow>
         </TableBody>
       </Table>
+      </div>
     )
   }
 
@@ -537,6 +539,7 @@ function StandardReports() {
       <div className="space-y-6">
         <div>
           <h4 className="text-xs font-bold mb-2 text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded">ASSETS</h4>
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader><TableRow><TableHead className="text-[10px]">Code</TableHead><TableHead className="text-[10px]">Name</TableHead><TableHead className="text-[10px]">Sub Type</TableHead><TableHead className="text-[10px] text-right">Amount</TableHead></TableRow></TableHeader>
             <TableBody>
@@ -546,9 +549,11 @@ function StandardReports() {
               <TableRow className="font-bold bg-emerald-50"><TableCell colSpan={3} className="text-xs">Total Assets</TableCell><TableCell className="text-xs text-right">{formatCurrency(reportData.totalAssets)}</TableCell></TableRow>
             </TableBody>
           </Table>
+          </div>
         </div>
         <div>
           <h4 className="text-xs font-bold mb-2 text-red-700 bg-red-50 px-3 py-1.5 rounded">LIABILITIES</h4>
+          <div className="overflow-x-auto">
           <Table>
             <TableBody>
               {reportData.sections.liabilities.map((a: any, i: number) => (
@@ -557,9 +562,11 @@ function StandardReports() {
               <TableRow className="font-bold bg-red-50"><TableCell colSpan={2} className="text-xs">Total Liabilities</TableCell><TableCell className="text-xs text-right">{formatCurrency(reportData.totalLiabilities)}</TableCell></TableRow>
             </TableBody>
           </Table>
+          </div>
         </div>
         <div>
           <h4 className="text-xs font-bold mb-2 text-violet-700 bg-violet-50 px-3 py-1.5 rounded">EQUITY</h4>
+          <div className="overflow-x-auto">
           <Table>
             <TableBody>
               {reportData.sections.equity.map((a: any, i: number) => (
@@ -568,6 +575,7 @@ function StandardReports() {
               <TableRow className="font-bold bg-violet-50"><TableCell colSpan={2} className="text-xs">Total Equity</TableCell><TableCell className="text-xs text-right">{formatCurrency(reportData.totalEquity)}</TableCell></TableRow>
             </TableBody>
           </Table>
+          </div>
         </div>
         <div className="p-3 rounded-lg border-2 text-center">
           <p className="text-xs font-bold">Assets = Liabilities + Equity</p>
@@ -584,6 +592,7 @@ function StandardReports() {
       <div className="space-y-4">
         <div>
           <h4 className="text-xs font-bold mb-2 text-blue-700 bg-blue-50 px-3 py-1.5 rounded">INCOME</h4>
+          <div className="overflow-x-auto">
           <Table>
             <TableBody>
               {reportData.income.map((a: any, i: number) => (
@@ -592,9 +601,11 @@ function StandardReports() {
               <TableRow className="font-bold bg-blue-50"><TableCell colSpan={2} className="text-xs">Total Income</TableCell><TableCell className="text-xs text-right">{formatCurrency(reportData.totalIncome)}</TableCell></TableRow>
             </TableBody>
           </Table>
+          </div>
         </div>
         <div>
           <h4 className="text-xs font-bold mb-2 text-orange-700 bg-orange-50 px-3 py-1.5 rounded">EXPENSES</h4>
+          <div className="overflow-x-auto">
           <Table>
             <TableBody>
               {reportData.expenses.map((a: any, i: number) => (
@@ -603,6 +614,7 @@ function StandardReports() {
               <TableRow className="font-bold bg-orange-50"><TableCell colSpan={2} className="text-xs">Total Expenses</TableCell><TableCell className="text-xs text-right">{formatCurrency(reportData.totalExpenses)}</TableCell></TableRow>
             </TableBody>
           </Table>
+          </div>
         </div>
         <div className={`p-4 rounded-lg border-2 text-center ${reportData.netSurplus >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
           <p className="text-xs font-bold">{reportData.netSurplus >= 0 ? 'NET SURPLUS' : 'NET DEFICIT'}</p>
@@ -621,6 +633,7 @@ function StandardReports() {
           <Card className="border-l-4 border-l-red-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Outflow</p><p className="text-sm font-bold text-red-600">{formatCurrency(reportData.totalOutflow)}</p></CardContent></Card>
           <Card className={`border-l-4 ${reportData.netCashFlow >= 0 ? 'border-l-emerald-400' : 'border-l-red-400'}`}><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Net Cash Flow</p><p className={`text-sm font-bold ${reportData.netCashFlow >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(reportData.netCashFlow)}</p></CardContent></Card>
         </div>
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader><TableRow><TableHead className="text-[10px]">Date</TableHead><TableHead className="text-[10px]">Voucher</TableHead><TableHead className="text-[10px]">Account</TableHead><TableHead className="text-[10px] text-right">Inflow</TableHead><TableHead className="text-[10px] text-right">Outflow</TableHead></TableRow></TableHeader>
           <TableBody>
@@ -635,6 +648,7 @@ function StandardReports() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </div>
     )
   }
@@ -642,6 +656,7 @@ function StandardReports() {
   const renderSegmentReport = () => {
     if (!reportData?.data) return <p className="text-xs text-muted-foreground text-center py-8">No data</p>
     return (
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader><TableRow>
           <TableHead className="text-[10px]">Code</TableHead>
@@ -664,6 +679,7 @@ function StandardReports() {
           ))}
         </TableBody>
       </Table>
+      </div>
     )
   }
 
@@ -681,6 +697,7 @@ function StandardReports() {
           <Card className="border-l-4 border-l-red-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Credit</p><p className="text-sm font-bold text-red-600">{formatCurrency(reportData.grandTotalCredit)}</p></CardContent></Card>
           <Card className={`border-l-4 ${reportData.grandBalance >= 0 ? 'border-l-emerald-400' : 'border-l-red-400'}`}><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Net Balance</p><p className={`text-sm font-bold ${reportData.grandBalance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(reportData.grandBalance)}</p></CardContent></Card>
         </div>
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader><TableRow>
             <TableHead className="text-[10px] w-8"></TableHead>
@@ -724,6 +741,7 @@ function StandardReports() {
             })}
           </TableBody>
         </Table>
+        </div>
       </div>
     )
   }
@@ -744,6 +762,7 @@ function StandardReports() {
             <p className="text-sm font-bold">{formatCurrency(reportData.closingBalance || 0)}</p>
           </div>
         </div>
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader><TableRow><TableHead className="text-[10px]">Date</TableHead><TableHead className="text-[10px]">Voucher</TableHead><TableHead className="text-[10px]">Narration</TableHead><TableHead className="text-[10px] text-right">Debit</TableHead><TableHead className="text-[10px] text-right">Credit</TableHead><TableHead className="text-[10px] text-right">Balance</TableHead></TableRow></TableHeader>
           <TableBody>
@@ -759,6 +778,7 @@ function StandardReports() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </div>
     )
   }

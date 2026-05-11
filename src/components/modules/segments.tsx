@@ -317,6 +317,7 @@ export function Donors() {
       </Dialog>
 
       <Card><CardContent className="p-0">
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader><TableRow>
             <TableHead className="text-[10px]">Code</TableHead>
@@ -360,6 +361,7 @@ export function Donors() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </CardContent></Card>
     </div>
   )
@@ -684,6 +686,7 @@ export function Clients() {
       </Dialog>
 
       <Card><CardContent className="p-0">
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader><TableRow>
             <TableHead className="text-[10px]">Code</TableHead>
@@ -733,6 +736,7 @@ export function Clients() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </CardContent></Card>
     </div>
   )

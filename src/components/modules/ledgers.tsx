@@ -164,6 +164,7 @@ export function Ledgers() {
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -205,6 +206,7 @@ export function Ledgers() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 </CardContent>
               </Card>
             )
@@ -237,6 +239,7 @@ export function Ledgers() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -261,6 +264,7 @@ export function Ledgers() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       ))}

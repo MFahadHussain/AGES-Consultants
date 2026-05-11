@@ -2780,6 +2780,7 @@ export function FixedAssetsModule() {
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Landmark className="h-4 w-4" />GL Account Mapping</CardTitle></CardHeader>
           <CardContent>
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader><TableRow><TableHead className="text-xs">Category</TableHead><TableHead className="text-xs">Asset Account</TableHead><TableHead className="text-xs">Acc. Dep. Account</TableHead><TableHead className="text-xs">Dep. Expense Account</TableHead></TableRow></TableHeader>
               <TableBody>
@@ -2793,6 +2794,7 @@ export function FixedAssetsModule() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
 
@@ -2812,6 +2814,7 @@ export function FixedAssetsModule() {
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><DollarSign className="h-4 w-4" />FBR Tax Rates (Schedule III)</CardTitle></CardHeader>
           <CardContent>
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader><TableRow><TableHead className="text-xs">Category</TableHead><TableHead className="text-xs">FBR Rate (%)</TableHead></TableRow></TableHeader>
               <TableBody>
@@ -2823,6 +2826,7 @@ export function FixedAssetsModule() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
 
@@ -3052,7 +3056,7 @@ export function FixedAssetsModule() {
               <>
                 <Separator />
                 <div className="text-xs font-medium">Depreciation History</div>
-                <div className="max-h-40 overflow-y-auto">
+                <div className="max-h-40 overflow-x-auto overflow-y-auto">
                   <Table>
                     <TableHeader><TableRow><TableHead className="text-[10px]">Period</TableHead><TableHead className="text-[10px] text-right">Charge</TableHead><TableHead className="text-[10px] text-right">Closing NBV</TableHead></TableRow></TableHeader>
                     <TableBody>

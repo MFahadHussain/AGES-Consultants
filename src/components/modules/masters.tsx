@@ -132,6 +132,7 @@ export function Customers() {
         </Dialog>
       </div>
       <Card><CardContent className="p-0">
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader><TableRow>
             <TableHead className="text-[10px]">Code</TableHead><TableHead className="text-[10px]">Name</TableHead><TableHead className="text-[10px]">Contact</TableHead><TableHead className="text-[10px]">Email</TableHead><TableHead className="text-[10px]">Phone</TableHead><TableHead className="text-[10px]">Terms</TableHead><TableHead className="text-[10px]">Status</TableHead><TableHead className="text-[10px] text-right">Actions</TableHead>
@@ -159,6 +160,7 @@ export function Customers() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </CardContent></Card>
     </div>
   )
@@ -282,6 +284,7 @@ export function Suppliers() {
         </Dialog>
       </div>
       <Card><CardContent className="p-0">
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader><TableRow>
             <TableHead className="text-[10px]">Code</TableHead><TableHead className="text-[10px]">Name</TableHead><TableHead className="text-[10px]">Contact</TableHead><TableHead className="text-[10px]">Tax #</TableHead><TableHead className="text-[10px]">Terms</TableHead><TableHead className="text-[10px]">Bank</TableHead><TableHead className="text-[10px]">Status</TableHead><TableHead className="text-[10px] text-right">Actions</TableHead>
@@ -309,6 +312,7 @@ export function Suppliers() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </CardContent></Card>
     </div>
   )

@@ -71,6 +71,12 @@ model Account {
   bankStatements  BankStatement[]
   bankReconciliations BankReconciliation[]
 
+  // Employee accounting config reverse relations
+  empSalaryExpense  Employee[] @relation("EmpSalaryExpense")
+  empScExpense      Employee[] @relation("EmpScExpense")
+  empSalaryPayable  Employee[] @relation("EmpSalaryPayable")
+  empScPayable      Employee[] @relation("EmpScPayable")
+  empTaxPayable     Employee[] @relation("EmpTaxPayable")
 }
 
 // ============================================================
@@ -731,6 +737,18 @@ model Employee {
   // Salary
   baseSalary        Float    @default(0) // Current base salary
   paymentType       String   @default("monthly") // monthly, daily, hourly
+
+  // Accounting Configuration (for voucher generation)
+  salaryExpenseAccountId  String?  // FK to Account — e.g., 5001 · Project Salary Cost
+  salaryExpenseAccount    Account? @relation("EmpSalaryExpense", fields: [salaryExpenseAccountId], references: [id])
+  scExpenseAccountId      String?  // FK to Account — e.g., 5010 · Employer SC Cost
+  scExpenseAccount        Account? @relation("EmpScExpense", fields: [scExpenseAccountId], references: [id])
+  salaryPayableAccountId  String?  // FK to Account — e.g., 2100 · Employee Salary Payable
+  salaryPayableAccount    Account? @relation("EmpSalaryPayable", fields: [salaryPayableAccountId], references: [id])
+  scPayableAccountId      String?  // FK to Account — e.g., 2110 · SC Payable to Authority
+  scPayableAccount        Account? @relation("EmpScPayable", fields: [scPayableAccountId], references: [id])
+  taxPayableAccountId     String?  // FK to Account — e.g., 2120 · Income Tax Payable
+  taxPayableAccount       Account? @relation("EmpTaxPayable", fields: [taxPayableAccountId], references: [id])
 
   // System
   isFinancialUsed   Boolean  @default(false) // Cannot delete after financial usage
