@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, Fragment } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -849,8 +849,8 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
                 </TableHeader>
                 <TableBody>
                   {generatedVouchers.map((v) => (
-                    <>
-                      <TableRow key={v.voucherId} className={v.status === 'posted' ? 'bg-emerald-50/30' : ''}>
+                    <Fragment key={v.voucherId}>
+                      <TableRow className={v.status === 'posted' ? 'bg-emerald-50/30' : ''}>
                         <TableCell className="text-xs py-2 font-mono font-medium">{v.voucherNumber}</TableCell>
                         <TableCell className="text-xs py-2">
                           <div>{v.employeeName}</div>
@@ -980,7 +980,7 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                 </TableBody>
               </Table>
@@ -1399,9 +1399,9 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
                   </TableHeader>
                   <TableBody>
                     {groupedRows.map(([projKey, group]) => (
-                      <>
+                      <Fragment key={projKey}>
                         {/* Project header */}
-                        <TableRow key={`proj-${projKey}`} className="bg-muted/40">
+                        <TableRow className="bg-muted/40">
                           <TableCell colSpan={8} className="py-1.5">
                             <div className="flex items-center gap-2">
                               <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1480,7 +1480,7 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
                           </TableRow>
                         ))}
                         {/* Project subtotal */}
-                        <TableRow key={`subtotal-${projKey}`} className="bg-muted/20 font-semibold">
+                        <TableRow className="bg-muted/20 font-semibold">
                           <TableCell className="text-xs py-1.5" colSpan={3}>
                             Subtotal — {group.project.code}
                           </TableCell>
@@ -1500,7 +1500,7 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
                             {formatCurrency(group.rows.reduce((s, r) => s + r.total, 0))}
                           </TableCell>
                         </TableRow>
-                      </>
+                      </Fragment>
                     ))}
                     {/* Grand total */}
                     <TableRow className="bg-primary/5 font-bold border-t-2 border-primary/20">

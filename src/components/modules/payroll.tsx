@@ -17,7 +17,7 @@ import {
   Banknote, ArrowRight, CheckCircle, Plus, Pencil, Trash2, Users,
   ChevronDown, ChevronUp, Play, Send, Shield, BookOpen, Loader2,
   TrendingDown, TrendingUp, Building2, Receipt, AlertCircle, Eye,
-  FileText, FolderOpen, DollarSign
+  FileText, FolderOpen, DollarSign, CircleDot
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/lib/store'
@@ -862,13 +862,16 @@ export function PayrollIntegration() {
       group.lineIds.push(line.id)
 
       const lineStatus = line.lineStatus || 'draft'
-      if (lineStatus !== 'approved') group.allLinesApproved = false
-      if (lineStatus === 'approved') group.anyLinesApproved = true
+      if (lineStatus !== 'approved' && lineStatus !== 'voucher-created' && lineStatus !== 'posted') group.allLinesApproved = false
+      if (lineStatus === 'approved' || lineStatus === 'voucher-created' || lineStatus === 'posted') group.anyLinesApproved = true
     }
 
-    // Determine paid status: all lines in group are approved
+    // Determine paid status: all lines in group have voucher or are posted
     for (const group of groupMap.values()) {
-      group.allLinesPaid = group.allLinesApproved && group.employeeCount > 0
+      const allHaveVoucherOrPosted = lines
+        .filter((l: any) => (l.projectId || '__unassigned__') === group.lineIds[0] || group.lineIds.includes(l.id))
+        .every((l: any) => ['voucher-created', 'posted'].includes(l.lineStatus))
+      group.allLinesPaid = allHaveVoucherOrPosted && group.employeeCount > 0
     }
 
     // Sort: assigned projects first, unassigned last
@@ -2351,6 +2354,58 @@ export function PayrollIntegration() {
                   ))}
                 </div>
 
+                {/* Salary Payment Status Summary */}
+                {(() => {
+                  const totalLines = batch.lines?.length || 0
+                  const paidLines = batch.lines?.filter((l: any) => l.lineStatus === 'posted').length || 0
+                  const voucherLines = batch.lines?.filter((l: any) => l.lineStatus === 'voucher-created').length || 0
+                  const unpaidLines = totalLines - paidLines - voucherLines
+                  const paidAmount = batch.lines?.filter((l: any) => l.lineStatus === 'posted').reduce((s: number, l: any) => s + (l.netPay || 0), 0) || 0
+                  const voucherAmount = batch.lines?.filter((l: any) => l.lineStatus === 'voucher-created').reduce((s: number, l: any) => s + (l.netPay || 0), 0) || 0
+                  const unpaidAmount = (batch.totalNetPay || 0) - paidAmount - voucherAmount
+                  const paidPct = totalLines > 0 ? Math.round((paidLines / totalLines) * 100) : 0
+                  if (totalLines === 0) return null
+                  return (
+                    <div className="mb-4 p-3 rounded-lg border bg-gradient-to-r from-slate-50 to-white">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">Salary Payment Status</span>
+                        <span className="text-[11px] font-medium text-muted-foreground">{totalLines} employee(s)</span>
+                      </div>
+                      {/* Progress bar */}
+                      <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden mb-2 flex">
+                        {paidLines > 0 && <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(paidLines/totalLines)*100}%` }} title={`Paid: ${paidLines}`} />}
+                        {voucherLines > 0 && <div className="bg-violet-500 h-full transition-all" style={{ width: `${(voucherLines/totalLines)*100}%` }} title={`Voucher: ${voucherLines}`} />}
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                          <div>
+                            <p className="text-[10px] text-muted-foreground">Paid</p>
+                            <p className="text-[13px] font-bold text-emerald-700">{paidLines} <span className="text-[10px] font-normal text-muted-foreground">({paidPct}%)</span></p>
+                            <p className="text-[10px] text-emerald-600 font-mono">{formatCurrency(paidAmount)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full bg-violet-500 shrink-0" />
+                          <div>
+                            <p className="text-[10px] text-muted-foreground">Voucher Created</p>
+                            <p className="text-[13px] font-bold text-violet-700">{voucherLines}</p>
+                            <p className="text-[10px] text-violet-600 font-mono">{formatCurrency(voucherAmount)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full bg-gray-300 shrink-0" />
+                          <div>
+                            <p className="text-[10px] text-muted-foreground">Unpaid</p>
+                            <p className="text-[13px] font-bold text-gray-600">{unpaidLines}</p>
+                            <p className="text-[10px] text-gray-500 font-mono">{formatCurrency(unpaidAmount)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+
                 <Separator className="mb-4" />
 
                 {/* Project-wise Payment View */}
@@ -2511,22 +2566,41 @@ export function PayrollIntegration() {
                                     <TableHeader>
                                       <TableRow>
                                         <TableHead className="text-[8px] h-6">Employee</TableHead>
-                                        <TableHead className="text-[8px] h-6 text-center">Status</TableHead>
+                                        <TableHead className="text-[8px] h-6 text-center">Workflow</TableHead>
+                                        <TableHead className="text-[8px] h-6 text-center">Salary</TableHead>
                                         <TableHead className="text-[8px] h-6 text-right">Net Pay</TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                      {groupEmployees.map((emp: any) => (
-                                        <TableRow key={emp.id}>
-                                          <TableCell className="text-[9px] py-0.5 font-medium">{emp.employeeName}</TableCell>
-                                          <TableCell className="text-[9px] py-0.5 text-center">
-                                            <Badge className={`text-[7px] px-1 border ${lineStatusStyles[emp.lineStatus || 'draft']}`}>
-                                              {emp.lineStatus === 'reviewed' ? 'Rev' : emp.lineStatus === 'approved' ? 'App' : 'Dft'}
-                                            </Badge>
-                                          </TableCell>
-                                          <TableCell className="text-[9px] py-0.5 text-right font-mono">{formatNumber(emp.netPay)}</TableCell>
-                                        </TableRow>
-                                      ))}
+                                      {groupEmployees.map((emp: any) => {
+                                        const empStatus = emp.lineStatus || 'draft'
+                                        return (
+                                          <TableRow key={emp.id}>
+                                            <TableCell className="text-[9px] py-0.5 font-medium">{emp.employeeName}</TableCell>
+                                            <TableCell className="text-[9px] py-0.5 text-center">
+                                              <Badge className={`text-[7px] px-1 border ${lineStatusStyles[empStatus]}`}>
+                                                {empStatus === 'reviewed' ? 'Rev' : empStatus === 'approved' ? 'App' : empStatus === 'voucher-created' ? 'VC' : empStatus === 'posted' ? 'Pst' : 'Dft'}
+                                              </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-[9px] py-0.5 text-center">
+                                              {empStatus === 'posted' ? (
+                                                <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded-full text-[7px] font-semibold bg-emerald-100 text-emerald-800">
+                                                  <CheckCircle className="h-2 w-2" />Paid
+                                                </span>
+                                              ) : empStatus === 'voucher-created' ? (
+                                                <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded-full text-[7px] font-semibold bg-violet-100 text-violet-800">
+                                                  <FileText className="h-2 w-2" />Voucher
+                                                </span>
+                                              ) : (
+                                                <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded-full text-[7px] font-semibold bg-gray-100 text-gray-500">
+                                                  <CircleDot className="h-2 w-2" />Unpaid
+                                                </span>
+                                              )}
+                                            </TableCell>
+                                            <TableCell className="text-[9px] py-0.5 text-right font-mono">{formatNumber(emp.netPay)}</TableCell>
+                                          </TableRow>
+                                        )
+                                      })}
                                     </TableBody>
                                   </Table>
                                 </div>
@@ -2674,6 +2748,7 @@ export function PayrollIntegration() {
                             <TableHead className="text-[10px] w-8"></TableHead>
                             <TableHead className="text-[10px]">Employee</TableHead>
                             <TableHead className="text-[10px]">Status</TableHead>
+                            <TableHead className="text-[10px] text-center">Salary</TableHead>
                             <TableHead className="text-[10px]">Code</TableHead>
                             <TableHead className="text-[10px]">Project</TableHead>
                             <TableHead className="text-[10px] text-center">Work</TableHead>
@@ -2716,7 +2791,7 @@ export function PayrollIntegration() {
                               const groupGross = groupLines.reduce((s: number, l: any) => s + (l.grossSalary || 0), 0)
                               const groupNet = groupLines.reduce((s: number, l: any) => s + (l.netPay || 0), 0)
                               const groupSC = groupLines.reduce((s: number, l: any) => s + (l.socialCharges || 0), 0)
-                              const colSpan = ['draft','reviewed'].includes(batch.status) ? 21 : 20
+                              const colSpan = ['draft','reviewed'].includes(batch.status) ? 22 : 21
                               // Project header row
                               allRows.push(
                                 <TableRow key={`proj-${projKey}`} style={{ background: '#F8FAFC', borderLeft: '3px solid #1A7A4A' }}>
@@ -2752,8 +2827,23 @@ export function PayrollIntegration() {
                                       <TableCell className="text-[13px] py-2 font-medium" style={{ color: '#1a1a2e' }}>{line.employeeName}</TableCell>
                                       <TableCell className="py-2">
                                         <span className={lineStatusStyles[lineStatus] || 'status-badge status-badge-draft'}>
-                                          {lineStatus === 'reviewed' ? 'Reviewed' : lineStatus === 'approved' ? 'Approved' : 'Draft'}
+                                          {lineStatus === 'reviewed' ? 'Reviewed' : lineStatus === 'approved' ? 'Approved' : lineStatus === 'voucher-created' ? 'Voucher Created' : lineStatus === 'posted' ? 'Posted' : 'Draft'}
                                         </span>
+                                      </TableCell>
+                                      <TableCell className="py-2 text-center">
+                                        {lineStatus === 'posted' ? (
+                                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                            <CheckCircle className="h-2.5 w-2.5" />Paid
+                                          </span>
+                                        ) : lineStatus === 'voucher-created' ? (
+                                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-violet-100 text-violet-800 border border-violet-200">
+                                            <FileText className="h-2.5 w-2.5" />Voucher
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-gray-100 text-gray-500 border border-gray-200">
+                                            <CircleDot className="h-2.5 w-2.5" />Unpaid
+                                          </span>
+                                        )}
                                       </TableCell>
                                       <TableCell className="text-[13px] py-2 font-mono" style={{ color: '#6B7280' }}>{line.employeeCode || '-'}</TableCell>
                                       <TableCell className="py-2">
@@ -2790,7 +2880,7 @@ export function PayrollIntegration() {
                                 {/* Expanded Line Detail */}
                                 {isLineExpanded && (
                                   <TableRow>
-                                    <TableCell colSpan={['draft','reviewed'].includes(batch.status) ? 21 : 20} className="p-0">
+                                    <TableCell colSpan={['draft','reviewed'].includes(batch.status) ? 22 : 21} className="p-0">
                                       <div className="p-4 bg-muted/20 space-y-3">
                                         {/* Quick Detail Row */}
                                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
