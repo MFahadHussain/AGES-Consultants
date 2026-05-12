@@ -32,19 +32,19 @@ function formatNumber(amount: number) {
   return new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
 }
 
-// Status styles
+// Enterprise Status Badges
 const statusStyles: Record<string, string> = {
-  draft: 'bg-amber-100 text-amber-800 border-amber-200',
-  reviewed: 'bg-sky-100 text-sky-800 border-sky-200',
-  approved: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  posted: 'bg-purple-100 text-purple-800 border-purple-200',
-  'draft-to-gl': 'bg-violet-100 text-violet-800 border-violet-200',
+  draft: 'status-badge status-badge-draft',
+  reviewed: 'status-badge status-badge-reviewed',
+  approved: 'status-badge status-badge-approved',
+  posted: 'status-badge status-badge-posted',
+  'draft-to-gl': 'status-badge status-badge-posted',
 }
 
 const lineStatusStyles: Record<string, string> = {
-  draft: 'bg-amber-100 text-amber-800 border-amber-200',
-  reviewed: 'bg-sky-100 text-sky-800 border-sky-200',
-  approved: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  draft: 'status-badge status-badge-draft',
+  reviewed: 'status-badge status-badge-reviewed',
+  approved: 'status-badge status-badge-approved',
 }
 
 const statusLabels: Record<string, string> = {
@@ -183,91 +183,103 @@ function JournalVoucherCard({ batch, draftVoucher, setDraftVoucher }: { batch: a
   if (!voucherData) return null
 
   return (
-    <Card className="voucher-print-area border-violet-200 bg-gradient-to-br from-violet-50/50 to-slate-50/50">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4 text-violet-600" />
-            <CardTitle className="text-sm font-bold text-violet-900">JOURNAL VOUCHER</CardTitle>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge className={`text-[10px] border ${voucherData.voucherStatus === 'draft' ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200'}`}>
-              {voucherData.voucherStatus === 'draft' ? 'DRAFT' : voucherData.voucherStatus === 'posted' ? 'POSTED' : (voucherData.voucherStatus || '').toUpperCase()}
-            </Badge>
-          </div>
+    <div className="erp-card overflow-hidden">
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: '#E5E7EB', background: '#F8FAFC' }}>
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-4 w-4" style={{ color: '#1A7A4A' }} />
+          <span className="text-[13px] font-semibold" style={{ color: '#1a1a2e' }}>AcctFin ERP</span>
+          <span className="text-[11px]" style={{ color: '#6B7280' }}>— Journal Voucher</span>
         </div>
-        <div className="flex items-center gap-4 mt-1">
-          <span className="text-xs text-muted-foreground">Voucher No:</span>
-          <span className="text-xs font-mono font-bold text-violet-800">{voucherData.voucherNumber || `JV-PAY-${batch.batchNumber}`}</span>
+        <div className="flex items-center gap-3">
+          <span className="text-[13px] font-mono font-bold" style={{ color: '#1a1a2e' }}>{voucherData.voucherNumber || `JV-PAY-${batch.batchNumber}`}</span>
+          <span className={voucherData.voucherStatus === 'draft' ? 'status-badge status-badge-draft' : 'status-badge status-badge-approved'}>
+            {voucherData.voucherStatus === 'draft' ? 'DRAFT' : voucherData.voucherStatus === 'posted' ? 'POSTED' : (voucherData.voucherStatus || '').toUpperCase()}
+          </span>
         </div>
-      </CardHeader>
-      <CardContent>
-        {/* Print-only company header */}
-        <div className="print-only hidden" style={{textAlign: 'center', marginBottom: '20px'}}>
-          <h1 style={{fontSize: '18px', fontWeight: 'bold'}}>AcctFin ERP</h1>
-          <p>Journal Voucher - Payroll Posting</p>
-          <p>Voucher No: {voucherData.voucherNumber || `JV-PAY-${batch.batchNumber}`} | Date: {new Date().toLocaleDateString()}</p>
-        </div>
-        <div className="rounded border overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-violet-100/50">
-                <TableHead className="text-[10px] h-8 w-10">#</TableHead>
-                <TableHead className="text-[10px] h-8">Account Code</TableHead>
-                <TableHead className="text-[10px] h-8">Account Name</TableHead>
-                <TableHead className="text-[10px] h-8 text-right">Debit (PKR)</TableHead>
-                <TableHead className="text-[10px] h-8 text-right">Credit (PKR)</TableHead>
-                <TableHead className="text-[10px] h-8">Description</TableHead>
+      </div>
+      {/* Meta strip */}
+      <div className="flex items-center divide-x px-5 py-2 text-[12px]" style={{ borderColor: '#E5E7EB', color: '#6B7280' }}>
+        <span className="pr-3">Date: {new Date().toLocaleDateString()}</span>
+        <span className="px-3">Period: {batch.period}</span>
+        <span className="px-3">Type: Payroll</span>
+        <span className="pl-3">Status: {voucherData.voucherStatus}</span>
+      </div>
+      {/* Legend */}
+      <div className="flex items-center gap-4 px-5 py-1.5 text-[10px] border-b" style={{ borderColor: '#F3F4F6' }}>
+        <span className="entry-dr">■ Dr — Debit</span>
+        <span className="entry-cr-salary">■ Cr Salary — Credit</span>
+        <span className="entry-cr-sc">■ Cr SC — Credit</span>
+        <span className="entry-cr-tax">■ Cr Tax — Credit</span>
+      </div>
+      {/* Entry table */}
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow style={{ background: '#FAFAFA' }}>
+              <TableHead className="text-[11px] h-8 w-10">#</TableHead>
+              <TableHead className="text-[11px] h-8">Account Code</TableHead>
+              <TableHead className="text-[11px] h-8">Account Name</TableHead>
+              <TableHead className="text-[11px] h-8 text-right">Debit (PKR)</TableHead>
+              <TableHead className="text-[11px] h-8 text-right">Credit (PKR)</TableHead>
+              <TableHead className="text-[11px] h-8">Narration</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {voucherData.entries.map((entry: any, idx: number) => (
+              <TableRow key={idx} className="transition-colors" style={{ background: entry.debit > 0 ? '#F0F9FF' : entry.credit > 0 ? '#F0FDF4' : undefined }}>
+                <TableCell className="text-[11px] py-2 font-mono">{entry.lineNumber}</TableCell>
+                <TableCell className="text-[11px] py-2 font-mono" style={{ color: '#6B7280' }}>{entry.accountCode}</TableCell>
+                <TableCell className="text-[11px] py-2 font-medium" style={{ color: '#1a1a2e' }}>{entry.accountName}</TableCell>
+                <TableCell className="text-[11px] py-2 text-right font-mono">{entry.debit > 0 ? <span className="entry-dr">{formatCurrency(entry.debit)}</span> : <span style={{ color: '#D1D5DB' }}>—</span>}</TableCell>
+                <TableCell className="text-[11px] py-2 text-right font-mono">{entry.credit > 0 ? <span className={entry.accountName?.toLowerCase().includes('social') || entry.accountName?.toLowerCase().includes('sc') ? 'entry-cr-sc' : entry.accountName?.toLowerCase().includes('tax') ? 'entry-cr-tax' : 'entry-cr-salary'}>{formatCurrency(entry.credit)}</span> : <span style={{ color: '#D1D5DB' }}>—</span>}</TableCell>
+                <TableCell className="text-[11px] py-2" style={{ color: '#6B7280' }}>{entry.description}</TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {voucherData.entries.map((entry: any, idx: number) => (
-                <TableRow key={idx} className={entry.debit > 0 ? 'bg-red-50/30' : 'bg-green-50/30'}>
-                  <TableCell className="text-[10px] py-1.5 font-mono">{entry.lineNumber}</TableCell>
-                  <TableCell className="text-[10px] py-1.5 font-mono">{entry.accountCode}</TableCell>
-                  <TableCell className="text-[10px] py-1.5 font-medium">{entry.accountName}</TableCell>
-                  <TableCell className="text-[10px] py-1.5 text-right font-mono">{entry.debit > 0 ? formatCurrency(entry.debit) : ''}</TableCell>
-                  <TableCell className="text-[10px] py-1.5 text-right font-mono">{entry.credit > 0 ? formatCurrency(entry.credit) : ''}</TableCell>
-                  <TableCell className="text-[10px] py-1.5 text-muted-foreground">{entry.description}</TableCell>
-                </TableRow>
-              ))}
-              {/* Totals row */}
-              <TableRow className="bg-violet-100/50 font-bold border-t-2 border-violet-300">
-                <TableCell className="text-[10px] py-2" colSpan={3}>TOTAL</TableCell>
-                <TableCell className="text-[10px] py-2 text-right font-mono">{formatCurrency(voucherData.totalDebit)}</TableCell>
-                <TableCell className="text-[10px] py-2 text-right font-mono">{formatCurrency(voucherData.totalCredit)}</TableCell>
-                <TableCell className="text-[10px] py-2"></TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+            ))}
+            {/* Totals row */}
+            <TableRow style={{ background: '#F8FAFC', fontWeight: 700, borderTop: '2px solid #E5E7EB' }}>
+              <TableCell className="text-[11px] py-2" colSpan={3}>TOTAL</TableCell>
+              <TableCell className="text-[11px] py-2 text-right font-mono font-bold">{formatCurrency(voucherData.totalDebit)}</TableCell>
+              <TableCell className="text-[11px] py-2 text-right font-mono font-bold">{formatCurrency(voucherData.totalCredit)}</TableCell>
+              <TableCell className="text-[11px] py-2"></TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
+      {/* Balance validation */}
+      <div className="flex items-center justify-between px-5 py-2 border-t" style={{ borderColor: '#F3F4F6' }}>
+        <div className="flex items-center gap-2">
+          {isBalanced ? (
+            <span className="status-badge status-badge-approved"><CheckCircle className="h-3 w-3" />Balanced (Dr = Cr)</span>
+          ) : (
+            <span className="status-badge status-badge-rejected"><AlertCircle className="h-3 w-3" />Imbalanced (Diff: {formatCurrency(Math.abs(voucherData.totalDebit - voucherData.totalCredit))})</span>
+          )}
         </div>
-        {/* Balance validation */}
-        <div className="flex items-center justify-between mt-2">
-          <div className="flex items-center gap-2">
-            {isBalanced ? (
-              <Badge className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-200">
-                <CheckCircle className="h-3 w-3 mr-1" />Balanced (Dr = Cr)
-              </Badge>
-            ) : (
-              <Badge className="text-[10px] bg-red-100 text-red-800 border border-red-200">
-                <AlertCircle className="h-3 w-3 mr-1" />Imbalanced (Diff: {formatCurrency(Math.abs(voucherData.totalDebit - voucherData.totalCredit))})
-              </Badge>
-            )}
+        <div className="text-[11px]" style={{ color: '#6B7280' }}>
+          {voucherData.entries.length} entries | Approved lines: {voucherData.approvedLineCount || '—'}
+        </div>
+      </div>
+      {/* Signature blocks */}
+      <div className="px-5 py-4 border-t" style={{ borderColor: '#F3F4F6' }}>
+        <div className="flex justify-between">
+          <div className="text-center">
+            <div className="w-36 border-t pt-1 mx-auto text-[10px]" style={{ borderColor: '#D1D5DB', color: '#6B7280' }}>Prepared By</div>
           </div>
-          <div className="text-[10px] text-muted-foreground">
-            {voucherData.entries.length} entries | Approved lines: {voucherData.approvedLineCount || '—'}
+          <div className="text-center">
+            <div className="w-36 border-t pt-1 mx-auto text-[10px]" style={{ borderColor: '#D1D5DB', color: '#6B7280' }}>Checked By</div>
+          </div>
+          <div className="text-center">
+            <div className="w-36 border-t pt-1 mx-auto text-[10px]" style={{ borderColor: '#D1D5DB', color: '#6B7280' }}>Approved By</div>
           </div>
         </div>
-        {/* Print-only signature lines */}
-        <div className="print-only hidden" style={{marginTop: '30px'}}>
-          <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '40px'}}>
-            <div style={{textAlign: 'center'}}><div style={{borderTop: '1px solid #000', width: '150px', paddingTop: '4px'}}>Prepared By</div></div>
-            <div style={{textAlign: 'center'}}><div style={{borderTop: '1px solid #000', width: '150px', paddingTop: '4px'}}>Reviewed By</div></div>
-            <div style={{textAlign: 'center'}}><div style={{borderTop: '1px solid #000', width: '150px', paddingTop: '4px'}}>Approved By</div></div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+      {/* Print-only company header */}
+      <div className="print-only hidden" style={{textAlign: 'center', marginBottom: '20px'}}>
+        <h1 style={{fontSize: '18px', fontWeight: 'bold'}}>AcctFin ERP</h1>
+        <p>Journal Voucher - Payroll Posting</p>
+        <p>Voucher No: {voucherData.voucherNumber || `JV-PAY-${batch.batchNumber}`} | Date: {new Date().toLocaleDateString()}</p>
+      </div>
+    </div>
   )
 }
 
@@ -1075,35 +1087,35 @@ export function PayrollIntegration() {
     const currentIdx = workflowSteps.indexOf(status)
     const effectiveIdx = currentIdx >= 0 ? currentIdx : 0
     return (
-      <div className="flex items-center gap-1 my-3 flex-wrap">
+      <div className="workflow-stepper my-3">
         {workflowSteps.map((step, idx) => {
           const stepActions = workflowStepActions[step] || []
+          const isCompleted = idx < effectiveIdx
+          const isActive = idx === effectiveIdx
+          const isPending = idx > effectiveIdx
           return (
-            <div key={step} className="flex items-center gap-1">
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                idx <= effectiveIdx
-                  ? idx === effectiveIdx
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'bg-primary/10 text-primary'
-                  : 'bg-muted text-muted-foreground'
-              }`}>
-                {idx <= effectiveIdx && <CheckCircle className="h-3 w-3" />}
-                <span>{statusLabels[step]}</span>
-                {/* Show action buttons for the current step */}
-                {idx === effectiveIdx && stepActions.length > 0 && (
+            <div key={step} className="flex items-center">
+              <div className="workflow-step">
+                <div className={`workflow-step-circle ${
+                  isCompleted ? 'completed' : isActive ? 'active' : 'pending'
+                }`}>
+                  {isCompleted ? <CheckCircle className="h-3 w-3" /> : <span>{idx + 1}</span>}
+                </div>
+                <span className={`text-[11px] ${isActive ? 'font-semibold' : ''}`} style={{ color: isActive ? '#1A7A4A' : isCompleted ? '#1A7A4A' : '#9CA3AF' }}>
+                  {statusLabels[step]}
+                </span>
+                {isActive && stepActions.length > 0 && (
                   <div className="flex items-center gap-1 ml-2">
                     {stepActions.map((sa) => {
                       const IconComp = sa.icon
                       return (
-                        <Button
+                        <button
                           key={sa.action}
-                          variant="ghost"
-                          size="sm"
-                          className="h-5 px-1.5 text-[9px] bg-white/20 hover:bg-white/40 text-primary-foreground"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors"
+                          style={{ background: 'rgba(26, 122, 74, 0.1)', color: '#1A7A4A' }}
                           onClick={(e) => {
                             e.stopPropagation()
                             if (sa.action === 'post-to-gl') {
-                              // Post all draft vouchers to GL
                               handlePostAllVouchersToGL()
                             } else if (sa.action === 'create-salary-voucher') {
                               setSelectedBatch(batches.find((b: any) => b.id === batchId) || null)
@@ -1113,16 +1125,16 @@ export function PayrollIntegration() {
                             }
                           }}
                         >
-                          <IconComp className="h-2.5 w-2.5 mr-0.5" />
+                          <IconComp className="h-3 w-3" />
                           {sa.label}
-                        </Button>
+                        </button>
                       )
                     })}
                   </div>
                 )}
               </div>
               {idx < workflowSteps.length - 1 && (
-                <ArrowRight className={`h-4 w-4 ${idx < effectiveIdx ? 'text-primary' : 'text-muted-foreground'}`} />
+                <div className={`workflow-connector ${isCompleted ? 'completed' : 'pending'}`} />
               )}
             </div>
           )
@@ -1673,129 +1685,96 @@ export function PayrollIntegration() {
   }
 
   return (
-    <div className="space-y-4">
-      <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          .voucher-print-area, .voucher-print-area * { visibility: visible; }
-          .voucher-print-area { position: absolute; left: 0; top: 0; width: 100%; }
-          .no-print { display: none !important; }
-          .print-only { display: block !important; }
-          .print-only.hidden { display: block !important; }
-          table { border-collapse: collapse; }
-          table th, table td { border: 1px solid #000; padding: 4px 8px; }
-          .voucher-print-area + .voucher-print-area { page-break-before: always; }
-          @page { margin: 15mm; }
-        }
-      `}</style>
-      {/* Create Salary Vouchers button */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold flex items-center gap-2">
-          <Banknote className="h-5 w-5 text-primary" />
-          Payroll Management
-        </h2>
-        <Button
-          size="sm"
+    <div className="space-y-6" style={{ background: '#F5F7FA' }}>
+      {/* Page Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-[20px] font-semibold flex items-center gap-2.5" style={{ color: '#1a1a2e' }}>
+            <Banknote className="h-5 w-5" style={{ color: '#1A7A4A' }} />
+            Payroll Management
+          </h2>
+          <p className="text-[12px] mt-1" style={{ color: '#6B7280' }}>Manage salary processing, project cost distribution and payroll batches</p>
+        </div>
+        <button
+          className="btn-primary"
           onClick={() => setShowSalaryVoucherCreation(true)}
-          className="bg-emerald-600 hover:bg-emerald-700"
         >
-          <FileText className="h-4 w-4 mr-1.5" />
+          <FileText className="h-4 w-4" />
           Create Salary Vouchers
-        </Button>
+        </button>
       </div>
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Card className="border-l-4 border-l-emerald-500">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
-              <div>
-                <p className="text-[10px] text-muted-foreground">Total Gross</p>
-                <p className="text-sm font-bold">{formatCurrency(kpiTotals.totalGross)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-red-500">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-red-500" />
-              <div>
-                <p className="text-[10px] text-muted-foreground">Total Deductions</p>
-                <p className="text-sm font-bold text-red-600">{formatCurrency(kpiTotals.totalDeductions)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-green-500">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <Banknote className="h-4 w-4 text-green-500" />
-              <div>
-                <p className="text-[10px] text-muted-foreground">Total Net Pay</p>
-                <p className="text-sm font-bold text-green-600">{formatCurrency(kpiTotals.totalNetPay)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-orange-500">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <Shield className="h-4 w-4 text-orange-500" />
-              <div>
-                <p className="text-[10px] text-muted-foreground">Social Charges</p>
-                <p className="text-sm font-bold">{formatCurrency(kpiTotals.totalSocialCharges)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-purple-500">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-purple-500" />
-              <div>
-                <p className="text-[10px] text-muted-foreground">Employer Charges</p>
-                <p className="text-sm font-bold">{formatCurrency(kpiTotals.totalEmployerCharges)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+
+      {/* KPI Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="kpi-card" style={{ borderLeftColor: '#2563EB' }}>
+          <div className="flex items-center justify-between mb-1">
+            <TrendingUp className="h-4 w-4" style={{ color: '#2563EB' }} />
+          </div>
+          <div className="kpi-label">Total Gross</div>
+          <div className="kpi-value">{formatCurrency(kpiTotals.totalGross)}</div>
+        </div>
+        <div className="kpi-card" style={{ borderLeftColor: '#DC2626' }}>
+          <div className="flex items-center justify-between mb-1">
+            <TrendingDown className="h-4 w-4" style={{ color: '#DC2626' }} />
+          </div>
+          <div className="kpi-label">Total Deductions</div>
+          <div className="kpi-value" style={{ color: '#DC2626' }}>{formatCurrency(kpiTotals.totalDeductions)}</div>
+        </div>
+        <div className="kpi-card" style={{ borderLeftColor: '#16A34A' }}>
+          <div className="flex items-center justify-between mb-1">
+            <Banknote className="h-4 w-4" style={{ color: '#16A34A' }} />
+          </div>
+          <div className="kpi-label">Total Net Pay</div>
+          <div className="kpi-value" style={{ color: '#16A34A' }}>{formatCurrency(kpiTotals.totalNetPay)}</div>
+        </div>
+        <div className="kpi-card" style={{ borderLeftColor: '#D97706' }}>
+          <div className="flex items-center justify-between mb-1">
+            <Shield className="h-4 w-4" style={{ color: '#D97706' }} />
+          </div>
+          <div className="kpi-label">Social Charges</div>
+          <div className="kpi-value" style={{ color: '#D97706' }}>{formatCurrency(kpiTotals.totalSocialCharges)}</div>
+        </div>
+        <div className="kpi-card" style={{ borderLeftColor: '#7C3AED' }}>
+          <div className="flex items-center justify-between mb-1">
+            <Building2 className="h-4 w-4" style={{ color: '#7C3AED' }} />
+          </div>
+          <div className="kpi-label">Employer Charges</div>
+          <div className="kpi-value" style={{ color: '#7C3AED' }}>{formatCurrency(kpiTotals.totalEmployerCharges)}</div>
+        </div>
       </div>
 
       {/* Payroll Calculator Section — Attendance-Driven with Project Detail */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-sm flex items-center gap-2">
-                <BookOpen className="h-4 w-4" />
-                Attendance-Driven Payroll Calculator
-              </CardTitle>
-              <CardDescription className="text-[10px]">
-                Calculates salary, deductions &amp; project cost distribution based on actual attendance data
-              </CardDescription>
+      <div className="erp-card">
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: '#E5E7EB' }}>
+          <div>
+            <div className="section-title">
+              <BookOpen className="h-4 w-4" style={{ color: '#1A7A4A' }} />
+              Attendance-Driven Payroll Calculator
             </div>
-            <div className="flex items-center gap-2">
-              <Input type="month" className="h-8 text-xs w-40" value={calculatorPeriod} onChange={e => setCalculatorPeriod(e.target.value)} />
-              <Button size="sm" className="h-8 text-xs" onClick={handleRecalculate} disabled={calculating}>
-                {calculating ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Play className="h-3.5 w-3.5 mr-1" />}
-                Recalculate
-              </Button>
-            </div>
+            <p className="text-[12px] mt-0.5" style={{ color: '#6B7280' }}>
+              Calculates salary, deductions &amp; project cost distribution based on actual attendance data
+            </p>
           </div>
-        </CardHeader>
-        <CardContent className="p-4 pt-0">
+          <div className="flex items-center gap-2">
+            <Input type="month" className="h-8 text-xs w-40" value={calculatorPeriod} onChange={e => setCalculatorPeriod(e.target.value)} />
+            <button className="btn-primary text-xs h-8" onClick={handleRecalculate} disabled={calculating}>
+              {calculating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+              <span className="ml-1">Recalculate</span>
+            </button>
+          </div>
+        </div>
+        <div className="p-5">
           {calculatorData.length === 0 && !calculating && (
-            <div className="text-center py-8 text-muted-foreground">
-              <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              <p className="text-xs">Select a period and click <strong>Recalculate</strong> to compute payroll for all active employees</p>
+            <div className="empty-state">
+              <BookOpen className="h-12 w-12" style={{ color: '#D1D5DB' }} />
+              <p className="text-[14px]" style={{ color: '#6B7280' }}>Select a period and click <strong>Recalculate</strong> to compute payroll</p>
             </div>
           )}
 
           {calculating && (
-            <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span className="text-xs">Calculating payroll via attendance engine…</span>
+            <div className="flex items-center justify-center py-8 gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" style={{ color: '#1A7A4A' }} />
+              <span className="text-xs" style={{ color: '#6B7280' }}>Calculating payroll via attendance engine…</span>
             </div>
           )}
 
@@ -1803,38 +1782,38 @@ export function PayrollIntegration() {
             <>
               {/* Summary KPIs */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                <div className="p-2.5 rounded-lg bg-muted/50 text-center">
-                  <p className="text-[10px] text-muted-foreground">Total Gross</p>
-                  <p className="text-sm font-bold">{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.grossSalary || 0), 0))}</p>
+                <div className="p-3 rounded-lg text-center" style={{ background: '#F0F9FF', border: '1px solid #DBEAFE' }}>
+                  <p className="text-[11px] font-medium" style={{ color: '#2563EB' }}>Total Gross</p>
+                  <p className="text-[18px] font-bold" style={{ color: '#1a1a2e' }}>{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.grossSalary || 0), 0))}</p>
                 </div>
-                <div className="p-2.5 rounded-lg bg-red-50 border border-red-100 text-center">
-                  <p className="text-[10px] text-red-700">Total Deductions</p>
-                  <p className="text-sm font-bold text-red-700">{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.deductions?.totalDeductions || 0), 0))}</p>
+                <div className="p-3 rounded-lg text-center" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
+                  <p className="text-[11px] font-medium" style={{ color: '#DC2626' }}>Total Deductions</p>
+                  <p className="text-[18px] font-bold" style={{ color: '#DC2626' }}>{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.deductions?.totalDeductions || 0), 0))}</p>
                 </div>
-                <div className="p-2.5 rounded-lg bg-green-50 border border-green-100 text-center">
-                  <p className="text-[10px] text-green-700">Total Net Pay</p>
-                  <p className="text-sm font-bold text-green-700">{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.netPay || 0), 0))}</p>
+                <div className="p-3 rounded-lg text-center" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+                  <p className="text-[11px] font-medium" style={{ color: '#16A34A' }}>Total Net Pay</p>
+                  <p className="text-[18px] font-bold" style={{ color: '#16A34A' }}>{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.netPay || 0), 0))}</p>
                 </div>
-                <div className="p-2.5 rounded-lg bg-orange-50 border border-orange-100 text-center">
-                  <p className="text-[10px] text-orange-700">Total SC</p>
-                  <p className="text-sm font-bold text-orange-700">{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.finalSC || 0), 0))}</p>
+                <div className="p-3 rounded-lg text-center" style={{ background: '#FFFBEB', border: '1px solid #FDE68A' }}>
+                  <p className="text-[11px] font-medium" style={{ color: '#D97706' }}>Total SC</p>
+                  <p className="text-[18px] font-bold" style={{ color: '#D97706' }}>{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.finalSC || 0), 0))}</p>
                 </div>
               </div>
 
               {/* Employee breakdown table */}
-              <div className="rounded border overflow-x-auto">
+              <div className="rounded-lg overflow-x-auto border" style={{ borderColor: '#E5E7EB' }}>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-[10px]">Employee</TableHead>
-                      <TableHead className="text-[10px] text-center">Eligible</TableHead>
-                      <TableHead className="text-[10px] text-center">Leave</TableHead>
-                      <TableHead className="text-[10px] text-center">Absent</TableHead>
-                      <TableHead className="text-[10px] text-right">Gross</TableHead>
-                      <TableHead className="text-[10px] text-right">Deductions</TableHead>
-                      <TableHead className="text-[10px] text-right">Net Pay</TableHead>
-                      <TableHead className="text-[10px] text-right">SC</TableHead>
-                      <TableHead className="text-[10px] text-center">Projects</TableHead>
+                      <TableHead className="text-[11px]">Employee</TableHead>
+                      <TableHead className="text-[11px] text-center">Eligible</TableHead>
+                      <TableHead className="text-[11px] text-center">Leave</TableHead>
+                      <TableHead className="text-[11px] text-center">Absent</TableHead>
+                      <TableHead className="text-[11px] text-right">Gross</TableHead>
+                      <TableHead className="text-[11px] text-right">Deductions</TableHead>
+                      <TableHead className="text-[11px] text-right">Net Pay</TableHead>
+                      <TableHead className="text-[11px] text-right">SC</TableHead>
+                      <TableHead className="text-[11px] text-center">Projects</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1864,16 +1843,16 @@ export function PayrollIntegration() {
                       )
                     })}
                     {/* Totals row */}
-                    <TableRow className="bg-muted/30 font-semibold">
-                      <TableCell className="text-xs py-1.5">Total ({calculatorData.length} employees)</TableCell>
-                      <TableCell className="text-xs py-1.5 text-center">{calculatorData.reduce((s: number, r: any) => s + (r.eligibleDays || 0), 0)}</TableCell>
-                      <TableCell className="text-xs py-1.5 text-center">{calculatorData.reduce((s: number, r: any) => s + (r.leaveDays || 0), 0)}</TableCell>
-                      <TableCell className="text-xs py-1.5 text-center">{calculatorData.reduce((s: number, r: any) => s + (r.absentDays || 0), 0)}</TableCell>
-                      <TableCell className="text-xs py-1.5 text-right">{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.grossSalary || 0), 0))}</TableCell>
-                      <TableCell className="text-xs py-1.5 text-right text-red-600">{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.deductions?.totalDeductions || 0), 0))}</TableCell>
-                      <TableCell className="text-xs py-1.5 text-right text-green-600">{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.netPay || 0), 0))}</TableCell>
-                      <TableCell className="text-xs py-1.5 text-right text-orange-600">{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.finalSC || 0), 0))}</TableCell>
-                      <TableCell className="text-xs py-1.5 text-center">&mdash;</TableCell>
+                    <TableRow className="totals-row">
+                      <TableCell className="text-xs py-2">Total ({calculatorData.length} employees)</TableCell>
+                      <TableCell className="text-xs py-2 text-center">{calculatorData.reduce((s: number, r: any) => s + (r.eligibleDays || 0), 0)}</TableCell>
+                      <TableCell className="text-xs py-2 text-center">{calculatorData.reduce((s: number, r: any) => s + (r.leaveDays || 0), 0)}</TableCell>
+                      <TableCell className="text-xs py-2 text-center">{calculatorData.reduce((s: number, r: any) => s + (r.absentDays || 0), 0)}</TableCell>
+                      <TableCell className="text-xs py-2 text-right font-mono">{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.grossSalary || 0), 0))}</TableCell>
+                      <TableCell className="text-xs py-2 text-right font-mono" style={{ color: '#DC2626' }}>{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.deductions?.totalDeductions || 0), 0))}</TableCell>
+                      <TableCell className="text-xs py-2 text-right font-mono" style={{ color: '#16A34A' }}>{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.netPay || 0), 0))}</TableCell>
+                      <TableCell className="text-xs py-2 text-right font-mono" style={{ color: '#D97706' }}>{formatCurrency(calculatorData.reduce((s: number, r: any) => s + (r.finalSC || 0), 0))}</TableCell>
+                      <TableCell className="text-xs py-2 text-center" style={{ color: '#D1D5DB' }}>&mdash;</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -1923,28 +1902,26 @@ export function PayrollIntegration() {
                 </div>
               )}
 
-              <div className="flex items-center gap-2 mt-3">
-                <Button
-                  variant="outline"
-                  className="border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 rounded-lg px-4 py-2"
+              <div className="flex items-center gap-2 mt-4">
+                <button
+                  className="btn-secondary"
                   onClick={handleCreateDraftVoucher}
                   disabled={!!draftVoucher}
                 >
                   Create Draft Voucher
-                </Button>
-                <Button
-                  variant="outline"
-                  className="rounded-lg px-4 py-2"
+                </button>
+                <button
+                  className="btn-secondary"
                   onClick={() => { setProjectCostPeriod(calculatorPeriod); fetchProjectCost(calculatorPeriod) }}
                 >
-                  <Building2 className="h-3.5 w-3.5 mr-1" />
-                  View Project Cost Ledger
-                </Button>
+                  <Building2 className="h-3.5 w-3.5" />
+                  <span className="ml-1">View Project Cost Ledger</span>
+                </button>
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Draft Voucher Preview (Fix 5) */}
       {draftVoucher && (
@@ -2011,50 +1988,47 @@ export function PayrollIntegration() {
         </Card>
       )}
 
-      {/* Project Cost Distribution Card */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                Project Cost Distribution
-              </CardTitle>
-              <CardDescription className="text-[10px]">
-                Salary &amp; social charges grouped by project from the Project Cost Ledger
-              </CardDescription>
+      {/* Project Cost Distribution */}
+      <div className="erp-card">
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: '#E5E7EB' }}>
+          <div>
+            <div className="section-title">
+              <Building2 className="h-4 w-4" style={{ color: '#1A7A4A' }} />
+              Project Cost Distribution
             </div>
-            <div className="flex items-center gap-2">
-              <Input
-                type="month"
-                className="h-8 text-xs w-40"
-                value={projectCostPeriod}
-                onChange={e => setProjectCostPeriod(e.target.value)}
-              />
-              <Button
-                size="sm"
-                className="h-8 text-xs"
-                onClick={() => fetchProjectCost()}
-                disabled={loadingProjectCost}
-              >
-                {loadingProjectCost ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Receipt className="h-3.5 w-3.5 mr-1" />}
-                Load
-              </Button>
-            </div>
+            <p className="text-[12px] mt-0.5" style={{ color: '#6B7280' }}>
+              Salary &amp; social charges grouped by project from the Project Cost Ledger
+            </p>
           </div>
-        </CardHeader>
-        <CardContent className="p-4 pt-0">
+          <div className="flex items-center gap-2">
+            <Input
+              type="month"
+              className="h-8 text-xs w-40"
+              value={projectCostPeriod}
+              onChange={e => setProjectCostPeriod(e.target.value)}
+            />
+            <button
+              className="btn-primary text-xs h-8"
+              onClick={() => fetchProjectCost()}
+              disabled={loadingProjectCost}
+            >
+              {loadingProjectCost ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Receipt className="h-3.5 w-3.5" />}
+              <span className="ml-1">Load</span>
+            </button>
+          </div>
+        </div>
+        <div className="p-5">
           {!projectCostData && !loadingProjectCost && (
-            <div className="text-center py-8 text-muted-foreground">
-              <Building2 className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              <p className="text-xs">Select a month and click <strong>Load</strong> to view project cost distribution from the ledger</p>
+            <div className="empty-state">
+              <Building2 className="h-12 w-12" style={{ color: '#D1D5DB' }} />
+              <p className="text-[14px]" style={{ color: '#6B7280' }}>Select a month and click <strong>Load</strong> to view project cost distribution</p>
             </div>
           )}
 
           {loadingProjectCost && (
-            <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span className="text-xs">Loading project cost data…</span>
+            <div className="flex items-center justify-center py-8 gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" style={{ color: '#1A7A4A' }} />
+              <span className="text-xs" style={{ color: '#6B7280' }}>Loading project cost data…</span>
             </div>
           )}
 
@@ -2062,17 +2036,17 @@ export function PayrollIntegration() {
             <>
               {/* Grand Total KPIs */}
               <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="p-2.5 rounded-lg bg-muted/50 text-center">
-                  <p className="text-[10px] text-muted-foreground">Total Salary</p>
-                  <p className="text-sm font-bold">{formatCurrency(projectCostData.grandTotal?.salary || 0)}</p>
+                <div className="p-3 rounded-lg text-center" style={{ background: '#F0F9FF', border: '1px solid #DBEAFE' }}>
+                  <p className="text-[11px] font-medium" style={{ color: '#2563EB' }}>Total Salary</p>
+                  <p className="text-[18px] font-bold" style={{ color: '#1a1a2e' }}>{formatCurrency(projectCostData.grandTotal?.salary || 0)}</p>
                 </div>
-                <div className="p-2.5 rounded-lg bg-orange-50 border border-orange-100 text-center">
-                  <p className="text-[10px] text-orange-700">Total SC</p>
-                  <p className="text-sm font-bold text-orange-700">{formatCurrency(projectCostData.grandTotal?.sc || 0)}</p>
+                <div className="p-3 rounded-lg text-center" style={{ background: '#FFFBEB', border: '1px solid #FDE68A' }}>
+                  <p className="text-[11px] font-medium" style={{ color: '#D97706' }}>Total SC</p>
+                  <p className="text-[18px] font-bold" style={{ color: '#D97706' }}>{formatCurrency(projectCostData.grandTotal?.sc || 0)}</p>
                 </div>
-                <div className="p-2.5 rounded-lg bg-muted/50 text-center">
-                  <p className="text-[10px] text-muted-foreground">Total Days</p>
-                  <p className="text-sm font-bold">{projectCostData.grandTotal?.days || 0}</p>
+                <div className="p-3 rounded-lg text-center" style={{ background: '#F3F4F6', border: '1px solid #E5E7EB' }}>
+                  <p className="text-[11px] font-medium" style={{ color: '#6B7280' }}>Total Days</p>
+                  <p className="text-[18px] font-bold" style={{ color: '#1a1a2e' }}>{projectCostData.grandTotal?.days || 0}</p>
                 </div>
               </div>
 
@@ -2183,26 +2157,27 @@ export function PayrollIntegration() {
               )}
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* Header */}
+      {/* Payroll Batches Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold flex items-center gap-2">
-          <Receipt className="h-4 w-4" />
+        <div className="section-title">
+          <Receipt className="h-4 w-4" style={{ color: '#1A7A4A' }} />
           Payroll Batches
-        </h3>
-        <Button size="sm" className="h-8 text-xs" onClick={() => setCreateDialogOpen(true)}>
-          <Plus className="h-3.5 w-3.5 mr-1" />New Batch
-        </Button>
+        </div>
+        <button className="btn-secondary" onClick={() => setCreateDialogOpen(true)}>
+          <Plus className="h-3.5 w-3.5" />
+          <span className="ml-1">New Batch</span>
+        </button>
       </div>
 
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-12">
           <div className="flex flex-col items-center gap-3">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            <p className="text-xs text-muted-foreground">Loading payroll batches...</p>
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-t-transparent" style={{ borderColor: '#1A7A4A', borderTopColor: 'transparent' }} />
+            <p className="text-xs" style={{ color: '#6B7280' }}>Loading payroll batches...</p>
           </div>
         </div>
       )}
@@ -2215,27 +2190,27 @@ export function PayrollIntegration() {
 
         return (
           <Fragment key={batch.id}>
-          <Card className="group overflow-hidden">
+          <div key={batch.id} className="erp-card overflow-hidden">
             {/* Batch Header */}
-            <CardHeader className="pb-2">
+            <div className="px-5 py-4 border-b" style={{ borderColor: '#F3F4F6' }}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 cursor-pointer flex-1 min-w-0" onClick={() => setExpandedBatch(isExpanded ? null : batch.id)}>
-                  {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />}
+                  {isExpanded ? <ChevronUp className="h-4 w-4 shrink-0" style={{ color: '#6B7280' }} /> : <ChevronDown className="h-4 w-4 shrink-0" style={{ color: '#6B7280' }} />}
                   <div className="min-w-0">
-                    <CardTitle className="text-sm truncate">{batch.name || batch.batchNumber}</CardTitle>
-                    <CardDescription className="text-[10px]">
-                      {batch.batchNumber} | Period: {batch.period} | {batch.lines?.length || 0} employees
-                    </CardDescription>
+                    <div className="text-[15px] font-semibold truncate" style={{ color: '#1a1a2e' }}>{batch.name || batch.batchNumber}</div>
+                    <div className="text-[12px]" style={{ color: '#6B7280' }}>
+                      {batch.batchNumber} &bull; Period: {batch.period} &bull; {batch.lines?.length || 0} employees
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <Badge className={`text-[10px] border ${statusStyles[batch.status] || ''}`}>
+                  <span className={statusStyles[batch.status] || 'status-badge status-badge-draft'}>
                     {statusLabels[batch.status] || batch.status}
-                  </Badge>
+                  </span>
                   {batch.postedToGL && (
-                    <Badge className="text-[10px] bg-purple-100 text-purple-800 border border-purple-200">
-                      <CheckCircle className="h-3 w-3 mr-1" />GL Posted
-                    </Badge>
+                    <span className="status-badge status-badge-posted">
+                      <CheckCircle className="h-3 w-3" />GL Posted
+                    </span>
                   )}
                 </div>
               </div>
@@ -2244,23 +2219,20 @@ export function PayrollIntegration() {
               {renderWorkflowBar(batch.status, batch.id)}
 
               {/* Step-Aware Action Buttons */}
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap mt-2">
                 {/* STEP 1: Draft — Select Employees, Run Payroll, Review */}
                 {batch.status === 'draft' && (
                   <>
-                    <Button
-                      size="sm"
-                      className="h-7 text-[10px]"
+                    <button
+                      className="btn-primary text-xs h-7"
                       onClick={() => handleRunPayroll(batch)}
                       disabled={isRunning}
                     >
-                      {isRunning ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Play className="h-3 w-3 mr-1" />}
-                      {isRunning ? 'Processing...' : 'Run Payroll'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-[10px]"
+                      {isRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+                      <span className="ml-1">{isRunning ? 'Processing...' : 'Run Payroll'}</span>
+                    </button>
+                    <button
+                      className="btn-secondary text-xs h-7"
                       onClick={async () => {
                         setRunningPayroll(batch.id)
                         try {
@@ -2281,84 +2253,84 @@ export function PayrollIntegration() {
                       }}
                       disabled={isRunning}
                     >
-                      <Receipt className="h-3 w-3 mr-1" />Recalculate
-                    </Button>
-                    <Button variant="outline" size="sm" className="h-7 text-[10px] border-sky-300 text-sky-700 hover:bg-sky-50" onClick={() => handleReviewAllLines(batch.id)} disabled={processingAction === 'review-all-lines'}>
-                      {processingAction === 'review-all-lines' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Eye className="h-3 w-3 mr-1" />}
-                      Review All
-                    </Button>
-                    <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => openAddLineDialog(batch)}>
-                      <Plus className="h-3 w-3 mr-1" />Add Line
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-7 text-[10px] text-red-600 hover:text-red-700" onClick={() => { setSelectedBatch(batch); setDeleteBatchDialogOpen(true) }}>
-                      <Trash2 className="h-3 w-3 mr-1" />Delete
-                    </Button>
+                      <Receipt className="h-3 w-3" /><span className="ml-1">Recalculate</span>
+                    </button>
+                    <button className="btn-secondary text-xs h-7" style={{ color: '#1D4ED8', borderColor: '#BFDBFE' }} onClick={() => handleReviewAllLines(batch.id)} disabled={processingAction === 'review-all-lines'}>
+                      {processingAction === 'review-all-lines' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3" />}
+                      <span className="ml-1">Review All</span>
+                    </button>
+                    <button className="btn-secondary text-xs h-7" onClick={() => openAddLineDialog(batch)}>
+                      <Plus className="h-3 w-3" /><span className="ml-1">Add Line</span>
+                    </button>
+                    <button className="btn-destructive text-xs h-7" onClick={() => { setSelectedBatch(batch); setDeleteBatchDialogOpen(true) }}>
+                      <Trash2 className="h-3 w-3" /><span className="ml-1">Delete</span>
+                    </button>
                   </>
                 )}
                 {/* STEP 2: Reviewed — Approve or Send Back */}
                 {batch.status === 'reviewed' && (
                   <>
-                    <Button variant="outline" size="sm" className="h-7 text-[10px] border-emerald-300 text-emerald-700 hover:bg-emerald-50" onClick={() => handleApproveAllLines(batch.id)} disabled={processingAction === 'approve-all-lines'}>
-                      {processingAction === 'approve-all-lines' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Shield className="h-3 w-3 mr-1" />}
-                      Approve All
-                    </Button>
-                    <Button variant="outline" size="sm" className="h-7 text-[10px] border-emerald-300 text-emerald-700 hover:bg-emerald-50" onClick={() => setProjectPayView(projectPayView === batch.id ? null : batch.id)}>
-                      <FolderOpen className="h-3 w-3 mr-1" />Pay by Project
-                    </Button>
-                    <Button variant="outline" size="sm" className="h-7 text-[10px] border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => handleWorkflowAction('send-back', batch.id)}>
-                      <ArrowRight className="h-3 w-3 mr-1 rotate-180" />Send Back to Draft
-                    </Button>
+                    <button className="btn-secondary text-xs h-7" style={{ color: '#15803D', borderColor: '#BBF7D0' }} onClick={() => handleApproveAllLines(batch.id)} disabled={processingAction === 'approve-all-lines'}>
+                      {processingAction === 'approve-all-lines' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Shield className="h-3 w-3" />}
+                      <span className="ml-1">Approve All</span>
+                    </button>
+                    <button className="btn-secondary text-xs h-7" onClick={() => setProjectPayView(projectPayView === batch.id ? null : batch.id)}>
+                      <FolderOpen className="h-3 w-3" /><span className="ml-1">Pay by Project</span>
+                    </button>
+                    <button className="btn-secondary text-xs h-7" style={{ color: '#D97706', borderColor: '#FDE68A' }} onClick={() => handleWorkflowAction('send-back', batch.id)}>
+                      <ArrowRight className="h-3 w-3 rotate-180" /><span className="ml-1">Send Back to Draft</span>
+                    </button>
                   </>
                 )}
                 {/* STEP 3: Approved — Create Salary Voucher */}
                 {batch.status === 'approved' && (
                   <>
-                    <Button variant="outline" size="sm" className="h-7 text-[10px] border-violet-300 text-violet-700 hover:bg-violet-50" onClick={() => { setSelectedBatch(batch); setCreateVoucherDialogOpen(true) }}>
-                      <FileText className="h-3 w-3 mr-1" />Create Salary Voucher
-                    </Button>
-                    <Button variant="outline" size="sm" className="h-7 text-[10px] border-emerald-300 text-emerald-700 hover:bg-emerald-50" onClick={() => setProjectPayView(projectPayView === batch.id ? null : batch.id)}>
-                      <FolderOpen className="h-3 w-3 mr-1" />Pay by Project
-                    </Button>
+                    <button className="btn-primary text-xs h-7" onClick={() => { setSelectedBatch(batch); setCreateVoucherDialogOpen(true) }}>
+                      <FileText className="h-3 w-3" /><span className="ml-1">Create Salary Voucher</span>
+                    </button>
+                    <button className="btn-secondary text-xs h-7" onClick={() => setProjectPayView(projectPayView === batch.id ? null : batch.id)}>
+                      <FolderOpen className="h-3 w-3" /><span className="ml-1">Pay by Project</span>
+                    </button>
                   </>
                 )}
                 {/* STEP 4: Draft-to-GL — Post to GL */}
                 {batch.status === 'draft-to-gl' && (
                   <>
-                    <Button size="sm" className="h-7 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handlePostAllVouchersToGL}
+                    <button className="btn-primary text-xs h-7" onClick={handlePostAllVouchersToGL}
                       disabled={generatedVouchers.length > 0 && generatedVouchers.every(v => v.status !== 'draft')}>
-                      <BookOpen className="h-3 w-3 mr-1" />Post All to GL
-                    </Button>
-                    <Badge className="text-[10px] bg-violet-100 text-violet-800 border border-violet-200">
-                      <FileText className="h-3 w-3 mr-1" />{generatedVouchers.length > 0 ? `${generatedVouchers.filter(v => v.status === 'draft').length} Draft / ${generatedVouchers.filter(v => v.status === 'posted').length} Posted` : 'Draft Voucher(s) Created'}
-                    </Badge>
+                      <BookOpen className="h-3 w-3" /><span className="ml-1">Post All to GL</span>
+                    </button>
+                    <span className="status-badge status-badge-posted">
+                      <FileText className="h-3 w-3" />{generatedVouchers.length > 0 ? `${generatedVouchers.filter(v => v.status === 'draft').length} Draft / ${generatedVouchers.filter(v => v.status === 'posted').length} Posted` : 'Draft Voucher(s) Created'}
+                    </span>
                   </>
                 )}
                 {/* STEP 5: Posted — Complete */}
                 {batch.status === 'posted' && (
-                  <Badge className="text-[10px] bg-purple-100 text-purple-800 border border-purple-200">
-                    <CheckCircle className="h-3 w-3 mr-1" />Posted to GL — Complete
-                  </Badge>
+                  <span className="status-badge status-badge-posted">
+                    <CheckCircle className="h-3 w-3" />Posted to GL — Complete
+                  </span>
                 )}
               </div>
-            </CardHeader>
+            </div>
 
             {/* Expanded Content */}
             {isExpanded && (
-              <CardContent>
+              <div className="p-5">
                 {/* Summary Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
                   {[
-                    { label: 'Basic Salary', value: batch.totalBasicSalary, color: '' },
-                    { label: 'Allowances', value: batch.totalAllowances, color: '' },
-                    { label: 'Gross', value: batch.totalGross, color: 'text-green-700' },
-                    { label: 'Deductions', value: batch.totalDeductions, color: 'text-red-700' },
-                    { label: 'Net Pay', value: batch.totalNetPay, color: 'text-green-700' },
-                    { label: 'Social Charges', value: batch.totalSocialCharges, color: 'text-orange-700' },
-                    { label: 'Employer Charges', value: batch.totalEmployerCharges, color: 'text-purple-700' },
+                    { label: 'Basic Salary', value: batch.totalBasicSalary, color: '#1a1a2e' },
+                    { label: 'Allowances', value: batch.totalAllowances, color: '#1a1a2e' },
+                    { label: 'Gross', value: batch.totalGross, color: '#16A34A' },
+                    { label: 'Deductions', value: batch.totalDeductions, color: '#DC2626' },
+                    { label: 'Net Pay', value: batch.totalNetPay, color: '#16A34A' },
+                    { label: 'Social Charges', value: batch.totalSocialCharges, color: '#D97706' },
+                    { label: 'Employer Charges', value: batch.totalEmployerCharges, color: '#7C3AED' },
                   ].map(item => (
-                    <div key={item.label} className="text-center p-2 rounded bg-muted/50">
-                      <p className="text-[10px] text-muted-foreground">{item.label}</p>
-                      <p className={`text-xs font-bold ${item.color}`}>{formatCurrency(item.value)}</p>
+                    <div key={item.label} className="text-center p-3 rounded-lg" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
+                      <p className="text-[11px] font-medium" style={{ color: '#6B7280' }}>{item.label}</p>
+                      <p className="text-[14px] font-bold" style={{ color: item.color }}>{formatCurrency(item.value)}</p>
                     </div>
                   ))}
                 </div>
@@ -2731,16 +2703,14 @@ export function PayrollIntegration() {
                               const colSpan = ['draft','reviewed'].includes(batch.status) ? 21 : 20
                               // Project header row
                               allRows.push(
-                                <TableRow key={`proj-${projKey}`} className="bg-muted/40 hover:bg-muted/40">
-                                  <TableCell colSpan={colSpan} className="py-2">
+                                <TableRow key={`proj-${projKey}`} style={{ background: '#F8FAFC', borderLeft: '3px solid #1A7A4A' }}>
+                                  <TableCell colSpan={colSpan} className="py-2.5">
                                     <div className="flex items-center gap-3">
-                                      <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                                      <Badge className="text-[10px] bg-slate-100 text-slate-800 border border-slate-300 font-mono">
-                                        {projCode}
-                                      </Badge>
-                                      <span className="text-xs font-bold">{projName}</span>
-                                      <span className="text-[10px] text-muted-foreground">
-                                        {groupLines.length} emp · Gross: {formatCurrency(groupGross)} · Net: {formatCurrency(groupNet)} · SC: {formatCurrency(groupSC)}
+                                      <Building2 className="h-3.5 w-3.5" style={{ color: '#1A7A4A' }} />
+                                      <span className="project-badge">{projCode}</span>
+                                      <span className="text-[13px] font-semibold" style={{ color: '#1a1a2e' }}>{projName}</span>
+                                      <span className="text-[12px]" style={{ color: '#6B7280' }}>
+                                        {groupLines.length} emp &bull; Gross: <span style={{ color: '#16A34A' }}>{formatCurrency(groupGross)}</span> &bull; Net: <span style={{ color: '#16A34A' }}>{formatCurrency(groupNet)}</span> &bull; SC: <span style={{ color: '#D97706' }}>{formatCurrency(groupSC)}</span>
                                       </span>
                                     </div>
                                   </TableCell>
@@ -2752,52 +2722,50 @@ export function PayrollIntegration() {
                                 const lineStatus = line.lineStatus || 'draft'
                                 allRows.push(
                                   <Fragment key={line.id}>
-                                    <TableRow className={`cursor-pointer hover:bg-muted/50 ${selectedLineIds.has(line.id) ? 'bg-primary/5' : ''}`} onClick={() => setExpandedLine(isLineExpanded ? null : line.id)}>
-                                      <TableCell className="py-1.5" onClick={(e) => e.stopPropagation()}>
+                                    <TableRow className={`cursor-pointer transition-colors ${selectedLineIds.has(line.id) ? 'row-selected' : ''}`} style={{ background: selectedLineIds.has(line.id) ? '#EFF6FF' : undefined }} onClick={() => setExpandedLine(isLineExpanded ? null : line.id)}>
+                                      <TableCell className="py-2" onClick={(e) => e.stopPropagation()}>
                                         <Checkbox
                                           checked={selectedLineIds.has(line.id)}
                                           onCheckedChange={() => toggleLineSelection(line.id)}
                                           className="h-4 w-4"
                                         />
                                       </TableCell>
-                                      <TableCell className="py-1.5">
-                                        {isLineExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+                                      <TableCell className="py-2">
+                                        {isLineExpanded ? <ChevronUp className="h-3 w-3" style={{ color: '#6B7280' }} /> : <ChevronDown className="h-3 w-3" style={{ color: '#6B7280' }} />}
                                       </TableCell>
-                                      <TableCell className="text-xs py-1.5 font-medium">{line.employeeName}</TableCell>
-                                      <TableCell className="py-1.5">
-                                        <Badge className={`text-[9px] border px-1.5 py-0 ${lineStatusStyles[lineStatus] || 'bg-muted text-muted-foreground'}`}>
+                                      <TableCell className="text-[13px] py-2 font-medium" style={{ color: '#1a1a2e' }}>{line.employeeName}</TableCell>
+                                      <TableCell className="py-2">
+                                        <span className={lineStatusStyles[lineStatus] || 'status-badge status-badge-draft'}>
                                           {lineStatus === 'reviewed' ? 'Reviewed' : lineStatus === 'approved' ? 'Approved' : 'Draft'}
-                                        </Badge>
+                                        </span>
                                       </TableCell>
-                                      <TableCell className="text-xs py-1.5 text-muted-foreground">{line.employeeCode || '-'}</TableCell>
-                                      <TableCell className="py-1.5">
-                                        <Badge variant="outline" className="text-[9px] h-5 px-1.5 font-mono">
-                                          {projCode}
-                                        </Badge>
+                                      <TableCell className="text-[13px] py-2 font-mono" style={{ color: '#6B7280' }}>{line.employeeCode || '-'}</TableCell>
+                                      <TableCell className="py-2">
+                                        <span className="project-badge">{projCode}</span>
                                       </TableCell>
-                                      <TableCell className="text-xs py-1.5 text-center">{line.workingDays}</TableCell>
-                                      <TableCell className="text-xs py-1.5 text-center">{line.eligibleDays}</TableCell>
-                                      <TableCell className="text-xs py-1.5 text-right">{formatNumber(line.basicSalary)}</TableCell>
-                                      <TableCell className="text-xs py-1.5 text-right">{line.allowances > 0 ? formatNumber(line.allowances) : '-'}</TableCell>
-                                      <TableCell className="text-xs py-1.5 text-right font-semibold">{formatNumber(line.grossSalary)}</TableCell>
-                                      <TableCell className="text-xs py-1.5 text-right text-red-600">{line.incomeTax > 0 ? formatNumber(line.incomeTax) : '-'}</TableCell>
-                                      <TableCell className="text-xs py-1.5 text-right text-red-600">{line.eobiEmployee > 0 ? formatNumber(line.eobiEmployee) : '-'}</TableCell>
-                                      <TableCell className="text-xs py-1.5 text-right">{line.eobiEmployer > 0 ? formatNumber(line.eobiEmployer) : '-'}</TableCell>
-                                      <TableCell className="text-xs py-1.5 text-right text-red-600">{line.pfEmployee > 0 ? formatNumber(line.pfEmployee) : '-'}</TableCell>
-                                      <TableCell className="text-xs py-1.5 text-right">{line.pfEmployer > 0 ? formatNumber(line.pfEmployer) : '-'}</TableCell>
-                                      <TableCell className="text-xs py-1.5 text-right text-red-600">{line.loanDeduction > 0 ? formatNumber(line.loanDeduction) : '-'}</TableCell>
-                                      <TableCell className="text-xs py-1.5 text-right font-bold text-green-600">{formatNumber(line.netPay)}</TableCell>
-                                      <TableCell className="text-xs py-1.5 text-right">{line.socialCharges > 0 ? formatNumber(line.socialCharges) : '-'}</TableCell>
+                                      <TableCell className="text-[13px] py-2 text-center">{line.workingDays}</TableCell>
+                                      <TableCell className="text-[13px] py-2 text-center">{line.eligibleDays}</TableCell>
+                                      <TableCell className="text-[13px] py-2 text-right font-mono">{formatNumber(line.basicSalary)}</TableCell>
+                                      <TableCell className="text-[13px] py-2 text-right font-mono">{line.allowances > 0 ? formatNumber(line.allowances) : <span style={{ color: '#D1D5DB' }}>—</span>}</TableCell>
+                                      <TableCell className="text-[13px] py-2 text-right font-mono font-semibold">{formatNumber(line.grossSalary)}</TableCell>
+                                      <TableCell className="text-[13px] py-2 text-right font-mono amount-tax">{line.incomeTax > 0 ? formatNumber(line.incomeTax) : <span style={{ color: '#D1D5DB' }}>—</span>}</TableCell>
+                                      <TableCell className="text-[13px] py-2 text-right font-mono" style={{ color: '#DC2626' }}>{line.eobiEmployee > 0 ? formatNumber(line.eobiEmployee) : <span style={{ color: '#D1D5DB' }}>—</span>}</TableCell>
+                                      <TableCell className="text-[13px] py-2 text-right font-mono">{line.eobiEmployer > 0 ? formatNumber(line.eobiEmployer) : <span style={{ color: '#D1D5DB' }}>—</span>}</TableCell>
+                                      <TableCell className="text-[13px] py-2 text-right font-mono" style={{ color: '#DC2626' }}>{line.pfEmployee > 0 ? formatNumber(line.pfEmployee) : <span style={{ color: '#D1D5DB' }}>—</span>}</TableCell>
+                                      <TableCell className="text-[13px] py-2 text-right font-mono">{line.pfEmployer > 0 ? formatNumber(line.pfEmployer) : <span style={{ color: '#D1D5DB' }}>—</span>}</TableCell>
+                                      <TableCell className="text-[13px] py-2 text-right font-mono" style={{ color: '#DC2626' }}>{line.loanDeduction > 0 ? formatNumber(line.loanDeduction) : <span style={{ color: '#D1D5DB' }}>—</span>}</TableCell>
+                                      <TableCell className="text-[13px] py-2 text-right font-mono amount-net">{formatNumber(line.netPay)}</TableCell>
+                                      <TableCell className="text-[13px] py-2 text-right font-mono amount-sc">{line.socialCharges > 0 ? formatNumber(line.socialCharges) : <span style={{ color: '#D1D5DB' }}>—</span>}</TableCell>
                                       {['draft','reviewed'].includes(batch.status) && (
-                                        <TableCell className="py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
+                                        <TableCell className="py-2 text-right" onClick={(e) => e.stopPropagation()}>
                                           <div className="flex justify-end gap-1">
-                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditLineDialog(batch, line)}>
-                                              <Pencil className="h-3 w-3 text-blue-600" />
-                                            </Button>
+                                            <button className="p-1 rounded hover:bg-gray-100 transition-colors" style={{ color: '#6B7280' }} onClick={() => openEditLineDialog(batch, line)}>
+                                              <Pencil className="h-3.5 w-3.5" />
+                                            </button>
                                             {batch.status === 'draft' && (
-                                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setSelectedLine(line); setDeleteLineDialogOpen(true) }}>
-                                                <Trash2 className="h-3 w-3 text-red-600" />
-                                              </Button>
+                                              <button className="p-1 rounded hover:bg-red-50 transition-colors" style={{ color: '#DC2626' }} onClick={() => { setSelectedLine(line); setDeleteLineDialogOpen(true) }}>
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                              </button>
                                             )}
                                           </div>
                                         </TableCell>
@@ -2986,9 +2954,9 @@ export function PayrollIntegration() {
                     <p className="text-[10px] text-muted-foreground">Click &ldquo;Run Payroll&rdquo; to auto-calculate or &ldquo;Add Line&rdquo; for manual entry.</p>
                   </div>
                 )}
-              </CardContent>
+              </div>
             )}
-          </Card>
+          </div>
 
           {/* Voucher Cards for Draft-to-GL and Posted batches */}
           {generatedVouchers.length > 0 && generatedVouchers.some(v => {

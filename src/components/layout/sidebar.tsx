@@ -42,6 +42,7 @@ import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 // ============================================================
@@ -50,7 +51,6 @@ import { cn } from '@/lib/utils'
 
 type UserRole = 'admin' | 'manager' | 'accountant' | 'auditor' | 'viewer'
 
-// Defines which modules each role can access
 const ROLE_MODULES: Record<UserRole, ModuleKey[]> = {
   admin: [
     'dashboard', 'chart-of-accounts', 'vouchers', 'ledgers', 'bank-reconciliation',
@@ -227,19 +227,20 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'border-r bg-card transition-all duration-300 flex flex-col h-full overflow-hidden',
-        sidebarOpen ? 'w-64' : 'w-16'
+        'border-r bg-white transition-all duration-300 flex flex-col h-full overflow-hidden',
+        sidebarOpen ? 'w-[220px]' : 'w-16'
       )}
+      style={{ borderColor: '#E5E7EB' }}
     >
       {/* Logo */}
-      <div className="flex items-center gap-2 px-4 py-4 border-b shrink-0">
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-primary-foreground font-bold text-sm shrink-0">
+      <div className="flex items-center gap-2.5 px-4 py-4 border-b shrink-0" style={{ borderColor: '#E5E7EB' }}>
+        <div className="flex items-center justify-center w-8 h-8 rounded-lg text-white font-bold text-sm shrink-0" style={{ background: '#1A7A4A' }}>
           AF
         </div>
         {sidebarOpen && (
           <div className="overflow-hidden">
-            <h1 className="text-sm font-bold truncate">AcctFin ERP</h1>
-            <p className="text-[10px] text-muted-foreground truncate">Accounting & Finance</p>
+            <h1 className="text-sm font-bold truncate" style={{ color: '#1a1a2e' }}>AcctFin ERP</h1>
+            <p className="text-[10px] text-gray-400 truncate">Accounting & Finance</p>
           </div>
         )}
       </div>
@@ -248,10 +249,10 @@ export function Sidebar() {
       {sidebarOpen && (
         <div className="px-3 py-2">
           <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
             <Input
               placeholder="Search modules..."
-              className="pl-7 h-8 text-xs"
+              className="pl-8 h-8 text-xs bg-gray-50 border-gray-200 focus:border-[#1A7A4A] focus:ring-[#1A7A4A]/20"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
@@ -260,14 +261,14 @@ export function Sidebar() {
       )}
 
       {/* Navigation */}
-      <ScrollArea className="flex-1 min-h-0 px-2 py-1">
-        <div className="space-y-1">
+      <ScrollArea className="flex-1 min-h-0 px-2 py-1 custom-scrollbar">
+        <div className="space-y-0.5">
           {filteredNav.map(group => (
             <div key={group.label} className="mb-1">
               {sidebarOpen && (
                 <button
                   onClick={() => toggleGroup(group.label)}
-                  className="flex items-center justify-between w-full px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                  className="flex items-center justify-between w-full px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   {group.label}
                   {expandedGroups[group.label] ? (
@@ -282,26 +283,46 @@ export function Sidebar() {
                   {group.items.map(item => {
                     const Icon = item.icon
                     const isActive = activeModule === item.key
-                    return (
+                    return sidebarOpen ? (
                       <button
                         key={item.key}
                         onClick={() => setActiveModule(item.key)}
                         className={cn(
-                          'flex items-center gap-2.5 w-full rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+                          'flex items-center gap-2.5 w-full rounded-md px-2.5 py-2 text-[13px] font-medium transition-all duration-150',
                           isActive
-                            ? 'bg-primary text-primary-foreground'
-                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                            ? 'bg-[#F0FDF4] text-[#1A7A4A] border-l-[3px] border-[#1A7A4A]'
+                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 border-l-[3px] border-transparent'
                         )}
-                        title={!sidebarOpen ? item.label : undefined}
                       >
                         <Icon className="h-4 w-4 shrink-0" />
-                        {sidebarOpen && <span className="truncate">{item.label}</span>}
+                        <span className="truncate">{item.label}</span>
                       </button>
+                    ) : (
+                      <TooltipProvider key={item.key} delayDuration={0}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={() => setActiveModule(item.key)}
+                              className={cn(
+                                'flex items-center justify-center w-full rounded-md p-2.5 transition-all duration-150',
+                                isActive
+                                  ? 'bg-[#F0FDF4] text-[#1A7A4A]'
+                                  : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'
+                              )}
+                            >
+                              <Icon className="h-4 w-4 shrink-0" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="text-xs">
+                            {item.label}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )
                   })}
                 </div>
               )}
-              {sidebarOpen && group.label !== 'System' && <Separator className="my-2" />}
+              {sidebarOpen && group.label !== 'System' && <Separator className="my-1.5 bg-gray-100" />}
             </div>
           ))}
         </div>
@@ -309,16 +330,16 @@ export function Sidebar() {
 
       {/* Role Badge + Version */}
       {sidebarOpen && (
-        <div className="px-3 py-2 border-t shrink-0">
-          <div className="flex items-center gap-2 mb-1">
+        <div className="px-3 py-2.5 border-t shrink-0" style={{ borderColor: '#E5E7EB' }}>
+          <div className="flex items-center gap-2 mb-1.5">
             <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${roleBadgeColor[role] || 'bg-slate-100 text-slate-500'}`}>
               {role.charAt(0).toUpperCase() + role.slice(1)}
             </span>
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-[10px] text-gray-400">
               {filteredNav.reduce((sum, g) => sum + g.items.length, 0)} modules
             </span>
           </div>
-          <p className="text-[10px] text-muted-foreground">v1.0.0 • Multi-Project • Multi-Donor</p>
+          <p className="text-[10px] text-gray-400">v1.0.0 &bull; Multi-Project &bull; Multi-Donor</p>
         </div>
       )}
     </aside>
