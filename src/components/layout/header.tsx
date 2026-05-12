@@ -186,6 +186,7 @@ export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
 
   // Change Password Dialog state
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -411,7 +412,7 @@ export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
         )}
 
         {/* User Profile Popover */}
-        <Popover>
+        <Popover open={profileOpen} onOpenChange={setProfileOpen}>
           <PopoverTrigger asChild>
             <button className="flex items-center gap-2.5 pl-3 border-l border-gray-200 cursor-pointer hover:bg-gray-50 rounded-md px-2 py-1.5 transition-colors ml-1">
               <div className="h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-bold" style={{ background: '#1A7A4A', color: '#FFFFFF' }}>
@@ -441,21 +442,21 @@ export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
             <div className="p-1">
               <button
                 className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md hover:bg-gray-50 transition-colors text-gray-600"
-                onClick={() => setChangePasswordOpen(true)}
+                onClick={() => { setProfileOpen(false); setChangePasswordOpen(true) }}
               >
                 <Lock className="h-3.5 w-3.5" />
                 Change Password
               </button>
               <button
                 className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md hover:bg-gray-50 transition-colors text-gray-600"
-                onClick={() => setActiveModule('settings')}
+                onClick={() => { setProfileOpen(false); setActiveModule('settings') }}
               >
                 <Settings className="h-3.5 w-3.5" />
                 System Settings
               </button>
               <button
                 className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md hover:bg-red-50 hover:text-red-600 transition-colors text-gray-600"
-                onClick={onLogout}
+                onClick={() => { setProfileOpen(false); onLogout?.() }}
               >
                 <LogOut className="h-3.5 w-3.5" />
                 Sign Out

@@ -224,7 +224,7 @@ export function AuditTrail() {
       log.module || '',
       log.entity,
       log.entityName || '',
-      log.details || '',
+      typeof log.details === 'object' ? JSON.stringify(log.details) : (log.details || ''),
       log.ipAddress || '',
       log.severity,
     ])
@@ -495,7 +495,13 @@ export function AuditTrail() {
                         {log.entityName || log.entityId?.slice(0, 8) || '-'}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-[250px] truncate">
-                        {log.details ? (parseJsonSafe(log.details)?.summary || log.details.slice(0, 60)) : '-'}
+                        {log.details ? (() => {
+                          const parsed = typeof log.details === 'string' ? parseJsonSafe(log.details) : log.details
+                          if (parsed && typeof parsed === 'object' && parsed.summary) return parsed.summary
+                          if (typeof parsed === 'string') return parsed.slice(0, 60)
+                          const str = JSON.stringify(parsed)
+                          return str.length > 60 ? str.slice(0, 60) + '…' : str
+                        })() : '-'}
                       </TableCell>
                       <TableCell className="text-xs font-mono">{log.ipAddress || '-'}</TableCell>
                       <TableCell>
@@ -524,7 +530,7 @@ export function AuditTrail() {
                               <div>
                                 <p className="text-[10px] font-medium text-muted-foreground mb-1">Details</p>
                                 <pre className="text-xs bg-muted/50 p-2 rounded border max-h-32 overflow-auto">
-                                  {(() => { const parsed = parseJsonSafe(log.details); return typeof parsed === 'object' ? JSON.stringify(parsed, null, 2) : String(parsed) })()}
+                                  {(() => { const parsed = typeof log.details === 'string' ? parseJsonSafe(log.details) : log.details; return typeof parsed === 'object' ? JSON.stringify(parsed, null, 2) : String(parsed) })()}
                                 </pre>
                               </div>
                             )}
