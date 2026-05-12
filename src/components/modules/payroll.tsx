@@ -39,12 +39,14 @@ const statusStyles: Record<string, string> = {
   approved: 'status-badge status-badge-approved',
   posted: 'status-badge status-badge-posted',
   'draft-to-gl': 'status-badge status-badge-posted',
+  'voucher-created': 'status-badge status-badge-posted',
 }
 
 const lineStatusStyles: Record<string, string> = {
   draft: 'status-badge status-badge-draft',
   reviewed: 'status-badge status-badge-reviewed',
   approved: 'status-badge status-badge-approved',
+  'voucher-created': 'status-badge status-badge-posted',
 }
 
 const statusLabels: Record<string, string> = {
@@ -53,10 +55,11 @@ const statusLabels: Record<string, string> = {
   approved: 'Approved',
   posted: 'Posted to GL',
   'draft-to-gl': 'Draft to GL',
+  'voucher-created': 'Voucher Created',
 }
 
 // Workflow steps — enhanced with action labels
-const workflowSteps = ['draft', 'reviewed', 'approved', 'draft-to-gl', 'posted']
+const workflowSteps = ['draft', 'reviewed', 'approved', 'voucher-created', 'posted']
 const workflowStepActions: Record<string, { label: string; action: string; icon: any }[]> = {
   draft: [{ label: 'Review', action: 'review-line', icon: Eye }],
   reviewed: [
@@ -64,6 +67,7 @@ const workflowStepActions: Record<string, { label: string; action: string; icon:
     { label: 'Send Back', action: 'send-back', icon: ArrowRight },
   ],
   approved: [{ label: 'Create Salary Voucher', action: 'create-salary-voucher', icon: FileText }],
+  'voucher-created': [{ label: 'Post to GL', action: 'post-to-gl', icon: BookOpen }],
   'draft-to-gl': [{ label: 'Post to GL', action: 'post-to-gl', icon: BookOpen }],
   posted: [],
 }
@@ -500,6 +504,18 @@ export function PayrollIntegration() {
       }
     }
     if (postedCount > 0) {
+      // Update batch status to 'posted' and mark isPayrollPosted
+      if (selectedBatch) {
+        try {
+          await fetch('/api/payroll', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'mark-posted', batchId: selectedBatch.id }),
+          })
+        } catch {
+          // ignore
+        }
+      }
       toast({ title: 'Posted to GL', description: `${postedCount} voucher(s) posted to General Ledger` })
       fetchData()
     }
@@ -2293,8 +2309,8 @@ export function PayrollIntegration() {
                     </button>
                   </>
                 )}
-                {/* STEP 4: Draft-to-GL — Post to GL */}
-                {batch.status === 'draft-to-gl' && (
+                {/* STEP 4: Voucher Created — Post to GL */}
+                {(batch.status === 'draft-to-gl' || batch.status === 'voucher-created') && (
                   <>
                     <button className="btn-primary text-xs h-7" onClick={handlePostAllVouchersToGL}
                       disabled={generatedVouchers.length > 0 && generatedVouchers.every(v => v.status !== 'draft')}>
@@ -2355,7 +2371,7 @@ export function PayrollIntegration() {
                   // Helper to determine project workflow step
                   const getProjectStep = (group: ProjectPayGroup) => {
                     if (batch.status === 'posted') return 5
-                    if (batch.status === 'draft-to-gl') return 4
+                    if (batch.status === 'draft-to-gl' || batch.status === 'voucher-created') return 4
                     if (batch.status === 'approved') return 3
                     if (group.allLinesApproved) return 3
                     if (group.anyLinesApproved) return 2
@@ -2547,7 +2563,7 @@ export function PayrollIntegration() {
                           {batch.status === 'draft' ? 'Step 1 — Select & Review' :
                            batch.status === 'reviewed' ? 'Step 2 — Approve' :
                            batch.status === 'approved' ? 'Step 3 — Create Voucher' :
-                           batch.status === 'draft-to-gl' ? 'Step 4 — Post to GL' :
+                           batch.status === 'draft-to-gl' || batch.status === 'voucher-created' ? 'Step 4 — Post to GL' :
                            'Step 5 — Complete'}
                         </span>
                         <Badge className={`text-[9px] border ${statusStyles[batch.status] || ''}`}>
@@ -2558,16 +2574,16 @@ export function PayrollIntegration() {
                       <div className="flex items-center gap-1 mb-3 flex-wrap">
                         {[
                           { step: 1, label: 'Select', icon: Users, color: batch.status === 'draft' ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-emerald-100 text-emerald-800 border-emerald-300' },
-                          { step: 2, label: 'Review', icon: Eye, color: batch.status === 'reviewed' ? 'bg-sky-100 text-sky-800 border-sky-300' : ['approved','draft-to-gl','posted'].includes(batch.status) ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-muted text-muted-foreground border-muted' },
-                          { step: 3, label: 'Approve', icon: Shield, color: batch.status === 'approved' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : ['draft-to-gl','posted'].includes(batch.status) ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-muted text-muted-foreground border-muted' },
-                          { step: 4, label: 'Create Voucher', icon: FileText, color: batch.status === 'draft-to-gl' ? 'bg-violet-100 text-violet-800 border-violet-300' : batch.status === 'posted' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-muted text-muted-foreground border-muted' },
+                          { step: 2, label: 'Review', icon: Eye, color: batch.status === 'reviewed' ? 'bg-sky-100 text-sky-800 border-sky-300' : ['approved','draft-to-gl','voucher-created','posted'].includes(batch.status) ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-muted text-muted-foreground border-muted' },
+                          { step: 3, label: 'Approve', icon: Shield, color: batch.status === 'approved' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : ['draft-to-gl','voucher-created','posted'].includes(batch.status) ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-muted text-muted-foreground border-muted' },
+                          { step: 4, label: 'Create Voucher', icon: FileText, color: ['draft-to-gl','voucher-created'].includes(batch.status) ? 'bg-violet-100 text-violet-800 border-violet-300' : batch.status === 'posted' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-muted text-muted-foreground border-muted' },
                           { step: 5, label: 'Post to GL', icon: BookOpen, color: batch.status === 'posted' ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-muted text-muted-foreground border-muted' },
                         ].map((s, idx) => {
                           const StepIcon = s.icon
                           const isCurrentStep = (batch.status === 'draft' && s.step === 1) ||
                             (batch.status === 'reviewed' && s.step === 2) ||
                             (batch.status === 'approved' && s.step === 3) ||
-                            (batch.status === 'draft-to-gl' && s.step === 4) ||
+                            (['draft-to-gl','voucher-created'].includes(batch.status) && s.step === 4) ||
                             (batch.status === 'posted' && s.step === 5)
                           return (
                             <Fragment key={s.step}>
@@ -3198,7 +3214,7 @@ export function PayrollIntegration() {
             </Card>
           )}
           {/* Also show the old JournalVoucherCard for backward compat */}
-          {batch.status === 'draft-to-gl' && generatedVouchers.length === 0 && (
+          {(batch.status === 'draft-to-gl' || batch.status === 'voucher-created') && generatedVouchers.length === 0 && (
             <JournalVoucherCard key={`jv-${batch.id}`} batch={batch} draftVoucher={draftVoucher} setDraftVoucher={setDraftVoucher} />
           )}
         </Fragment>
@@ -3206,7 +3222,7 @@ export function PayrollIntegration() {
       })}
 
       {/* Legacy Generated GL Voucher Cards - shown when no batch context (e.g., after page refresh with vouchers in state) */}
-      {generatedVouchers.length > 0 && !batches.some(b => b.status === 'draft-to-gl' || b.status === 'posted') && (
+      {generatedVouchers.length > 0 && !batches.some(b => ['draft-to-gl','voucher-created','posted'].includes(b.status)) && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold flex items-center gap-2">

@@ -504,7 +504,6 @@ async function generateSalaryVouchers(
       const existingVoucher = await db.voucher.findFirst({
         where: {
           voucherNumber: { startsWith: voucherPrefix },
-          isPayrollPosted: true,
           projectId: alloc.projectId,
         },
         select: { id: true, voucherNumber: true, narration: true },
@@ -648,7 +647,7 @@ async function generateSalaryVouchers(
           status: 'draft',
           financialYearId,
           projectId: alloc.projectId,
-          isPayrollPosted: true,
+          isPayrollPosted: false,
           totalDebit,
           totalCredit,
           createdBy: 'system',
@@ -909,7 +908,7 @@ export async function POST(request: NextRequest) {
           narration: `Social Charges posting for ${employee.name} (${employee.employeeCode}) - ${month}`,
           status: 'draft',
           financialYearId,
-          isPayrollPosted: true,
+          isPayrollPosted: false,
           totalDebit: amount,
           totalCredit: amount,
           createdBy: 'system',
@@ -972,25 +971,23 @@ export async function POST(request: NextRequest) {
       projectFilter
     )
 
-    // ── Mark batch as processed (project-wise mode) ──
+    // ── Mark batch as voucher created (not posted — voucher is draft) ──
     if (batchId && vouchers.length > 0) {
       await db.payrollBatch.update({
         where: { id: batchId },
         data: {
-          postedToGL: true,
-          status: 'draft-to-gl',
-          postedBy: 'system',
+          status: 'voucher-created',
         },
       })
 
-      // Mark processed lines
+      // Mark processed lines as voucher-created (not posted to GL yet)
       const lineIds = employees.map(e => e.employeeId)
       await db.payrollBatchLine.updateMany({
         where: {
           batchId,
           employeeId: { in: lineIds },
         },
-        data: { lineStatus: 'draft-to-gl' },
+        data: { lineStatus: 'voucher-created' },
       })
     }
 

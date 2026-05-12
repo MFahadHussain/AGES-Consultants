@@ -28,7 +28,7 @@ function getPeriodDates(period: string): { startDate: Date; endDate: Date } {
 // When batch status is "approved" or "posted", only include lines with lineStatus = "approved"
 async function recalcBatchTotals(batchId: string) {
   const batch = await db.payrollBatch.findUnique({ where: { id: batchId } })
-  const filterApproved = batch && (batch.status === 'approved' || batch.status === 'posted')
+  const filterApproved = batch && (batch.status === 'approved' || batch.status === 'posted' || batch.status === 'voucher-created')
   const lines = await db.payrollBatchLine.findMany({
     where: { batchId, ...(filterApproved ? { lineStatus: 'approved' } : {}) },
   })
@@ -956,7 +956,50 @@ export async function POST(request: Request) {
     }
 
     // ----------------------------------------------------------
-    // 11. RECALCULATE — Re-run payroll calculation for all lines
+    // 11. MARK POSTED — Mark batch as posted to GL after vouchers are posted
+    // ----------------------------------------------------------
+    if (action === 'mark-posted') {
+      const { batchId } = data
+      if (!batchId) return NextResponse.json({ error: 'Batch ID required' }, { status: 400 })
+
+      const batch = await db.payrollBatch.findUnique({
+        where: { id: batchId },
+      })
+      if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
+
+      // Update batch status to posted
+      await db.payrollBatch.update({
+        where: { id: batchId },
+        data: {
+          status: 'posted',
+          postedToGL: true,
+          postedBy: 'system',
+        },
+      })
+
+      // Update all lines to posted status
+      await db.payrollBatchLine.updateMany({
+        where: { batchId },
+        data: { lineStatus: 'posted' },
+      })
+
+      // Mark all related vouchers as isPayrollPosted
+      const vouchers = await db.voucher.findMany({
+        where: { narration: { contains: batch.period }, isPayrollPosted: false, status: 'posted' },
+        select: { id: true },
+      })
+      if (vouchers.length > 0) {
+        await db.voucher.updateMany({
+          where: { id: { in: vouchers.map(v => v.id) } },
+          data: { isPayrollPosted: true },
+        })
+      }
+
+      return NextResponse.json({ message: 'Batch marked as posted to GL', batchId })
+    }
+
+    // ----------------------------------------------------------
+    // 12. RECALCULATE — Re-run payroll calculation for all lines
     //     Useful when tax slabs change or YTD data updates
     // ----------------------------------------------------------
     if (action === 'recalculate') {
