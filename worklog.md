@@ -65,3 +65,28 @@ Stage Summary:
 - Change Password dialog now works properly (popover/dialog conflict resolved)
 - RBAC module verified working - APIs returning correct data
 - All lint checks pass (0 errors)
+
+---
+Task ID: fix-password-audit-rbac
+Agent: Main Agent
+Task: Fix three bugs - change password failure, audit trail fragment key, RBAC access issues
+
+Work Log:
+- Diagnosed change password failure: `passwordHistory.findMany` used `orderBy: { createdAt: 'desc' }` but PasswordHistory model has `changedAt` not `createdAt` - Prisma threw error causing generic "Failed to change password"
+- Fixed change-password/route.ts: Changed `createdAt` to `changedAt` in orderBy clause
+- Verified password change works via curl test (both wrong password → error, correct password → success)
+- Fixed audit-trail.tsx: Changed `<>` Fragment shorthand to `<React.Fragment key={log.id}>` in map() to fix React key prop warning
+- Added `React` import to audit-trail.tsx
+- Investigated RBAC issue: Settings page RBAC tab was static/read-only with hardcoded constants, no link to actual RBAC module
+- Added useAppStore import and `setActiveModule` to SettingsModule component
+- Added prominent "Open RBAC Module" card/button in Settings RBAC tab linking to dedicated RBAC module
+- Added auto-seed logic to RBACModule: when no roles/permissions exist, automatically calls /api/rbac/seed
+- Added "Seed Defaults" button to RBAC module header for manual re-seeding
+- Added `handleSeed` callback and `seeding` state to RBACModule
+- All lint checks pass (0 errors)
+
+Stage Summary:
+- Change Password API fixed - `changedAt` field name correction resolved the 500 error
+- Audit Trail Fragment key issue fixed - proper React.Fragment with key
+- RBAC accessibility improved - Settings page now links to dedicated RBAC module with prominent CTA
+- RBAC auto-seeds default data when tables are empty

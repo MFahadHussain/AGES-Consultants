@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
+import { useAppStore } from '@/lib/store'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -122,6 +123,7 @@ const MODULE_PERMISSIONS = [
 // ============================================================
 
 export function SettingsModule() {
+  const { setActiveModule } = useAppStore()
   const [activeTab, setActiveTab] = useState('general')
   const [settingsMap, setSettingsMap] = useState<SettingsMap>({})
   const [users, setUsers] = useState<UserRecord[]>([])
@@ -815,6 +817,27 @@ export function SettingsModule() {
 
   const renderRolesPermissions = () => (
     <div className="space-y-4">
+      {/* Link to dedicated RBAC module */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Shield className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Role-Based Access Control</p>
+                <p className="text-xs text-muted-foreground">Create, edit, and manage roles, permissions, and user assignments in the dedicated RBAC module</p>
+              </div>
+            </div>
+            <Button size="sm" onClick={() => setActiveModule('rbac')} className="shrink-0">
+              <Shield className="h-3.5 w-3.5 mr-1.5" />
+              Open RBAC Module
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Role Cards */}
       <Card>
         <CardHeader className="pb-3">
@@ -822,7 +845,7 @@ export function SettingsModule() {
             <Shield className="h-4 w-4 text-primary" />
             Role Definitions
           </CardTitle>
-          <CardDescription className="text-xs">Click on a role to expand and view its permissions</CardDescription>
+          <CardDescription className="text-xs">Click on a role to expand and view its permissions. To modify roles, use the RBAC Module above.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
           {ROLES.map(r => {

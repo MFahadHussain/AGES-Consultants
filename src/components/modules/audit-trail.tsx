@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -467,9 +467,8 @@ export function AuditTrail() {
                     </TableCell>
                   </TableRow>
                 ) : data.data.map(log => (
-                  <>
+                  <React.Fragment key={log.id}>
                     <TableRow
-                      key={log.id}
                       className={`cursor-pointer hover:bg-muted/50 transition-colors ${log.severity === 'critical' ? 'bg-red-50/50' : ''}`}
                       onClick={() => setExpandedRow(expandedRow === log.id ? null : log.id)}
                     >
@@ -546,7 +545,7 @@ export function AuditTrail() {
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </TableBody>
             </Table>

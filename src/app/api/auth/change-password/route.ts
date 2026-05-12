@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
     // Check password history (prevent reuse of last 5 passwords)
     const passwordHistory = await db.passwordHistory.findMany({
       where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { changedAt: 'desc' },
       take: 5,
       select: { passwordHash: true },
     })

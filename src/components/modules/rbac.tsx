@@ -184,6 +184,7 @@ export function RBACModule() {
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState('roles')
   const [loading, setLoading] = useState(true)
+  const [seeding, setSeeding] = useState(false)
   const [roles, setRoles] = useState<RoleRecord[]>([])
   const [permissions, setPermissions] = useState<PermissionRecord[]>([])
   const [users, setUsers] = useState<UserRecord[]>([])
@@ -200,6 +201,36 @@ export function RBACModule() {
     }).length,
   }), [roles, permissions, users])
 
+  const handleSeed = useCallback(async () => {
+    setSeeding(true)
+    try {
+      const res = await fetch('/api/rbac/seed', { method: 'POST' })
+      const data = await res.json()
+      if (res.ok && data.success !== false) {
+        toast({ title: 'Data Seeded', description: data.message || 'RBAC data seeded successfully' })
+        // Re-fetch data
+        const [rolesRes, permsRes] = await Promise.all([
+          fetch('/api/roles'),
+          fetch('/api/permissions'),
+        ])
+        if (rolesRes.ok) {
+          const rd = await rolesRes.json()
+          setRoles(unwrap<RoleRecord>(rd))
+        }
+        if (permsRes.ok) {
+          const pd = await permsRes.json()
+          setPermissions(unwrap<PermissionRecord>(pd))
+        }
+      } else {
+        toast({ title: 'Error', description: data.error || 'Failed to seed', variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to seed data', variant: 'destructive' })
+    } finally {
+      setSeeding(false)
+    }
+  }, [toast])
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
@@ -208,24 +239,46 @@ export function RBACModule() {
         fetch('/api/permissions'),
         fetch('/api/users'),
       ])
+      let rolesData: RoleRecord[] = []
+      let permsData: PermissionRecord[] = []
       if (rolesRes.ok) {
         const rd = await rolesRes.json()
-        setRoles(unwrap<RoleRecord>(rd))
+        rolesData = unwrap<RoleRecord>(rd)
+        setRoles(rolesData)
       }
       if (permsRes.ok) {
         const pd = await permsRes.json()
-        setPermissions(unwrap<PermissionRecord>(pd))
+        permsData = unwrap<PermissionRecord>(pd)
+        setPermissions(permsData)
       }
       if (usersRes.ok) {
         const ud = await usersRes.json()
         setUsers(unwrap<UserRecord>(ud))
+      }
+      // Auto-seed if no roles and permissions exist
+      if (rolesData.length === 0 && permsData.length === 0) {
+        setSeeding(true)
+        try {
+          const seedRes = await fetch('/api/rbac/seed', { method: 'POST' })
+          if (seedRes.ok) {
+            const seedData = await seedRes.json()
+            if (seedData.success !== false) {
+              toast({ title: 'RBAC Initialized', description: seedData.message || 'Default roles and permissions have been created' })
+              // Re-fetch after seeding
+              const [r2, p2] = await Promise.all([fetch('/api/roles'), fetch('/api/permissions')])
+              if (r2.ok) { const rd2 = await r2.json(); setRoles(unwrap<RoleRecord>(rd2)) }
+              if (p2.ok) { const pd2 = await p2.json(); setPermissions(unwrap<PermissionRecord>(pd2)) }
+            }
+          }
+        } catch { /* ignore auto-seed failure */ }
+        finally { setSeeding(false) }
       }
     } catch (err) {
       console.error('Error fetching RBAC data:', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [toast])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -251,10 +304,16 @@ export function RBACModule() {
           </h1>
           <p className="text-sm text-muted-foreground mt-1">Manage roles, permissions, and access policies</p>
         </div>
-        <Button onClick={fetchData} variant="outline" size="sm" className="h-9 text-sm">
-          <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={handleSeed} variant="outline" size="sm" className="h-9 text-sm" disabled={seeding}>
+            {seeding ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Database className="h-3.5 w-3.5 mr-1.5" />}
+            {seeding ? 'Seeding...' : 'Seed Defaults'}
+          </Button>
+          <Button onClick={fetchData} variant="outline" size="sm" className="h-9 text-sm">
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards */}
