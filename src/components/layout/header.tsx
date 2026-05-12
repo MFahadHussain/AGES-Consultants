@@ -1,9 +1,11 @@
 'use client'
 
 import { useAppStore, type ModuleKey } from '@/lib/store'
-import { Menu, Bell, Moon, Sun, User, Search, LogOut, Settings } from 'lucide-react'
+import { Menu, Bell, Moon, Sun, User, Search, LogOut, Settings, Lock, Eye, EyeOff, CheckCircle, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useTheme } from 'next-themes'
 import { useEffect, useState, useCallback } from 'react'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -20,6 +22,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { useToast } from '@/hooks/use-toast'
 
 const moduleLabels: Record<ModuleKey, string> = {
   dashboard: 'Dashboard',
@@ -110,12 +121,78 @@ interface HeaderProps {
   onLogout?: () => void
 }
 
+// ============================================================
+// Password Strength Indicator Component (defined outside to avoid re-render issues)
+// ============================================================
+
+function PasswordStrengthBar({ password }: { password: string }) {
+  const getStrength = (pwd: string) => {
+    let score = 0
+    if (pwd.length >= 8) score++
+    if (pwd.length >= 12) score++
+    if (/[A-Z]/.test(pwd)) score++
+    if (/[a-z]/.test(pwd)) score++
+    if (/[0-9]/.test(pwd)) score++
+    if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd)) score++
+    return Math.min(score, 5)
+  }
+
+  const strength = getStrength(password)
+  const labels = ['', 'Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong']
+  const colors = ['', 'bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-400', 'bg-green-600']
+  const textColors = ['', 'text-red-500', 'text-orange-500', 'text-yellow-600', 'text-green-500', 'text-green-600']
+
+  if (!password) return null
+
+  return (
+    <div className="space-y-1.5 mt-1">
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map(level => (
+          <div
+            key={level}
+            className={`h-1 flex-1 rounded-full transition-colors ${level <= strength ? colors[strength] : 'bg-gray-200'}`}
+          />
+        ))}
+      </div>
+      <p className={`text-[10px] font-medium ${textColors[strength]}`}>{labels[strength]}</p>
+    </div>
+  )
+}
+
+// ============================================================
+// Password Requirement Check Component
+// ============================================================
+
+function PasswordCheck({ label, met }: { label: string; met: boolean }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {met ? (
+        <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />
+      ) : (
+        <div className="h-3 w-3 rounded-full border border-gray-300 shrink-0" />
+      )}
+      <span className={`text-[10px] ${met ? 'text-green-600' : 'text-muted-foreground'}`}>{label}</span>
+    </div>
+  )
+}
+
 export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
   const { activeModule, setSidebarOpen, sidebarOpen, setActiveModule } = useAppStore()
   const { theme, setTheme } = useTheme()
+  const { toast } = useToast()
   const [mounted, setMounted] = useState(false)
   const [notifications, setNotifications] = useState<{ count: number; items: { id: string; text: string; type: string; module: ModuleKey }[] }>({ count: 0, items: [] })
   const isMobile = useIsMobile()
+
+  // Change Password Dialog state
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  })
+  const [showPasswords, setShowPasswords] = useState({ current: false, new: false, confirm: false })
+  const [changingPassword, setChangingPassword] = useState(false)
 
   useEffect(() => { queueMicrotask(() => setMounted(true)) }, [])
 
@@ -151,6 +228,78 @@ export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
     const interval = setInterval(fetchNotifications, 30000)
     return () => clearInterval(interval)
   }, [fetchNotifications])
+
+  // Password change handler
+  const handleChangePassword = async () => {
+    if (!authUser?.id) {
+      toast({ title: 'Error', description: 'You must be logged in to change your password', variant: 'destructive' })
+      return
+    }
+
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      toast({ title: 'Validation Error', description: 'All fields are required', variant: 'destructive' })
+      return
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast({ title: 'Validation Error', description: 'New password and confirmation do not match', variant: 'destructive' })
+      return
+    }
+
+    if (passwordForm.newPassword.length < 8) {
+      toast({ title: 'Validation Error', description: 'Password must be at least 8 characters', variant: 'destructive' })
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: authUser.id,
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+          confirmPassword: passwordForm.confirmPassword,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok && data.success) {
+        toast({
+          title: 'Password Changed',
+          description: 'Your password has been updated successfully. Please use the new password next time you sign in.',
+        })
+        setChangePasswordOpen(false)
+        setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+        setShowPasswords({ current: false, new: false, confirm: false })
+      } else {
+        toast({
+          title: 'Password Change Failed',
+          description: data.error || 'Failed to change password',
+          variant: 'destructive',
+        })
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to change password. Please try again.', variant: 'destructive' })
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
+  // Password requirement checks
+  const newPassword = passwordForm.newPassword
+  const passwordChecks = {
+    minLength: newPassword.length >= 8,
+    uppercase: /[A-Z]/.test(newPassword),
+    lowercase: /[a-z]/.test(newPassword),
+    number: /[0-9]/.test(newPassword),
+    special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword),
+    match: passwordForm.confirmPassword.length > 0 && newPassword === passwordForm.confirmPassword,
+  }
+
+  const allChecksMet = Object.values(passwordChecks).every(v => v)
 
   return (
     <header className="bg-white px-5 py-2.5 flex items-center justify-between shrink-0 border-b" style={{ borderColor: '#E5E7EB', height: '56px' }}>
@@ -292,6 +441,13 @@ export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
             <div className="p-1">
               <button
                 className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md hover:bg-gray-50 transition-colors text-gray-600"
+                onClick={() => setChangePasswordOpen(true)}
+              >
+                <Lock className="h-3.5 w-3.5" />
+                Change Password
+              </button>
+              <button
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md hover:bg-gray-50 transition-colors text-gray-600"
                 onClick={() => setActiveModule('settings')}
               >
                 <Settings className="h-3.5 w-3.5" />
@@ -308,6 +464,142 @@ export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
           </PopoverContent>
         </Popover>
       </div>
+
+      {/* Change Password Dialog */}
+      <Dialog open={changePasswordOpen} onOpenChange={(open) => {
+        if (!open) {
+          setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+          setShowPasswords({ current: false, new: false, confirm: false })
+        }
+        setChangePasswordOpen(open)
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-sm flex items-center gap-2">
+              <Lock className="h-4 w-4 text-primary" />
+              Change Password
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Update your account password. After changing, you will need to use the new password on your next sign in.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Current Password */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Current Password</Label>
+              <div className="relative">
+                <Input
+                  type={showPasswords.current ? 'text' : 'password'}
+                  className="h-9 text-sm pr-10"
+                  placeholder="Enter current password"
+                  value={passwordForm.currentPassword}
+                  onChange={e => setPasswordForm(p => ({ ...p, currentPassword: e.target.value }))}
+                />
+                <button
+                  type="button"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowPasswords(s => ({ ...s, current: !s.current }))}
+                >
+                  {showPasswords.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* New Password */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">New Password</Label>
+              <div className="relative">
+                <Input
+                  type={showPasswords.new ? 'text' : 'password'}
+                  className="h-9 text-sm pr-10"
+                  placeholder="Enter new password"
+                  value={passwordForm.newPassword}
+                  onChange={e => setPasswordForm(p => ({ ...p, newPassword: e.target.value }))}
+                />
+                <button
+                  type="button"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowPasswords(s => ({ ...s, new: !s.new }))}
+                >
+                  {showPasswords.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <PasswordStrengthBar password={passwordForm.newPassword} />
+              {/* Password requirements */}
+              {passwordForm.newPassword.length > 0 && (
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
+                  <PasswordCheck label="At least 8 characters" met={passwordChecks.minLength} />
+                  <PasswordCheck label="One uppercase letter" met={passwordChecks.uppercase} />
+                  <PasswordCheck label="One lowercase letter" met={passwordChecks.lowercase} />
+                  <PasswordCheck label="One number" met={passwordChecks.number} />
+                  <PasswordCheck label="One special character" met={passwordChecks.special} />
+                  <PasswordCheck label="Passwords match" met={passwordChecks.match} />
+                </div>
+              )}
+            </div>
+
+            {/* Confirm Password */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Confirm New Password</Label>
+              <div className="relative">
+                <Input
+                  type={showPasswords.confirm ? 'text' : 'password'}
+                  className="h-9 text-sm pr-10"
+                  placeholder="Re-enter new password"
+                  value={passwordForm.confirmPassword}
+                  onChange={e => setPasswordForm(p => ({ ...p, confirmPassword: e.target.value }))}
+                />
+                <button
+                  type="button"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowPasswords(s => ({ ...s, confirm: !s.confirm }))}
+                >
+                  {showPasswords.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {passwordForm.confirmPassword.length > 0 && passwordForm.newPassword !== passwordForm.confirmPassword && (
+                <p className="text-[10px] text-red-500 flex items-center gap-1 mt-1">
+                  <AlertTriangle className="h-3 w-3" /> Passwords do not match
+                </p>
+              )}
+            </div>
+
+            {/* Security Notice */}
+            <div className="rounded-lg border bg-amber-50 border-amber-200 p-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-[11px] font-medium text-amber-800">Password Requirements</p>
+                  <p className="text-[10px] text-amber-700 mt-0.5">
+                    Your new password must be different from your last 5 passwords. Passwords expire every 90 days.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setChangePasswordOpen(false)}
+              className="h-8 text-xs"
+              disabled={changingPassword}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleChangePassword}
+              disabled={changingPassword || !allChecksMet || !passwordForm.currentPassword}
+              className="h-8 text-xs"
+            >
+              {changingPassword ? 'Changing...' : 'Change Password'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </header>
   )
 }

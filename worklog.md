@@ -28,3 +28,23 @@ Stage Summary:
 - RBAC: 10 default roles, 137 permissions across 31 modules, permission matrix UI
 - Audit: Enhanced audit log with IP, user agent, old/new values, severity levels
 - Default admin login: admin@acctfin.erp / Admin@123 (force password change on first login)
+---
+Task ID: 1
+Agent: Main
+Task: Fix React key prop error, users.filter TypeError, and add password change feature
+
+Work Log:
+- Fixed Fragment key error in security-center.tsx: Changed `<>` to `<Fragment key={s.id}>` in filteredSessions.map() at line 996
+- Added Fragment import to security-center.tsx
+- Fixed users.filter is not a function error in settings.tsx: Changed setUsers(data) to setUsers(Array.isArray(json.data) ? json.data : Array.isArray(json) ? json : []) since API returns { success: true, data: [...] }
+- Added safeUsers guard in renderUserManagement() and fixed all direct users.filter() calls
+- Created /api/auth/change-password route with full password validation, history check, bcrypt hashing
+- Added Change Password dialog to Header user profile popover with: password strength bar, requirement checklist, show/hide password toggles, security notice
+- Added ForcedPasswordChangeDialog component to page.tsx that shows when authUser.forcePasswordChange is true (non-dismissable)
+- Updated change-password API to support forceChange flag for forced password resets
+- Fixed lint error (setState in useEffect) by using useRef pattern instead
+
+Stage Summary:
+- 2 console errors fixed (Fragment key, users.filter)
+- Password change feature added with 3 access points: Header profile menu, Forced password dialog on login, API endpoint
+- All lint checks pass (0 errors, 4 pre-existing warnings)

@@ -193,8 +193,8 @@ export function SettingsModule() {
     try {
       const res = await fetch('/api/users')
       if (res.ok) {
-        const data = await res.json()
-        setUsers(data)
+        const json = await res.json()
+        setUsers(Array.isArray(json.data) ? json.data : Array.isArray(json) ? json : [])
       }
     } catch (err) {
       console.error('Error fetching users:', err)
@@ -573,10 +573,11 @@ export function SettingsModule() {
   // ============================================================
 
   const renderUserManagement = () => {
-    const filteredUsers = users.filter(u =>
-      u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
-      u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
-      u.role.toLowerCase().includes(userSearch.toLowerCase())
+    const safeUsers = Array.isArray(users) ? users : []
+    const filteredUsers = safeUsers.filter(u =>
+      (u.name || '').toLowerCase().includes(userSearch.toLowerCase()) ||
+      (u.email || '').toLowerCase().includes(userSearch.toLowerCase()) ||
+      (u.role || '').toLowerCase().includes(userSearch.toLowerCase())
     )
 
     return (
@@ -584,10 +585,10 @@ export function SettingsModule() {
         {/* User Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-            { label: 'Total Users', value: users.length, icon: Users, color: 'text-primary' },
-            { label: 'Active', value: users.filter(u => u.isActive).length, icon: CheckCircle, color: 'text-green-600' },
-            { label: 'Admins', value: users.filter(u => u.role === 'admin').length, icon: Shield, color: 'text-red-600' },
-            { label: 'Inactive', value: users.filter(u => !u.isActive).length, icon: AlertTriangle, color: 'text-amber-600' },
+            { label: 'Total Users', value: safeUsers.length, icon: Users, color: 'text-primary' },
+            { label: 'Active', value: safeUsers.filter(u => u.isActive).length, icon: CheckCircle, color: 'text-green-600' },
+            { label: 'Admins', value: safeUsers.filter(u => u.role === 'admin').length, icon: Shield, color: 'text-red-600' },
+            { label: 'Inactive', value: safeUsers.filter(u => !u.isActive).length, icon: AlertTriangle, color: 'text-amber-600' },
           ].map(stat => (
             <Card key={stat.label} className="p-3">
               <div className="flex items-center gap-3">
@@ -827,7 +828,7 @@ export function SettingsModule() {
           {ROLES.map(r => {
             const IconComp = r.icon
             const isExpanded = expandedRole === r.key
-            const userCount = users.filter(u => u.role === r.key).length
+            const userCount = (Array.isArray(users) ? users : []).filter(u => u.role === r.key).length
             return (
               <div key={r.key} className="rounded-lg border">
                 <button

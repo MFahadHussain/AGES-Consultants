@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { Fragment, useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -993,8 +993,8 @@ export function SecurityCenter() {
                     {filteredSessions.length === 0 ? (
                       <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">No sessions found</TableCell></TableRow>
                     ) : filteredSessions.map(s => (
-                      <>
-                        <TableRow key={s.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setExpandedSession(expandedSession === s.id ? null : s.id)}>
+                      <Fragment key={s.id}>
+                        <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => setExpandedSession(expandedSession === s.id ? null : s.id)}>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
@@ -1061,7 +1061,7 @@ export function SecurityCenter() {
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </Fragment>
                     ))}
                   </TableBody>
                 </Table>

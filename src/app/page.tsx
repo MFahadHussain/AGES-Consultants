@@ -5,9 +5,15 @@ import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
 import { GlobalSearch } from '@/components/layout/global-search'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useToast } from '@/hooks/use-toast'
 import LoginPage from '@/components/auth/LoginPage'
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState, useCallback, useRef } from 'react'
+import { Lock, Eye, EyeOff, CheckCircle, AlertTriangle } from 'lucide-react'
 
 // Lazy-load all modules to prevent compiling everything on initial page load
 const Dashboard = lazy(() => import('@/components/modules/dashboard').then(m => ({ default: m.Dashboard })))
@@ -104,10 +110,181 @@ function ModuleLoader() {
   )
 }
 
+// ============================================================
+// Forced Password Change Dialog (shown after login when forcePasswordChange=true)
+// ============================================================
+
+function ForcedPasswordChangeDialog({ userId, onComplete }: { userId: string; onComplete: () => void }) {
+  const { toast } = useToast()
+  const [form, setForm] = useState({ newPassword: '', confirmPassword: '' })
+  const [showPasswords, setShowPasswords] = useState({ new: false, confirm: false })
+  const [loading, setLoading] = useState(false)
+
+  const checks = {
+    minLength: form.newPassword.length >= 8,
+    uppercase: /[A-Z]/.test(form.newPassword),
+    lowercase: /[a-z]/.test(form.newPassword),
+    number: /[0-9]/.test(form.newPassword),
+    special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.newPassword),
+    match: form.confirmPassword.length > 0 && form.newPassword === form.confirmPassword,
+  }
+
+  const allMet = Object.values(checks).every(v => v)
+
+  const handleSubmit = useCallback(async () => {
+    if (!allMet) return
+    setLoading(true)
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          currentPassword: '__force_change__',
+          newPassword: form.newPassword,
+          confirmPassword: form.confirmPassword,
+          forceChange: true,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        toast({ title: 'Password Set', description: 'Your password has been set successfully.' })
+        onComplete()
+      } else {
+        toast({ title: 'Error', description: data.error || 'Failed to set password', variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to set password', variant: 'destructive' })
+    } finally {
+      setLoading(false)
+    }
+  }, [userId, form, allMet, onComplete, toast])
+
+  return (
+    <Dialog open={true} onOpenChange={() => { /* cannot dismiss */ }}>
+      <DialogContent className="sm:max-w-md" onPointerDownOutside={e => e.preventDefault()} onEscapeKeyDown={e => e.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle className="text-sm flex items-center gap-2">
+            <Lock className="h-4 w-4 text-primary" />
+            Set Your Password
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            You must set a new password before accessing the system. This is required for security purposes.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Warning Banner */}
+          <div className="rounded-lg border bg-amber-50 border-amber-200 p-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-[11px] font-medium text-amber-800">Password Change Required</p>
+                <p className="text-[10px] text-amber-700 mt-0.5">
+                  Your account requires a password change. You cannot access the system until you set a new password.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* New Password */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">New Password</Label>
+            <div className="relative">
+              <Input
+                type={showPasswords.new ? 'text' : 'password'}
+                className="h-9 text-sm pr-10"
+                placeholder="Enter new password"
+                value={form.newPassword}
+                onChange={e => setForm(p => ({ ...p, newPassword: e.target.value }))}
+                autoFocus
+              />
+              <button
+                type="button"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowPasswords(s => ({ ...s, new: !s.new }))}
+              >
+                {showPasswords.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            {form.newPassword.length > 0 && (
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
+                <div className="flex items-center gap-1.5">
+                  {checks.minLength ? <CheckCircle className="h-3 w-3 text-green-500 shrink-0" /> : <div className="h-3 w-3 rounded-full border border-gray-300 shrink-0" />}
+                  <span className={`text-[10px] ${checks.minLength ? 'text-green-600' : 'text-muted-foreground'}`}>At least 8 characters</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {checks.uppercase ? <CheckCircle className="h-3 w-3 text-green-500 shrink-0" /> : <div className="h-3 w-3 rounded-full border border-gray-300 shrink-0" />}
+                  <span className={`text-[10px] ${checks.uppercase ? 'text-green-600' : 'text-muted-foreground'}`}>One uppercase letter</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {checks.lowercase ? <CheckCircle className="h-3 w-3 text-green-500 shrink-0" /> : <div className="h-3 w-3 rounded-full border border-gray-300 shrink-0" />}
+                  <span className={`text-[10px] ${checks.lowercase ? 'text-green-600' : 'text-muted-foreground'}`}>One lowercase letter</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {checks.number ? <CheckCircle className="h-3 w-3 text-green-500 shrink-0" /> : <div className="h-3 w-3 rounded-full border border-gray-300 shrink-0" />}
+                  <span className={`text-[10px] ${checks.number ? 'text-green-600' : 'text-muted-foreground'}`}>One number</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {checks.special ? <CheckCircle className="h-3 w-3 text-green-500 shrink-0" /> : <div className="h-3 w-3 rounded-full border border-gray-300 shrink-0" />}
+                  <span className={`text-[10px] ${checks.special ? 'text-green-600' : 'text-muted-foreground'}`}>One special character</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {checks.match ? <CheckCircle className="h-3 w-3 text-green-500 shrink-0" /> : <div className="h-3 w-3 rounded-full border border-gray-300 shrink-0" />}
+                  <span className={`text-[10px] ${checks.match ? 'text-green-600' : 'text-muted-foreground'}`}>Passwords match</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Confirm Password */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Confirm New Password</Label>
+            <div className="relative">
+              <Input
+                type={showPasswords.confirm ? 'text' : 'password'}
+                className="h-9 text-sm pr-10"
+                placeholder="Re-enter new password"
+                value={form.confirmPassword}
+                onChange={e => setForm(p => ({ ...p, confirmPassword: e.target.value }))}
+              />
+              <button
+                type="button"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowPasswords(s => ({ ...s, confirm: !s.confirm }))}
+              >
+                {showPasswords.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <Button
+          className="w-full h-9 text-xs"
+          onClick={handleSubmit}
+          disabled={loading || !allMet}
+        >
+          {loading ? 'Setting Password...' : 'Set Password & Continue'}
+        </Button>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export default function Home() {
   const { activeModule, sidebarOpen, setSidebarOpen, authUser, setAuthUser } = useAppStore()
   const isMobile = useIsMobile()
   const [searchOpen, setSearchOpen] = useState(false)
+  const lastUserIdRef = useRef<string | null>(null)
+  const [forcePasswordResolved, setForcePasswordResolved] = useState(false)
+
+  // Track user changes to reset force password state
+  if (authUser?.id !== lastUserIdRef.current) {
+    lastUserIdRef.current = authUser?.id ?? null
+    if (forcePasswordResolved) {
+      setForcePasswordResolved(false)
+    }
+  }
 
   // On mobile, auto-close sidebar when module changes
   useEffect(() => {
@@ -125,7 +302,9 @@ export default function Home() {
     )
   }
 
-  // Main ERP application
+  // Handle forced password change
+  const needsPasswordChange = authUser.forcePasswordChange && !forcePasswordResolved
+
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Desktop Sidebar */}
@@ -155,6 +334,18 @@ export default function Home() {
 
       {/* Global Search Dialog */}
       <GlobalSearch />
+
+      {/* Forced Password Change Dialog */}
+      {needsPasswordChange && (
+        <ForcedPasswordChangeDialog
+          userId={authUser.id}
+          onComplete={() => {
+            setForcePasswordResolved(true)
+            // Update the authUser to remove forcePasswordChange flag
+            setAuthUser({ ...authUser, forcePasswordChange: false })
+          }}
+        />
+      )}
     </div>
   )
 }
