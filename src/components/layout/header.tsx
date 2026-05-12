@@ -113,6 +113,7 @@ interface AuthUser {
   avatarUrl: string | null
   lastLoginAt: string | null
   createdAt: string
+  forcePasswordChange?: boolean
 }
 
 interface HeaderProps {

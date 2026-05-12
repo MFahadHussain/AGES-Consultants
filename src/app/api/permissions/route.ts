@@ -63,16 +63,27 @@ export async function POST(request: NextRequest) {
       return await seedDefaultPermissions()
     }
 
-    const { code, name, description, module: permModule, action: permAction, resource: permResource, isActive } = body
+    const { description, module: permModule, action: permAction, resource: permResource, isActive } = body
+    let { code, name } = body
 
-    if (!code || !name || !permModule || !permAction || !permResource) {
+    if (!permModule || !permAction || !permResource) {
       return NextResponse.json(
         {
           success: false,
-          error: 'code, name, module, action, and resource are required',
+          error: 'module, action, and resource are required',
         },
         { status: 400 }
       )
+    }
+
+    // Auto-generate code and name if not provided
+    if (!code) {
+      code = `${permModule.toUpperCase().replace(/-/g, '_')}_${permAction.toUpperCase().replace(/-/g, '_')}`
+    }
+    if (!name) {
+      const actionLabel = permAction.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+      const resourceLabel = permResource.replace(/-/g, ' ')
+      name = `${actionLabel} ${resourceLabel}`
     }
 
     // Check if code already exists

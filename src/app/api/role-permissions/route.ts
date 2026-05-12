@@ -51,22 +51,19 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/role-permissions - Set permissions for a role (replace all)
+// POST /api/role-permissions - Create/update role-permission mappings
+// Supports three modes:
+// 1. Replace all: { roleId, permissions: [{ permissionId, isGranted }] }
+// 2. Single mapping: { roleId, permissionId, isGranted }
+// 3. Batch grant: { roleId, permissionIds: string[] }
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { roleId, permissions } = body
+    const { roleId, permissions, permissionId, isGranted, permissionIds } = body
 
     if (!roleId) {
       return NextResponse.json(
         { success: false, error: 'roleId is required' },
-        { status: 400 }
-      )
-    }
-
-    if (!Array.isArray(permissions)) {
-      return NextResponse.json(
-        { success: false, error: 'permissions must be an array' },
         { status: 400 }
       )
     }
@@ -79,13 +76,132 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate all permission IDs exist
-    if (permissions.length > 0) {
-      const permissionIds = permissions.map((p: { permissionId: string }) => p.permissionId)
-      const existingPermissions = await db.permission.findMany({
+    // Mode 2: Single mapping { roleId, permissionId, isGranted }
+    if (permissionId && !permissions && !permissionIds) {
+      const perm = await db.permission.findUnique({ where: { id: permissionId } })
+      if (!perm) {
+        return NextResponse.json(
+          { success: false, error: 'Permission not found' },
+          { status: 404 }
+        )
+      }
+
+      const result = await db.rolePermission.upsert({
+        where: { roleId_permissionId: { roleId, permissionId } },
+        update: { isGranted: isGranted ?? true },
+        create: {
+          roleId,
+          permissionId,
+          isGranted: isGranted ?? true,
+        },
+        include: { permission: true },
+      })
+
+      // Audit log
+      try {
+        await db.auditLog.create({
+          data: {
+            action: 'PERMISSION_CHANGE',
+            entity: 'Role',
+            entityId: roleId,
+            entityName: role.name,
+            details: JSON.stringify({
+              action: 'set_permission',
+              permissionCode: perm.code,
+              isGranted: isGranted ?? true,
+            }),
+            module: 'rbac',
+            severity: 'info',
+          },
+        })
+      } catch {
+        // Non-blocking
+      }
+
+      return NextResponse.json({ success: true, data: result }, { status: 201 })
+    }
+
+    // Mode 3: Batch grant { roleId, permissionIds: string[] }
+    if (permissionIds && Array.isArray(permissionIds)) {
+      // Validate all permission IDs exist
+      const existingPerms = await db.permission.findMany({
         where: { id: { in: permissionIds } },
       })
-      if (existingPermissions.length !== permissionIds.length) {
+      if (existingPerms.length !== permissionIds.length) {
+        const foundIds = new Set(existingPerms.map((p) => p.id))
+        const missing = permissionIds.filter((id: string) => !foundIds.has(id))
+        return NextResponse.json(
+          { success: false, error: `Permission IDs not found: ${missing.join(', ')}` },
+          { status: 400 }
+        )
+      }
+
+      // Create mappings in bulk (skip existing)
+      let created = 0
+      let skipped = 0
+      for (const pid of permissionIds as string[]) {
+        const existing = await db.rolePermission.findUnique({
+          where: { roleId_permissionId: { roleId, permissionId: pid } },
+        })
+        if (existing) {
+          skipped++
+        } else {
+          await db.rolePermission.create({
+            data: { roleId, permissionId: pid, isGranted: true },
+          })
+          created++
+        }
+      }
+
+      // Audit log
+      try {
+        await db.auditLog.create({
+          data: {
+            action: 'PERMISSION_CHANGE',
+            entity: 'Role',
+            entityId: roleId,
+            entityName: role.name,
+            details: JSON.stringify({
+              action: 'batch_grant',
+              permissionCount: permissionIds.length,
+              created,
+              skipped,
+            }),
+            module: 'rbac',
+            severity: 'info',
+          },
+        })
+      } catch {
+        // Non-blocking
+      }
+
+      const updatedPermissions = await db.rolePermission.findMany({
+        where: { roleId },
+        include: { permission: true },
+      })
+
+      return NextResponse.json({
+        success: true,
+        data: updatedPermissions,
+        message: `Granted ${created} permissions to role "${role.name}" (${skipped} already existed)`,
+      })
+    }
+
+    // Mode 1: Replace all { roleId, permissions: [...] }
+    if (!Array.isArray(permissions)) {
+      return NextResponse.json(
+        { success: false, error: 'permissions must be an array, or provide permissionId/isGranted, or permissionIds' },
+        { status: 400 }
+      )
+    }
+
+    // Validate all permission IDs exist
+    if (permissions.length > 0) {
+      const permIds = permissions.map((p: { permissionId: string }) => p.permissionId)
+      const existingPermissions = await db.permission.findMany({
+        where: { id: { in: permIds } },
+      })
+      if (existingPermissions.length !== permIds.length) {
         return NextResponse.json(
           { success: false, error: 'One or more permission IDs not found' },
           { status: 400 }
@@ -154,6 +270,73 @@ export async function POST(request: NextRequest) {
     console.error('Error setting role permissions:', error)
     return NextResponse.json(
       { success: false, error: 'Failed to set role permissions' },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE /api/role-permissions - Remove a role-permission mapping
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const roleId = searchParams.get('roleId')
+    const permissionId = searchParams.get('permissionId')
+
+    if (!roleId || !permissionId) {
+      return NextResponse.json(
+        { success: false, error: 'roleId and permissionId query parameters are required' },
+        { status: 400 }
+      )
+    }
+
+    const rolePermission = await db.rolePermission.findUnique({
+      where: { roleId_permissionId: { roleId, permissionId } },
+      include: {
+        role: { select: { id: true, code: true, name: true } },
+        permission: { select: { id: true, code: true, name: true } },
+      },
+    })
+
+    if (!rolePermission) {
+      return NextResponse.json(
+        { success: false, error: 'Role-permission mapping not found' },
+        { status: 404 }
+      )
+    }
+
+    await db.rolePermission.delete({
+      where: { roleId_permissionId: { roleId, permissionId } },
+    })
+
+    // Audit log
+    try {
+      await db.auditLog.create({
+        data: {
+          action: 'PERMISSION_CHANGE',
+          entity: 'Role',
+          entityId: roleId,
+          entityName: rolePermission.role.name,
+          details: JSON.stringify({
+            action: 'remove_permission',
+            permissionCode: rolePermission.permission.code,
+            permissionName: rolePermission.permission.name,
+          }),
+          module: 'rbac',
+          severity: 'warning',
+        },
+      })
+    } catch {
+      // Non-blocking
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Removed permission "${rolePermission.permission.name}" from role "${rolePermission.role.name}"`,
+    })
+  } catch (error) {
+    console.error('Error removing role permission:', error)
+    return NextResponse.json(
+      { success: false, error: 'Failed to remove role permission' },
       { status: 500 }
     )
   }

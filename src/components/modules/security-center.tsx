@@ -82,7 +82,7 @@ interface ApprovalInstance {
 interface AuditLog {
   id: string; userId?: string; username?: string; action: string;
   entity: string; entityId?: string; entityName?: string;
-  details?: string; severity: string; module?: string;
+  details?: string | Record<string, unknown>; severity: string; module?: string;
   ipAddress?: string; createdAt: string;
   user?: { name: string; email: string };
   oldValues?: string; newValues?: string;
@@ -662,7 +662,7 @@ export function SecurityCenter() {
                                 <span className="text-[10px] text-muted-foreground">{new Date(log.createdAt).toLocaleString()}</span>
                               </div>
                               <p className="text-xs font-medium">{log.action} on {log.entity}</p>
-                              <p className="text-xs text-muted-foreground">{log.user?.name || 'System'} — {log.details ? JSON.parse(log.details).summary || log.details : ''}</p>
+                              <p className="text-xs text-muted-foreground">{log.user?.name || 'System'} — {log.details ? (() => { const d = typeof log.details === 'string' ? (() => { try { return JSON.parse(log.details) } catch { return log.details } })() : log.details; if (d && typeof d === 'object' && 'summary' in d) return (d as Record<string, unknown>).summary as string; if (typeof d === 'string') return d; return JSON.stringify(d) })() : ''}</p>
                             </div>
                           ))}
                       </div>
