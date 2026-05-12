@@ -144,6 +144,54 @@ const emptyForm = {
 }
 
 // ---------------------------------------------------------------------------
+// Form Field Components (MUST be outside EmployeeMaster to avoid re-mount on every keystroke)
+// ---------------------------------------------------------------------------
+
+function FormField({ label, field, type = 'text', placeholder = '', required = false, colSpan = '', form, updateForm }: {
+  label: string; field: string; type?: string; placeholder?: string; required?: boolean; colSpan?: string;
+  form: Record<string, any>; updateForm: (field: string, value: string) => void
+}) {
+  return (
+    <div className={colSpan}>
+      <Label className="text-xs">
+        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+      </Label>
+      <Input
+        type={type}
+        className="h-8 text-xs"
+        value={form[field] || ''}
+        onChange={e => updateForm(field, e.target.value)}
+        placeholder={placeholder}
+      />
+    </div>
+  )
+}
+
+function FormSelect({ label, field, options, placeholder = 'Select...', required = false, form, updateForm }: {
+  label: string; field: string; options: { value: string; label: string }[]; placeholder?: string; required?: boolean;
+  form: Record<string, any>; updateForm: (field: string, value: string) => void
+}) {
+  return (
+    <div>
+      <Label className="text-xs">
+        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+      </Label>
+      <Select value={form[field] || '_none'} onValueChange={v => updateForm(field, v === '_none' ? '' : v)}>
+        <SelectTrigger className="h-8 text-xs">
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="_none">{placeholder}</SelectItem>
+          {options.map(opt => (
+            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
 
@@ -494,69 +542,27 @@ export function EmployeeMaster() {
   }
 
   // ---------------------------------------------------------------------------
-  // Form Field Component
-  // ---------------------------------------------------------------------------
-
-  const FormField = ({ label, field, type = 'text', placeholder = '', required = false, colSpan = '' }: {
-    label: string; field: string; type?: string; placeholder?: string; required?: boolean; colSpan?: string
-  }) => (
-    <div className={colSpan}>
-      <Label className="text-xs">
-        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
-      </Label>
-      <Input
-        type={type}
-        className="h-8 text-xs"
-        value={form[field] || ''}
-        onChange={e => updateForm(field, e.target.value)}
-        placeholder={placeholder}
-      />
-    </div>
-  )
-
-  const FormSelect = ({ label, field, options, placeholder = 'Select...', required = false }: {
-    label: string; field: string; options: { value: string; label: string }[]; placeholder?: string; required?: boolean
-  }) => (
-    <div>
-      <Label className="text-xs">
-        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
-      </Label>
-      <Select value={form[field] || '_none'} onValueChange={v => updateForm(field, v === '_none' ? '' : v)}>
-        <SelectTrigger className="h-8 text-xs">
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="_none">{placeholder}</SelectItem>
-          {options.map(opt => (
-            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  )
-
-  // ---------------------------------------------------------------------------
   // Tab Content Renderers
   // ---------------------------------------------------------------------------
 
   const renderPersonalTab = () => (
     <div className="space-y-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormField label="Full Name" field="name" placeholder="Muhammad Ahmed" required />
-        <FormField label="Father's Name" field="fatherName" placeholder="Father's full name" />
+        <FormField form={form} updateForm={updateForm} label="Full Name" field="name" placeholder="Muhammad Ahmed" required />
+        <FormField form={form} updateForm={updateForm} label="Father's Name" field="fatherName" placeholder="Father's full name" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormField label="CNIC" field="cnic" placeholder="1234567890123" required />
-        <FormField label="NTN" field="ntn" placeholder="National Tax Number" />
+        <FormField form={form} updateForm={updateForm} label="CNIC" field="cnic" placeholder="1234567890123" required />
+        <FormField form={form} updateForm={updateForm} label="NTN" field="ntn" placeholder="National Tax Number" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <FormField label="Date of Birth" field="dateOfBirth" type="date" />
-        <FormSelect label="Religion" field="religion" options={religionOptions} placeholder="Select religion" />
-        <FormSelect label="Gender" field="gender" options={genderOptions} placeholder="Select gender" />
+        <FormField form={form} updateForm={updateForm} label="Date of Birth" field="dateOfBirth" type="date" />
+        <FormSelect form={form} updateForm={updateForm} label="Religion" field="religion" options={religionOptions} placeholder="Select religion" />
+        <FormSelect form={form} updateForm={updateForm} label="Gender" field="gender" options={genderOptions} placeholder="Select gender" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormField label="Contact No" field="contactNo" placeholder="+92-300-1234567" />
-        <FormField label="Email" field="email" type="email" placeholder="ahmed@company.com" />
+        <FormField form={form} updateForm={updateForm} label="Contact No" field="contactNo" placeholder="+92-300-1234567" />
+        <FormField form={form} updateForm={updateForm} label="Email" field="email" type="email" placeholder="ahmed@company.com" />
       </div>
       <div className="grid grid-cols-1 gap-3">
         <div>
@@ -586,16 +592,16 @@ export function EmployeeMaster() {
   const renderEmploymentTab = () => (
     <div className="space-y-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormField label="Designation" field="designation" placeholder="e.g. Senior Accountant" />
-        <FormField label="Department" field="department" placeholder="e.g. Finance, HR, IT" />
+        <FormField form={form} updateForm={updateForm} label="Designation" field="designation" placeholder="e.g. Senior Accountant" />
+        <FormField form={form} updateForm={updateForm} label="Department" field="department" placeholder="e.g. Finance, HR, IT" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormField label="Joining Date" field="joiningDate" type="date" />
-        <FormField label="Leaving Date" field="leavingDate" type="date" />
+        <FormField form={form} updateForm={updateForm} label="Joining Date" field="joiningDate" type="date" />
+        <FormField form={form} updateForm={updateForm} label="Leaving Date" field="leavingDate" type="date" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <FormSelect label="Employment Type" field="employmentType" options={employmentTypeOptions} placeholder="Select type" />
-        <FormSelect label="Category" field="category" options={categoryOptions} placeholder="Select category" />
+        <FormSelect form={form} updateForm={updateForm} label="Employment Type" field="employmentType" options={employmentTypeOptions} placeholder="Select type" />
+        <FormSelect form={form} updateForm={updateForm} label="Category" field="category" options={categoryOptions} placeholder="Select category" />
         <div>
           <Label className="text-xs">Default Project</Label>
           <Select value={form.defaultProjectId || '_none'} onValueChange={v => updateForm('defaultProjectId', v === '_none' ? '' : v)}>
@@ -612,7 +618,7 @@ export function EmployeeMaster() {
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormSelect label="Status" field="status" options={Object.entries(statusConfig).map(([v, c]) => ({ value: v, label: c.label }))} placeholder="Select status" required />
+        <FormSelect form={form} updateForm={updateForm} label="Status" field="status" options={Object.entries(statusConfig).map(([v, c]) => ({ value: v, label: c.label }))} placeholder="Select status" required />
       </div>
       {selectedEmployee?.isFinancialUsed && (
         <div className="flex items-center gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
@@ -629,12 +635,12 @@ export function EmployeeMaster() {
   const renderBankingTab = () => (
     <div className="space-y-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormField label="Bank Name" field="bankName" placeholder="e.g. HBL, UBL, MCB" />
-        <FormField label="Branch Name" field="branchName" placeholder="e.g. Main Branch" />
+        <FormField form={form} updateForm={updateForm} label="Bank Name" field="bankName" placeholder="e.g. HBL, UBL, MCB" />
+        <FormField form={form} updateForm={updateForm} label="Branch Name" field="branchName" placeholder="e.g. Main Branch" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormField label="Branch Code" field="branchCode" placeholder="e.g. 0123" />
-        <FormField label="Account Number" field="bankAccountNumber" placeholder="Bank account number" />
+        <FormField form={form} updateForm={updateForm} label="Branch Code" field="branchCode" placeholder="e.g. 0123" />
+        <FormField form={form} updateForm={updateForm} label="Account Number" field="bankAccountNumber" placeholder="Bank account number" />
       </div>
       <div className="p-3 rounded-md bg-muted/50">
         <div className="flex items-center gap-2 mb-1">
@@ -650,26 +656,26 @@ export function EmployeeMaster() {
       <div>
         <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><GraduationCap className="h-3.5 w-3.5" />Qualification 1</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <FormField label="Degree / Certificate" field="qualification1" placeholder="e.g. B.Com, MBA" />
-          <FormField label="Institute" field="institute1" placeholder="University name" />
-          <FormField label="Year" field="year1" placeholder="e.g. 2018" />
+          <FormField form={form} updateForm={updateForm} label="Degree / Certificate" field="qualification1" placeholder="e.g. B.Com, MBA" />
+          <FormField form={form} updateForm={updateForm} label="Institute" field="institute1" placeholder="University name" />
+          <FormField form={form} updateForm={updateForm} label="Year" field="year1" placeholder="e.g. 2018" />
         </div>
       </div>
       <Separator />
       <div>
         <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><GraduationCap className="h-3.5 w-3.5" />Qualification 2</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <FormField label="Degree / Certificate" field="qualification2" placeholder="e.g. M.A, ACCA" />
-          <FormField label="Institute" field="institute2" placeholder="University name" />
-          <FormField label="Year" field="year2" placeholder="e.g. 2020" />
+          <FormField form={form} updateForm={updateForm} label="Degree / Certificate" field="qualification2" placeholder="e.g. M.A, ACCA" />
+          <FormField form={form} updateForm={updateForm} label="Institute" field="institute2" placeholder="University name" />
+          <FormField form={form} updateForm={updateForm} label="Year" field="year2" placeholder="e.g. 2020" />
         </div>
       </div>
       <Separator />
       <div>
         <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><Briefcase className="h-3.5 w-3.5" />Experience</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <FormField label="Previous Employer" field="previousEmployer" placeholder="Previous company name" />
-          <FormField label="Years of Experience" field="yearsOfExperience" placeholder="e.g. 5" />
+          <FormField form={form} updateForm={updateForm} label="Previous Employer" field="previousEmployer" placeholder="Previous company name" />
+          <FormField form={form} updateForm={updateForm} label="Years of Experience" field="yearsOfExperience" placeholder="e.g. 5" />
         </div>
       </div>
     </div>
@@ -688,7 +694,7 @@ export function EmployeeMaster() {
             placeholder="0"
           />
         </div>
-        <FormSelect label="Payment Type" field="paymentType" options={paymentTypeOptions} placeholder="Select type" />
+        <FormSelect form={form} updateForm={updateForm} label="Payment Type" field="paymentType" options={paymentTypeOptions} placeholder="Select type" />
       </div>
       {form.baseSalary && parseFloat(form.baseSalary) > 0 && (
         <div className="p-3 rounded-md bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
@@ -720,8 +726,8 @@ export function EmployeeMaster() {
       <div>
         <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><Shield className="h-3.5 w-3.5" />Statutory Information</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <FormField label="EOBI Number" field="eobiNumber" placeholder="EOBI registration no." />
-          <FormField label="Social Security No" field="socialSecurityNo" placeholder="Social security no." />
+          <FormField form={form} updateForm={updateForm} label="EOBI Number" field="eobiNumber" placeholder="EOBI registration no." />
+          <FormField form={form} updateForm={updateForm} label="Social Security No" field="socialSecurityNo" placeholder="Social security no." />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
           <div className="flex items-center gap-3 p-3 rounded-lg border border-slate-200">
@@ -804,11 +810,11 @@ export function EmployeeMaster() {
                 <p className="text-[10px] text-muted-foreground">Allocate across all assigned projects</p>
               </div>
             </div>
-            <FormSelect label="Default Allocation Method" field="defaultAllocationMethod" options={[{ value: 'days', label: 'Days-based' }, { value: 'percentage', label: 'Percentage' }]} placeholder="Select method" />
+            <FormSelect form={form} updateForm={updateForm} label="Default Allocation Method" field="defaultAllocationMethod" options={[{ value: 'days', label: 'Days-based' }, { value: 'percentage', label: 'Percentage' }]} placeholder="Select method" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-            <FormSelect label="Tax Filing Status" field="taxFilingStatus" options={[{ value: 'filer', label: 'Filer' }, { value: 'non-filer', label: 'Non-Filer' }]} placeholder="Select status" />
-            <FormField label="Tax City (FBR PSID)" field="taxCity" placeholder="e.g. Islamabad, Karachi" />
+            <FormSelect form={form} updateForm={updateForm} label="Tax Filing Status" field="taxFilingStatus" options={[{ value: 'filer', label: 'Filer' }, { value: 'non-filer', label: 'Non-Filer' }]} placeholder="Select status" />
+            <FormField form={form} updateForm={updateForm} label="Tax City (FBR PSID)" field="taxCity" placeholder="e.g. Islamabad, Karachi" />
           </div>
         </div>
       </div>
@@ -818,12 +824,12 @@ export function EmployeeMaster() {
   const renderNextOfKinTab = () => (
     <div className="space-y-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormField label="Next of Kin Name" field="nokName" placeholder="Full name" />
-        <FormField label="Relation" field="nokRelation" placeholder="e.g. Spouse, Father, Brother" />
+        <FormField form={form} updateForm={updateForm} label="Next of Kin Name" field="nokName" placeholder="Full name" />
+        <FormField form={form} updateForm={updateForm} label="Relation" field="nokRelation" placeholder="e.g. Spouse, Father, Brother" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormField label="NOK CNIC" field="nokCnic" placeholder="1234567890123" />
-        <FormField label="NOK Contact" field="nokContact" placeholder="+92-300-1234567" />
+        <FormField form={form} updateForm={updateForm} label="NOK CNIC" field="nokCnic" placeholder="1234567890123" />
+        <FormField form={form} updateForm={updateForm} label="NOK Contact" field="nokContact" placeholder="+92-300-1234567" />
       </div>
       <div className="p-3 rounded-md bg-muted/50">
         <div className="flex items-center gap-2 mb-1">
