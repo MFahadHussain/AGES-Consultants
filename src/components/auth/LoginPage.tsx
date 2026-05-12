@@ -9,11 +9,21 @@ interface LoginPageProps {
     id: string
     email: string
     name: string
+    username: string | null
+    phone: string | null
     role: string
     isActive: boolean
+    isLocked: boolean
     avatarUrl: string | null
     lastLoginAt: string | null
+    lastLoginIp: string | null
+    branchId: string | null
+    departmentId: string | null
+    employeeId: string | null
+    designation: string | null
+    forcePasswordChange: boolean
     createdAt: string
+    roles?: { id: string; code: string; name: string; isPrimary: boolean }[]
   }) => void
 }
 
@@ -46,6 +56,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [loading, setLoading] = useState(false)
   const [alertKey, setAlertKey] = useState(0)
   const [showAlert, setShowAlert] = useState(false)
+  const [alertMessage, setAlertMessage] = useState('Invalid credentials. Please check your email and password.')
 
   // Forgot password overlay
   const [showForgot, setShowForgot] = useState(false)
@@ -71,22 +82,6 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
     setLoading(true)
 
-    // Simulated delay — replace with actual API call in production
-    // Backend Integration: Replace the setTimeout below with:
-    //   const res = await fetch('/api/auth/login', {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify({ email, password, rememberMe }),
-    //   })
-    //   if (res.status === 401) { setShowAlert(true); setAlertKey(k => k + 1); return }
-    //   if (res.ok) { const data = await res.json(); onLoginSuccess(data.user); return }
-    // Handle 401 → show invalid credentials alert
-    // Handle 200 → redirect to dashboard
-    // The "Remember me" value should be passed to the API and used to set
-    // session cookie expiry (7 days vs session-only)
-
-    await new Promise<void>(resolve => setTimeout(resolve, 1800))
-
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -94,24 +89,29 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
         body: JSON.stringify({ email, password, rememberMe }),
       })
 
-      if (res.status === 401) {
+      const data = await res.json()
+
+      if (res.status === 401 || res.status === 403) {
+        // Show specific error message from the server
+        setAlertMessage(data.error || 'Invalid credentials. Please check your email and password.')
         setShowAlert(true)
         setAlertKey(k => k + 1)
         setLoading(false)
         return
       }
 
-      if (res.ok) {
-        const data = await res.json()
-        onLoginSuccess(data.user)
+      if (res.ok && data.success && data.data?.user) {
+        onLoginSuccess(data.data.user)
         return
       }
 
       // Unexpected error
+      setAlertMessage('An unexpected error occurred. Please try again.')
       setShowAlert(true)
       setAlertKey(k => k + 1)
       setLoading(false)
     } catch {
+      setAlertMessage('Network error. Please check your connection.')
       setShowAlert(true)
       setAlertKey(k => k + 1)
       setLoading(false)
@@ -181,7 +181,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
               className="mb-4 flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2.5 text-[13px] text-red-700 animate-[slideDownFade_0.25s_ease-out]"
             >
               <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
-              <span>Invalid credentials. Please check your email and password.</span>
+              <span>{alertMessage}</span>
             </div>
           )}
 

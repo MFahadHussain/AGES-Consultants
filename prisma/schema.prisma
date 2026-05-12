@@ -13,34 +13,414 @@ datasource db {
 }
 
 // ============================================================
-// CORE: Users & Roles
+// CORE: Users, Roles, Permissions & Access Control
 // ============================================================
 
-model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String
-  passwordHash String   @default("") // bcrypt hash; empty for system/OAuth users
-  role         String   @default("viewer") // admin, manager, accountant, auditor, viewer
-  isActive     Boolean  @default(true)
-  avatarUrl    String?  // Optional avatar URL
-  lastLoginAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+// --- Branch Master ---
+model Branch {
+  id          String   @id @default(cuid())
+  code        String   @unique  // e.g., "HO", "ISB", "LHR"
+  name        String   // e.g., "Head Office", "Islamabad Branch"
+  address     String?
+  city        String?
+  province    String?  // Punjab, Sindh, KPK, Balochistan, ICT, AJK, GB
+  phone       String?
+  email       String?
+  managerName String?  // Branch manager name
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  auditLogs       AuditLog[]
-  voucherActions  VoucherApproval[]
+  users       User[]
+  departments Department[]
 }
 
-model AuditLog {
+// --- Department Master ---
+model Department {
+  id          String   @id @default(cuid())
+  code        String   @unique  // e.g., "FIN", "HR", "IT"
+  name        String   // e.g., "Finance", "Human Resources", "Information Technology"
+  branchId    String?
+  branch      Branch?  @relation(fields: [branchId], references: [id])
+  headName    String?  // Department head name
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+}
+
+// --- User Master (Enhanced) ---
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String
+  username        String?   @unique  // Login username (optional, defaults to email)
+  phone           String?
+  passwordHash    String    @default("") // bcrypt hash; empty for system/OAuth users
+  role            String    @default("viewer") // Legacy: admin, manager, accountant, auditor, viewer
+  isActive        Boolean   @default(true)
+  isLocked        Boolean   @default(false) // Account lockout
+  lockedUntil     DateTime? // Auto-unlock time
+  failedLoginAttempts Int   @default(0)
+  avatarUrl       String?   // Optional avatar URL
+  lastLoginAt     DateTime?
+  lastLoginIp     String?   // IP address of last login
+  passwordChangedAt DateTime?
+  forcePasswordChange Boolean @default(false) // Must change password on next login
+  passwordExpiresAt  DateTime? // Password expiry date
+
+  // Organization
+  branchId        String?
+  branch          Branch?   @relation(fields: [branchId], references: [id])
+  departmentId    String?
+  department      Department? @relation(fields: [departmentId], references: [id])
+  employeeId      String?   // Link to Employee record
+  designation     String?   // Job title
+
+  // System fields
+  createdBy       String?   // User ID who created this user
+  updatedBy       String?   // User ID who last updated
+  deletedAt       DateTime? // Soft delete timestamp
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  auditLogs       AuditLog[]
+  voucherActions  VoucherApproval[]
+  userRoles       UserRole[]
+  userPermissions UserPermission[]
+  sessions        UserSession[]
+  loginHistory    LoginHistory[]
+  passwordHistory PasswordHistory[]
+  approvalActions ApprovalInstanceStep[]
+
+  @@index([branchId])
+  @@index([departmentId])
+  @@index([isActive])
+  @@index([role])
+}
+
+// --- Role Master ---
+model Role {
+  id              String   @id @default(cuid())
+  code            String   @unique  // e.g., "SUPER_ADMIN", "FINANCE_MANAGER"
+  name            String   // e.g., "Super Admin", "Finance Manager"
+  description     String?
+  level           Int      @default(0)   // Hierarchy level: 0=highest (Super Admin), 1=Admin, etc.
+  parentRoleId    String?  // For role hierarchy / inheritance
+  parentRole      Role?    @relation("RoleHierarchy", fields: [parentRoleId], references: [id])
+  childRoles      Role[]   @relation("RoleHierarchy")
+  isSystem        Boolean  @default(false) // System roles cannot be deleted
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+
+  @@index([level])
+  @@index([isActive])
+}
+
+// --- Permission Master ---
+model Permission {
+  id              String   @id @default(cuid())
+  code            String   @unique  // e.g., "VOUCHER_CREATE", "VOUCHER_APPROVE"
+  name            String   // e.g., "Create Voucher", "Approve Voucher"
+  description     String?
+  module          String   // e.g., "vouchers", "accounts", "payroll", "users"
+  action          String   // view, create, edit, delete, approve, reject, export, print, reverse, post, unpost
+  resource        String   // e.g., "voucher", "account", "employee", "user"
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
+
+  @@unique([module, action, resource])
+  @@index([module])
+  @@index([action])
+  @@index([resource])
+}
+
+// --- Role-Permission Mapping ---
+model RolePermission {
+  id           String     @id @default(cuid())
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  isGranted    Boolean    @default(true) // true=grant, false=deny (deny overrides grant)
+  conditions   String?    // JSON: branch-specific, amount-limit, etc.
+  createdBy    String?
+  createdAt    DateTime   @default(now())
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
+
+// --- User-Role Mapping (supports multiple roles per user) ---
+model UserRole {
   id        String   @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  action    String   // CREATE, UPDATE, DELETE, APPROVE, REJECT
-  entity    String   // Account, Voucher, Budget, etc.
-  entityId  String
-  details   String?  // JSON string with change details
-  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId    String
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  isPrimary Boolean  @default(false) // Primary role determines default permissions
+  grantedBy String?  // User ID who granted this role
+  grantedAt DateTime @default(now())
+  expiresAt DateTime? // Role can be temporary
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+}
+
+// --- User-Permission Override (user-level overrides) ---
+model UserPermission {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  isGranted    Boolean    // true=grant override, false=deny override
+  conditions   String?    // JSON: specific conditions
+  grantedBy    String?
+  createdAt    DateTime   @default(now())
+  expiresAt    DateTime?
+
+  @@unique([userId, permissionId])
+  @@index([userId])
+  @@index([permissionId])
+}
+
+// --- User Session Tracking ---
+model UserSession {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token           String    @unique  // Session token
+  refreshToken    String?   @unique  // Refresh token
+  deviceInfo      String?   // JSON: {browser, os, device}
+  deviceFingerprint String? // Device fingerprint hash
+  ipAddress       String?
+  geoLocation     String?   // JSON: {country, city, lat, lon}
+  isActive        Boolean   @default(true)
+  expiresAt       DateTime
+  lastActivityAt  DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@index([isActive])
+  @@index([expiresAt])
+}
+
+// --- Login History ---
+model LoginHistory {
+  id              String   @id @default(cuid())
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email           String   // Email used for login attempt
+  loginStatus     String   // success, failed, locked, expired_token
+  failureReason   String?  // invalid_password, account_locked, account_inactive, etc.
+  ipAddress       String?
+  userAgent       String?  // Raw User-Agent header
+  browser         String?  // Parsed browser name + version
+  os              String?  // Parsed OS
+  device          String?  // desktop, mobile, tablet
+  geoLocation     String?  // JSON: {country, city}
+  sessionId       String?  // Link to UserSession on success
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([loginStatus])
+  @@index([createdAt])
+  @@index([email])
+}
+
+// --- Password History ---
+model PasswordHistory {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  passwordHash String   // Previous password hash
+  changedAt    DateTime @default(now())
+  changedBy    String?  // User ID who changed it (admin reset vs self-change)
+  changeType   String   @default("self") // self, admin_reset, system
+  ipAddress    String?
+
+  @@index([userId])
+  @@index([changedAt])
+}
+
+// --- Security Policy Configuration ---
+model SecurityPolicy {
+  id                        String   @id @default(cuid())
+  name                      String   @unique  // e.g., "Default Security Policy"
+  description               String?
+
+  // Password Policy
+  passwordMinLength          Int      @default(8)
+  passwordMaxLength          Int      @default(128)
+  passwordRequireUppercase   Boolean  @default(true)
+  passwordRequireLowercase   Boolean  @default(true)
+  passwordRequireNumbers     Boolean  @default(true)
+  passwordRequireSpecial     Boolean  @default(true)
+  passwordExpiryDays         Int      @default(90)  // 0 = never expires
+  passwordHistoryCount       Int      @default(5)   // Can't reuse last N passwords
+  passwordMinAgeDays         Int      @default(1)   // Can't change again within N days
+
+  // Account Lockout
+  lockoutThreshold          Int      @default(5)   // Failed attempts before lockout
+  lockoutDurationMinutes    Int      @default(30)  // Lockout duration
+  lockoutIncrementDuration  Boolean  @default(true) // Increase duration on repeated lockouts
+
+  // Session Policy
+  sessionTimeoutMinutes     Int      @default(480)  // 8 hours
+  idleTimeoutMinutes        Int      @default(30)   // 30 min idle
+  maxConcurrentSessions     Int      @default(3)    // Max simultaneous sessions per user
+  singleSessionEnforcement  Boolean  @default(false) // Kill other sessions on new login
+
+  // Login Policy
+  allowRememberMe           Boolean  @default(true)
+  rememberMeDays            Int      @default(30)
+  requireMfa                Boolean  @default(false) // Require 2FA/MFA
+  mfaMethod                 String   @default("totp") // totp, sms, email
+
+  // IP & Access
+  ipWhitelist               String?  // JSON array of allowed IPs/ranges
+  ipBlacklist               String?  // JSON array of blocked IPs/ranges
+  geoRestrictions           String?  // JSON: {allowedCountries: ["PK"]}
+  allowedLoginHours         String?  // JSON: {start: "08:00", end: "22:00"}
+
+  // General
+  isDefault                 Boolean  @default(false)
+  isActive                  Boolean  @default(true)
+  updatedBy                 String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+}
+
+// --- Approval Workflow Definition ---
+model ApprovalWorkflow {
+  id              String   @id @default(cuid())
+  name            String   // e.g., "Journal Entry Approval", "Expense Approval"
+  code            String   @unique // e.g., "JE_APPROVAL", "EXPENSE_APPROVAL"
+  description     String?
+  module          String   // vouchers, expenses, payroll, etc.
+  entityType      String   // Voucher, Expense, PayrollBatch, etc.
+  isActive        Boolean  @default(true)
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  steps           WorkflowStep[]
+  instances       ApprovalInstance[]
+}
+
+// --- Workflow Step Definition ---
+model WorkflowStep {
+  id              String   @id @default(cuid())
+  workflowId      String
+  workflow        ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  stepNumber      Int      // 1, 2, 3...
+  stepName        String   // e.g., "Manager Review", "Finance Approval"
+  stepType        String   @default("role") // role, user, condition, auto
+  approverRoleId  String?  // If stepType=role
+  approverUserId  String?  // If stepType=user (specific person)
+  condition       String?  // JSON: {field: "amount", operator: ">", value: 50000}
+  isParallel      Boolean  @default(false) // Can this step run in parallel with next?
+  escalationMinutes Int?   // Auto-escalate after N minutes
+  escalationTo    String?  // Role or user ID to escalate to
+  isRequired      Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([workflowId])
+}
+
+// --- Approval Instance (runtime) ---
+model ApprovalInstance {
+  id              String   @id @default(cuid())
+  workflowId      String
+  workflow        ApprovalWorkflow @relation(fields: [workflowId], references: [id])
+  entityId        String   // ID of the entity being approved
+  entityType      String   // Voucher, Expense, etc.
+  entityNumber    String?  // Human-readable reference (e.g., voucher number)
+  currentStep     Int      @default(1)
+  totalSteps      Int
+  status          String   @default("pending") // pending, approved, rejected, cancelled, escalated
+  requestedBy     String?  // User ID who submitted
+  requestedAt     DateTime @default(now())
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  steps           ApprovalInstanceStep[]
+  auditLogs       AuditLog[]
+
+  @@index([workflowId])
+  @@index([entityId])
+  @@index([status])
+  @@index([requestedBy])
+}
+
+// --- Approval Instance Step (runtime) ---
+model ApprovalInstanceStep {
+  id              String   @id @default(cuid())
+  instanceId      String
+  instance        ApprovalInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  stepNumber      Int
+  stepName        String
+  approverUserId  String?
+  approver        User?    @relation(fields: [approverUserId], references: [id])
+  approverRoleId  String?
+  status          String   @default("pending") // pending, approved, rejected, skipped, escalated
+  comments        String?
+  actionDate      DateTime?
+  delegatedTo     String?  // User ID if delegated
+  delegatedBy     String?  // User ID who delegated
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([instanceId])
+  @@index([approverUserId])
+  @@index([status])
+}
+
+// --- Enhanced Audit Log ---
+model AuditLog {
+  id              String   @id @default(cuid())
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  username        String?  // Denormalized for quick display
+  action          String   // LOGIN, LOGOUT, CREATE, UPDATE, DELETE, APPROVE, REJECT, EXPORT, PRINT, REVERSE, POST, PERMISSION_CHANGE, PASSWORD_CHANGE
+  entity          String   // Account, Voucher, User, Role, Permission, etc.
+  entityId        String?
+  entityName      String?  // Human-readable name of the entity
+  details         String?  // JSON string with change details
+  oldValues       String?  // JSON: previous state
+  newValues       String?  // JSON: new state
+  ipAddress       String?
+  userAgent       String?
+  sessionId       String?  // Link to session
+  approvalInstanceId String? // Link to approval workflow
+  approvalInstance ApprovalInstance? @relation(fields: [approvalInstanceId], references: [id])
+  severity        String   @default("info") // info, warning, critical
+  module          String?  // Module where action occurred
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([entityId])
+  @@index([createdAt])
+  @@index([severity])
+  @@index([module])
 }
 
 // ============================================================

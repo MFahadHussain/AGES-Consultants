@@ -37,6 +37,9 @@ import {
   FileCheck2,
   Printer,
   FileSpreadsheet,
+  ShieldCheck,
+  Lock,
+  KeyRound,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Input } from '@/components/ui/input'
@@ -59,7 +62,7 @@ const ROLE_MODULES: Record<UserRole, ModuleKey[]> = {
     'reports', 'fixed-assets', 'payroll',
     'employees', 'employee-profile', 'project-assignments', 'allowances', 'attendance',
     'loans', 'tax-slabs', 'payroll-gl-mapping', 'final-settlement', 'payroll-slips', 'payroll-reports',
-    'user-management', 'import-export', 'audit-log', 'settings',
+    'user-management', 'rbac', 'security', 'import-export', 'audit-log', 'settings',
   ],
   manager: [
     'dashboard', 'chart-of-accounts', 'vouchers', 'ledgers', 'bank-reconciliation',
@@ -68,7 +71,7 @@ const ROLE_MODULES: Record<UserRole, ModuleKey[]> = {
     'reports', 'fixed-assets', 'payroll',
     'employees', 'employee-profile', 'project-assignments', 'allowances', 'attendance',
     'loans', 'final-settlement', 'payroll-slips', 'payroll-reports',
-    'audit-log',
+    'audit-log', 'rbac',
   ],
   accountant: [
     'dashboard', 'chart-of-accounts', 'vouchers', 'ledgers', 'bank-reconciliation',
@@ -183,6 +186,8 @@ const navigation: NavGroup[] = [
     label: 'System',
     items: [
       { key: 'user-management', label: 'User Management', icon: UserCog },
+      { key: 'rbac', label: 'Roles & Permissions', icon: KeyRound },
+      { key: 'security', label: 'Security Center', icon: ShieldCheck },
       { key: 'import-export', label: 'Import / Export', icon: Download },
       { key: 'audit-log', label: 'Audit Trail', icon: Shield },
       { key: 'settings', label: 'Settings', icon: Settings },

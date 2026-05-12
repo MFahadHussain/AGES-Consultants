@@ -32,6 +32,8 @@ const ImportExport = lazy(() => import('@/components/modules/import-export').the
 const AuditTrail = lazy(() => import('@/components/modules/audit-trail').then(m => ({ default: m.AuditTrail })))
 const SettingsModule = lazy(() => import('@/components/modules/settings').then(m => ({ default: m.SettingsModule })))
 const UserManagement = lazy(() => import('@/components/modules/user-management').then(m => ({ default: m.UserManagement })))
+const RBACModule = lazy(() => import('@/components/modules/rbac').then(m => ({ default: m.RBACModule })))
+const SecurityCenter = lazy(() => import('@/components/modules/security-center').then(m => ({ default: m.SecurityCenter })))
 
 // HR & Payroll modules
 const EmployeeMaster = lazy(() => import('@/components/modules/employee-master').then(m => ({ default: m.EmployeeMaster })))
@@ -67,6 +69,8 @@ const moduleComponents: Record<ModuleKey, React.LazyExoticComponent<React.Compon
   'audit-log': AuditTrail,
   settings: SettingsModule,
   'user-management': UserManagement,
+  'rbac': RBACModule,
+  'security': SecurityCenter,
   'fixed-assets': FixedAssetsIntegration,
   payroll: PayrollIntegration,
   employees: EmployeeMaster,

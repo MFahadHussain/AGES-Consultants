@@ -34,16 +34,28 @@ export type ModuleKey =
   | 'employee-profile'
   | 'payroll-reports'
   | 'payroll-slips'
+  | 'rbac'
+  | 'security'
 
 export interface AuthUser {
   id: string
   email: string
   name: string
+  username: string | null
+  phone: string | null
   role: string
   isActive: boolean
+  isLocked: boolean
   avatarUrl: string | null
   lastLoginAt: string | null
+  lastLoginIp: string | null
+  branchId: string | null
+  departmentId: string | null
+  employeeId: string | null
+  designation: string | null
+  forcePasswordChange: boolean
   createdAt: string
+  roles?: { id: string; code: string; name: string; isPrimary: boolean }[]
 }
 
 interface AppState {
