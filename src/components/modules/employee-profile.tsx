@@ -11,11 +11,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Badge } from '@/components/ui/badge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import {
   Eye, ChevronDown, ChevronRight, Calendar, MapPin, Landmark, Phone, Mail,
   Briefcase, Edit3, Upload, Plus, Loader2, Info, Search, Printer, Save,
-  FileText, File, Calculator, BarChart3, PieChart, AlertCircle
+  FileText, File, Calculator, BarChart3, PieChart, AlertCircle,
+  Download, Trash2, RefreshCw, Grid3X3, List, X, CheckCircle, AlertTriangle, Clock, Shield, FolderOpen, ZoomIn, ZoomOut
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 
@@ -59,6 +62,26 @@ interface AdvanceData {
 
 interface DocData {
   id: number; name: string; type: string; uploaded: string; size: string
+}
+
+// Document Management types
+interface DocumentTypeData {
+  id: string; name: string; code: string; isRequired: boolean; hasExpiry: boolean
+  allowedFormats: string; maxFileSizeKB: number; sortOrder: number; isActive: boolean
+  _count?: { documents: number }
+}
+
+interface EmployeeDocumentData {
+  id: string; employeeId: string; documentTypeId: string; title: string
+  documentNumber: string | null; issueDate: string | null; expiryDate: string | null
+  notes: string | null; fileName: string; filePath: string; fileSize: number
+  fileType: string; version: number; uploadedBy: string; createdAt: string; updatedAt: string
+  documentType: DocumentTypeData
+  status?: 'valid' | 'expiring' | 'expired' | 'no-expiry'
+}
+
+interface DocumentSummary {
+  total: number; valid: number; expiring: number; expired: number; noExpiry: number; missing: number
 }
 
 interface ContractEarningRow {
@@ -294,6 +317,24 @@ export function EmployeeProfile() {
   const [docStore, setDocStore] = useState<Record<string,DocData[]>>({})
   const [previewDoc, setPreviewDoc] = useState<DocData|null>(null)
   const [replaceDocId, setReplaceDocId] = useState<number|null>(null)
+
+  // Document Management (new)
+  const [empDocs, setEmpDocs] = useState<EmployeeDocumentData[]>([])
+  const [docTypes, setDocTypes] = useState<DocumentTypeData[]>([])
+  const [docSummary, setDocSummary] = useState<DocumentSummary>({ total:0, valid:0, expiring:0, expired:0, noExpiry:0, missing:0 })
+  const [missingRequired, setMissingRequired] = useState<DocumentTypeData[]>([])
+  const [docsLoading, setDocsLoading] = useState(false)
+  const [docViewMode, setDocViewMode] = useState<'grid'|'list'>('grid')
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
+  const [viewDocId, setViewDocId] = useState<string|null>(null)
+  const [deleteDocId, setDeleteDocId] = useState<string|null>(null)
+  const [uploadForm, setUploadForm] = useState({
+    documentTypeId: '', title: '', documentNumber: '', issueDate: '', expiryDate: '', notes: ''
+  })
+  const [uploadFile, setUploadFile] = useState<File|null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [replaceDocIdNew, setReplaceDocIdNew] = useState<string|null>(null)
 
   // Available months for dropdowns
   const availableMonths = useMemo(() => getRecentMonths(12), [])
@@ -552,6 +593,37 @@ export function EmployeeProfile() {
     fetchLoans()
     fetchSalaryHistory()
   }, [selectedId, attMonths[selectedId || '']])
+
+  // ---- Fetch Documents ----
+  const fetchEmpDocs = useCallback(async () => {
+    if (!selectedId) return
+    setDocsLoading(true)
+    try {
+      const [docsRes, typesRes] = await Promise.all([
+        fetch(`/api/documents?employeeId=${selectedId}`),
+        fetch('/api/document-types')
+      ])
+      if (docsRes.ok) {
+        const docsData = await docsRes.json()
+        setEmpDocs(docsData.documents || [])
+        setDocSummary(docsData.summary || { total:0, valid:0, expiring:0, expired:0, noExpiry:0, missing:0 })
+        setMissingRequired(docsData.missingRequired || [])
+      }
+      if (typesRes.ok) {
+        const typesData = await typesRes.json()
+        setDocTypes(typesData || [])
+      }
+    } catch {
+      toast.error('Failed to load documents')
+    } finally {
+      setDocsLoading(false)
+    }
+  }, [selectedId, toast])
+
+  // Fetch documents when employee changes
+  useEffect(() => {
+    if (selectedId && activeTab === 'documents') fetchEmpDocs()
+  }, [selectedId, activeTab, fetchEmpDocs])
 
   // Set default payroll month to current month
   useEffect(() => {
@@ -835,7 +907,7 @@ export function EmployeeProfile() {
     {key:'social-charges',label:'Social Charges'},
     {key:'loans-advances',label:'Loans & Advances'},
     {key:'attendance-summary',label:'Attendance Summary'},
-    {key:'documents',label:'Documents'},
+    {key:'documents',label:'Documents', badge: docSummary.total > 0 ? String(docSummary.total) : undefined, alert: docSummary.expired > 0 || docSummary.expiring > 0 },
   ]
 
   // ========================================================================
@@ -1057,6 +1129,19 @@ export function EmployeeProfile() {
         <p className="text-[11px] text-slate-500">Advance Balance</p>
         <p className="text-[18px] font-semibold text-orange-500">{formatPKR(advBalance)}</p>
       </div>
+      {/* Document Health Indicator */}
+      {(docSummary.total > 0 || docSummary.missing > 0) && (
+        <div className="col-span-2 bg-white border border-slate-200 rounded-xl p-3">
+          <p className="text-[11px] text-slate-500 mb-1.5">Documents</p>
+          <div className="flex items-center gap-3 flex-wrap">
+            {docSummary.valid > 0 && <span className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1"><CheckCircle className="h-3 w-3"/>{docSummary.valid} Valid</span>}
+            {docSummary.expiring > 0 && <span className="text-[11px] font-semibold text-amber-700 flex items-center gap-1"><AlertTriangle className="h-3 w-3"/>{docSummary.expiring} Expiring</span>}
+            {docSummary.expired > 0 && <span className="text-[11px] font-semibold text-red-700 flex items-center gap-1"><AlertTriangle className="h-3 w-3"/>{docSummary.expired} Expired</span>}
+            {docSummary.missing > 0 && <span className="text-[11px] font-semibold text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3"/>{docSummary.missing} Missing</span>}
+            {docSummary.noExpiry > 0 && <span className="text-[11px] text-gray-500 flex items-center gap-1"><Clock className="h-3 w-3"/>{docSummary.noExpiry} No Expiry</span>}
+          </div>
+        </div>
+      )}
     </div>
   )
 
@@ -1998,89 +2083,563 @@ export function EmployeeProfile() {
   // ========================================================================
   // RENDER: Tab 5 — Documents
   // ========================================================================
+  // Helper: format file size
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024*1024) return `${(bytes/1024).toFixed(1)} KB`
+    return `${(bytes/(1024*1024)).toFixed(1)} MB`
+  }
+
+  // Helper: CNIC format
+  const formatCnicInput = (val: string) => {
+    const digits = val.replace(/\D/g, '').slice(0, 13)
+    if (digits.length <= 5) return digits
+    if (digits.length <= 12) return `${digits.slice(0,5)}-${digits.slice(5)}`
+    return `${digits.slice(0,5)}-${digits.slice(5,12)}-${digits.slice(12)}`
+  }
+
+  // Helper: get document status badge
+  const getDocStatusBadge = (doc: EmployeeDocumentData) => {
+    if (!doc.expiryDate) return { label: 'No Expiry', color: 'bg-gray-100 text-gray-600 border-gray-200', icon: Clock }
+    const now = new Date()
+    const exp = new Date(doc.expiryDate)
+    const daysUntil = Math.ceil((exp.getTime() - now.getTime()) / (1000*60*60*24))
+    if (daysUntil < 0) return { label: 'Expired', color: 'bg-red-100 text-red-700 border-red-200', icon: AlertTriangle }
+    if (daysUntil <= 90) return { label: `Expiring ${daysUntil}d`, color: 'bg-amber-100 text-amber-700 border-amber-200', icon: AlertTriangle }
+    return { label: 'Valid', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle }
+  }
+
+  // Helper: get file type icon color
+  const getFileTypeStyle = (fileType: string) => {
+    if (fileType.includes('pdf')) return { bg: 'bg-red-100 text-red-700', icon: FileText }
+    if (fileType.includes('image') || fileType.includes('jpg') || fileType.includes('png')) return { bg: 'bg-blue-100 text-blue-700', icon: File }
+    return { bg: 'bg-violet-100 text-violet-700', icon: File }
+  }
+
+  // Upload handler
+  const handleDocumentUpload = async () => {
+    if (!selectedId || !uploadForm.documentTypeId || !uploadFile) {
+      toast.error('Please fill all required fields and select a file')
+      return
+    }
+    const selectedDocType = docTypes.find(dt => dt.id === uploadForm.documentTypeId)
+    if (!selectedDocType) return
+
+    // CNIC validation
+    if ((selectedDocType.code === 'CNIC_FRONT' || selectedDocType.code === 'CNIC_BACK') && uploadForm.documentNumber) {
+      const cnicPattern = /^\d{5}-\d{7}-\d{1}$/
+      if (!cnicPattern.test(uploadForm.documentNumber)) {
+        toast.error('CNIC format must be XXXXX-XXXXXXX-X')
+        return
+      }
+    }
+
+    // File format check
+    const ext = uploadFile.name.split('.').pop()?.toLowerCase() || ''
+    const allowed = selectedDocType.allowedFormats.split(',').map(f => f.trim().toLowerCase())
+    if (!allowed.includes(ext)) {
+      toast.error(`File format .${ext} not allowed. Accepted: ${selectedDocType.allowedFormats}`)
+      return
+    }
+
+    // File size check
+    if (uploadFile.size > selectedDocType.maxFileSizeKB * 1024) {
+      toast.error(`File too large. Max size: ${formatFileSize(selectedDocType.maxFileSizeKB * 1024)}`)
+      return
+    }
+
+    setUploading(true)
+    setUploadProgress(0)
+    try {
+      const formData = new FormData()
+      formData.append('employeeId', selectedId)
+      formData.append('documentTypeId', uploadForm.documentTypeId)
+      formData.append('title', uploadForm.title || selectedDocType.name)
+      formData.append('documentNumber', uploadForm.documentNumber)
+      formData.append('issueDate', uploadForm.issueDate)
+      formData.append('expiryDate', uploadForm.expiryDate)
+      formData.append('notes', uploadForm.notes)
+      formData.append('file', uploadFile)
+      formData.append('employeeCode', emp?.employeeCode || 'UNKNOWN')
+
+      // Simulate progress
+      const progressInterval = setInterval(() => setUploadProgress(p => Math.min(p + 10, 90)), 200)
+
+      const res = await fetch('/api/documents/upload', { method: 'POST', body: formData })
+      clearInterval(progressInterval)
+      setUploadProgress(100)
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Upload failed')
+      }
+
+      toast.success('Document uploaded successfully')
+      setUploadDialogOpen(false)
+      setUploadForm({ documentTypeId: '', title: '', documentNumber: '', issueDate: '', expiryDate: '', notes: '' })
+      setUploadFile(null)
+      setUploadProgress(0)
+      fetchEmpDocs()
+    } catch (e: any) {
+      toast.error(e.message || 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  // Replace handler
+  const handleDocumentReplace = async (docId: string, file: File) => {
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('reason', 'Document replaced')
+      formData.append('employeeCode', emp?.employeeCode || 'UNKNOWN')
+
+      const res = await fetch(`/api/documents/${docId}`, { method: 'PUT', body: formData })
+      if (!res.ok) throw new Error('Replace failed')
+      toast.success('Document replaced successfully')
+      setReplaceDocIdNew(null)
+      fetchEmpDocs()
+    } catch {
+      toast.error('Failed to replace document')
+    }
+  }
+
+  // Delete handler
+  const handleDocumentDelete = async () => {
+    if (!deleteDocId) return
+    try {
+      const res = await fetch(`/api/documents/${deleteDocId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Delete failed')
+      toast.success('Document deleted')
+      setDeleteDocId(null)
+      fetchEmpDocs()
+    } catch {
+      toast.error('Failed to delete document')
+    }
+  }
+
+  // Auto-suggest CNIC expiry (10 years from issue)
+  const handleIssueDateChange = (date: string) => {
+    setUploadForm(prev => {
+      const updated = { ...prev, issueDate: date }
+      const selectedDocType = docTypes.find(dt => dt.id === prev.documentTypeId)
+      if (selectedDocType?.hasExpiry && date) {
+        const issueDate = new Date(date)
+        if (selectedDocType.code === 'CNIC_FRONT' || selectedDocType.code === 'CNIC_BACK') {
+          issueDate.setFullYear(issueDate.getFullYear() + 10)
+          updated.expiryDate = issueDate.toISOString().split('T')[0]
+        }
+      }
+      return updated
+    })
+  }
+
+  // View document
+  const viewDoc = empDocs.find(d => d.id === viewDocId)
+
   const renderDocuments = () => {
-    const docsList = docs.length > 0 ? docs : [
-      { id:1, name:'CNIC Copy', type:'pdf', uploaded: emp?.joinDate || new Date().toISOString().split('T')[0], size:'—' },
-      { id:2, name:'Employment Contract', type:'pdf', uploaded: emp?.joinDate || new Date().toISOString().split('T')[0], size:'—' },
-    ]
+    if (docsLoading) {
+      return (
+        <div className="space-y-4 animate-pulse">
+          <div className="h-20 bg-slate-100 rounded-xl"/>
+          <div className="grid grid-cols-3 gap-3">{[1,2,3].map(i => <div key={i} className="h-32 bg-slate-100 rounded-xl"/>)}</div>
+        </div>
+      )
+    }
 
     return (
       <div className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {docsList.map(doc => {
-            const isReplacing = replaceDocId === doc.id
-            const typeColor = doc.type === 'pdf' ? 'bg-red-100 text-red-700' : doc.type === 'zip' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
-            return (
-              <div key={doc.id} className="bg-white border border-slate-200 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <div className={`h-9 w-9 rounded-lg flex items-center justify-center text-[10px] font-bold ${typeColor}`}>
-                    {doc.type.toUpperCase()}
+        {/* Missing Documents Alert */}
+        {missingRequired.length > 0 && (
+          <div className="flex items-start gap-3 p-3 rounded-xl bg-red-50 border border-red-200">
+            <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-xs font-semibold text-red-800">
+                {missingRequired.length} mandatory document{missingRequired.length > 1 ? 's' : ''} missing
+              </p>
+              <p className="text-[11px] text-red-600">
+                {missingRequired.map(d => d.name).join(', ')}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Document Health Summary */}
+        <div className="flex items-center gap-4 p-3 rounded-xl bg-gradient-to-r from-slate-50 to-white border">
+          <div className="flex items-center gap-1.5">
+            <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+            <span className="text-[11px] font-semibold text-emerald-700">{docSummary.valid} Valid</span>
+          </div>
+          {docSummary.expiring > 0 && (
+            <div className="flex items-center gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+              <span className="text-[11px] font-semibold text-amber-700">{docSummary.expiring} Expiring</span>
+            </div>
+          )}
+          {docSummary.expired > 0 && (
+            <div className="flex items-center gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+              <span className="text-[11px] font-semibold text-red-700">{docSummary.expired} Expired</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5 text-gray-400" />
+            <span className="text-[11px] text-gray-500">{docSummary.noExpiry} No Expiry</span>
+          </div>
+          {docSummary.missing > 0 && (
+            <div className="flex items-center gap-1.5">
+              <AlertCircle className="h-3.5 w-3.5 text-red-400" />
+              <span className="text-[11px] font-semibold text-red-600">{docSummary.missing} Missing</span>
+            </div>
+          )}
+          <div className="flex-1" />
+          <Button size="sm" className="h-7 text-[10px] bg-slate-900 hover:bg-slate-800" onClick={() => { setUploadForm({ documentTypeId: '', title: '', documentNumber: '', issueDate: '', expiryDate: '', notes: '' }); setUploadFile(null); setUploadDialogOpen(true) }}>
+            <Plus className="h-3 w-3 mr-1"/>Upload Document
+          </Button>
+          <div className="flex items-center border rounded-lg overflow-hidden">
+            <button className={`p-1.5 ${docViewMode === 'grid' ? 'bg-slate-900 text-white' : 'text-slate-400 hover:text-slate-600'}`} onClick={() => setDocViewMode('grid')}><Grid3X3 className="h-3.5 w-3.5"/></button>
+            <button className={`p-1.5 ${docViewMode === 'list' ? 'bg-slate-900 text-white' : 'text-slate-400 hover:text-slate-600'}`} onClick={() => setDocViewMode('list')}><List className="h-3.5 w-3.5"/></button>
+          </div>
+        </div>
+
+        {/* Empty State */}
+        {empDocs.length === 0 && missingRequired.length === 0 && (
+          <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-xl">
+            <FolderOpen className="h-10 w-10 text-slate-300 mx-auto mb-3"/>
+            <p className="text-sm font-medium text-slate-500">No documents uploaded yet</p>
+            <p className="text-[11px] text-slate-400 mt-1">Upload employee documents like CNIC, contracts, and certificates</p>
+            <Button size="sm" className="mt-4 h-8 text-xs bg-slate-900 hover:bg-slate-800" onClick={() => { setUploadForm({ documentTypeId: '', title: '', documentNumber: '', issueDate: '', expiryDate: '', notes: '' }); setUploadFile(null); setUploadDialogOpen(true) }}>
+              <Plus className="h-3 w-3 mr-1"/>Upload First Document
+            </Button>
+          </div>
+        )}
+
+        {/* Card Grid View */}
+        {docViewMode === 'grid' && empDocs.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {empDocs.map(doc => {
+              const statusBadge = getDocStatusBadge(doc)
+              const fileStyle = getFileTypeStyle(doc.fileType)
+              const FileIcon = fileStyle.icon
+              const StatusIcon = statusBadge.icon
+              const isReplacing = replaceDocIdNew === doc.id
+              return (
+                <div key={doc.id} className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-sm transition-shadow">
+                  <div className="flex items-start gap-3">
+                    <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${fileStyle.bg}`}>
+                      <FileIcon className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-slate-900 truncate">{doc.title}</p>
+                      <p className="text-[11px] text-slate-500 truncate">{doc.documentType.name}</p>
+                      {doc.documentNumber && <p className="text-[10px] font-mono text-slate-400">{doc.documentNumber}</p>}
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium text-slate-900 truncate">{doc.name}</p>
-                    <p className="text-[11px] text-slate-500">{formatDate(doc.uploaded)} • {doc.size}</p>
+                  {/* Dates */}
+                  <div className="mt-2 flex items-center gap-3 text-[10px] text-slate-500">
+                    {doc.issueDate && <span>Issue: {formatDate(doc.issueDate)}</span>}
+                    {doc.expiryDate && <span>Exp: {formatDate(doc.expiryDate)}</span>}
+                  </div>
+                  {/* Status + Actions */}
+                  <div className="mt-3 flex items-center justify-between">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold border ${statusBadge.color}`}>
+                      <StatusIcon className="h-2.5 w-2.5" />{statusBadge.label}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Tooltip><TooltipTrigger asChild><button className="p-1 rounded hover:bg-slate-100 text-slate-500" onClick={() => setViewDocId(doc.id)}><Eye className="h-3.5 w-3.5"/></button></TooltipTrigger><TooltipContent>View</TooltipContent></Tooltip>
+                      <Tooltip><TooltipTrigger asChild><a href={`/api/documents/${doc.id}?download=true`} className="p-1 rounded hover:bg-slate-100 text-slate-500"><Download className="h-3.5 w-3.5"/></a></TooltipTrigger><TooltipContent>Download</TooltipContent></Tooltip>
+                      <Tooltip><TooltipTrigger asChild><button className="p-1 rounded hover:bg-slate-100 text-slate-500" onClick={() => setReplaceDocIdNew(isReplacing ? null : doc.id)}><RefreshCw className="h-3.5 w-3.5"/></button></TooltipTrigger><TooltipContent>Replace</TooltipContent></Tooltip>
+                      <Tooltip><TooltipTrigger asChild><button className="p-1 rounded hover:bg-red-50 text-red-400" onClick={() => setDeleteDocId(doc.id)}><Trash2 className="h-3.5 w-3.5"/></button></TooltipTrigger><TooltipContent>Delete</TooltipContent></Tooltip>
+                    </div>
+                  </div>
+                  {/* Replace file area */}
+                  {isReplacing && (
+                    <div className="mt-2 p-2 border border-dashed border-slate-300 rounded-lg bg-slate-50">
+                      <Input type="file" className="h-8 text-xs" onChange={(e) => {
+                        const f = e.target.files?.[0]
+                        if (f) handleDocumentReplace(doc.id, f)
+                      }} accept=".pdf,.jpg,.jpeg,.png,.docx" />
+                      <button className="text-[10px] text-slate-400 mt-1 hover:text-slate-600" onClick={() => setReplaceDocIdNew(null)}>Cancel</button>
+                    </div>
+                  )}
+                  {/* File info */}
+                  <div className="mt-2 text-[9px] text-slate-400">
+                    {doc.fileName} • {formatFileSize(doc.fileSize)} • v{doc.version} • {formatDate(doc.createdAt)}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 mt-3">
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1" onClick={()=>setPreviewDoc(doc)}>
-                    <Eye className="h-3 w-3 mr-1"/>View
-                  </Button>
-                  {isAdmin && !isReplacing && (
-                    <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1" onClick={()=>setReplaceDocId(doc.id)}>
-                      <Edit3 className="h-3 w-3 mr-1"/>Replace
-                    </Button>
-                  )}
-                  {isAdmin && isReplacing && (
-                    <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1" onClick={()=>setReplaceDocId(null)}>Cancel</Button>
-                  )}
+              )
+            })}
+          </div>
+        )}
+
+        {/* Table List View */}
+        {docViewMode === 'list' && empDocs.length > 0 && (
+          <div className="border rounded-xl overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-[10px] h-8">Document Type</TableHead>
+                  <TableHead className="text-[10px] h-8">Document No.</TableHead>
+                  <TableHead className="text-[10px] h-8">Issue Date</TableHead>
+                  <TableHead className="text-[10px] h-8">Expiry Date</TableHead>
+                  <TableHead className="text-[10px] h-8">Status</TableHead>
+                  <TableHead className="text-[10px] h-8">File</TableHead>
+                  <TableHead className="text-[10px] h-8 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {empDocs.map(doc => {
+                  const statusBadge = getDocStatusBadge(doc)
+                  const StatusIcon = statusBadge.icon
+                  const isReplacing = replaceDocIdNew === doc.id
+                  return (
+                    <React.Fragment key={doc.id}>
+                      <TableRow className="hover:bg-slate-50">
+                        <TableCell className="text-xs py-2 font-medium">{doc.title}<span className="text-[10px] text-slate-400 block">{doc.documentType.name}</span></TableCell>
+                        <TableCell className="text-xs py-2 font-mono">{doc.documentNumber || '—'}</TableCell>
+                        <TableCell className="text-xs py-2">{doc.issueDate ? formatDate(doc.issueDate) : '—'}</TableCell>
+                        <TableCell className="text-xs py-2">{doc.expiryDate ? formatDate(doc.expiryDate) : '—'}</TableCell>
+                        <TableCell className="py-2">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold border ${statusBadge.color}`}>
+                            <StatusIcon className="h-2.5 w-2.5" />{statusBadge.label}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-[10px] py-2 text-slate-500">{doc.fileName} ({formatFileSize(doc.fileSize)})</TableCell>
+                        <TableCell className="py-2 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setViewDocId(doc.id)}><Eye className="h-3 w-3"/></Button>
+                            <a href={`/api/documents/${doc.id}?download=true`}><Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]"><Download className="h-3 w-3"/></Button></a>
+                            <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setReplaceDocIdNew(isReplacing ? null : doc.id)}><RefreshCw className="h-3 w-3"/></Button>
+                            <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px] text-red-500" onClick={() => setDeleteDocId(doc.id)}><Trash2 className="h-3 w-3"/></Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {isReplacing && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="p-2 bg-slate-50">
+                            <div className="flex items-center gap-2">
+                              <Input type="file" className="h-8 text-xs flex-1" onChange={(e) => {
+                                const f = e.target.files?.[0]
+                                if (f) handleDocumentReplace(doc.id, f)
+                              }} accept=".pdf,.jpg,.jpeg,.png,.docx" />
+                              <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={() => setReplaceDocIdNew(null)}>Cancel</Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {/* Upload Dialog */}
+        <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="text-sm flex items-center gap-2">
+                <Upload className="h-4 w-4"/>Upload Document
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
+              {/* Document Type */}
+              <div>
+                <Label className="text-xs">Document Type <span className="text-red-500">*</span></Label>
+                <Select value={uploadForm.documentTypeId} onValueChange={v => {
+                  const dt = docTypes.find(d => d.id === v)
+                  setUploadForm(prev => ({
+                    ...prev,
+                    documentTypeId: v,
+                    title: dt?.name || prev.title,
+                    expiryDate: dt?.hasExpiry ? prev.expiryDate : ''
+                  }))
+                }}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select document type..." /></SelectTrigger>
+                  <SelectContent>
+                    {docTypes.filter(dt => dt.isActive).sort((a,b) => a.sortOrder - b.sortOrder).map(dt => (
+                      <SelectItem key={dt.id} value={dt.id}>
+                        {dt.name} {dt.isRequired && <span className="text-red-500">*</span>}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Title */}
+              <div>
+                <Label className="text-xs">Document Title <span className="text-red-500">*</span></Label>
+                <Input className="h-8 text-xs" value={uploadForm.title} onChange={e => setUploadForm(prev => ({...prev, title: e.target.value}))} placeholder="Document title" />
+              </div>
+
+              {/* Document Number */}
+              <div>
+                <Label className="text-xs">Document Number {['CNIC_FRONT','CNIC_BACK'].includes(docTypes.find(d => d.id === uploadForm.documentTypeId)?.code || '') && <span className="text-red-500">*</span>}</Label>
+                <Input className="h-8 text-xs font-mono" value={uploadForm.documentNumber}
+                  onChange={e => {
+                    const code = docTypes.find(d => d.id === uploadForm.documentTypeId)?.code
+                    if (code === 'CNIC_FRONT' || code === 'CNIC_BACK') {
+                      setUploadForm(prev => ({...prev, documentNumber: formatCnicInput(e.target.value)}))
+                    } else {
+                      setUploadForm(prev => ({...prev, documentNumber: e.target.value}))
+                    }
+                  }}
+                  placeholder={docTypes.find(d => d.id === uploadForm.documentTypeId)?.code === 'CNIC_FRONT' ? '35202-1234567-1' : 'Document number'} />
+                {['CNIC_FRONT','CNIC_BACK'].includes(docTypes.find(d => d.id === uploadForm.documentTypeId)?.code || '') && (
+                  <p className="text-[10px] text-slate-400 mt-0.5">Format: XXXXX-XXXXXXX-X (13 digits)</p>
+                )}
+              </div>
+
+              {/* Issue / Expiry dates */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Issue Date</Label>
+                  <Input type="date" className="h-8 text-xs" value={uploadForm.issueDate} onChange={e => handleIssueDateChange(e.target.value)} />
                 </div>
-                {isReplacing && (
-                  <div className="mt-2">
-                    <Input type="file" className="h-8 text-xs" onChange={() => { setReplaceDocId(null); toast.success('Document replaced successfully') }} accept=".pdf,.zip,.jpg,.png" />
+                {docTypes.find(d => d.id === uploadForm.documentTypeId)?.hasExpiry && (
+                  <div>
+                    <Label className="text-xs">Expiry Date <span className="text-red-500">*</span></Label>
+                    <Input type="date" className="h-8 text-xs" value={uploadForm.expiryDate} onChange={e => setUploadForm(prev => ({...prev, expiryDate: e.target.value}))} />
+                    {['CNIC_FRONT','CNIC_BACK'].includes(docTypes.find(d => d.id === uploadForm.documentTypeId)?.code || '') && uploadForm.issueDate && (
+                      <p className="text-[10px] text-emerald-600 mt-0.5">Auto-suggested: 10 years from issue</p>
+                    )}
                   </div>
                 )}
               </div>
-            )
-          })}
-        </div>
-        {isAdmin && (
-          <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-slate-300 transition-colors">
-            <Upload className="h-8 w-8 text-slate-300 mx-auto mb-2"/>
-            <p className="text-sm text-slate-500 mb-1">Upload New Document</p>
-            <p className="text-[11px] text-slate-400 mb-3">PDF, ZIP, or image files</p>
-            <Input type="file" className="max-w-xs mx-auto h-8 text-xs" onChange={() => toast.success('Document uploaded successfully')} accept=".pdf,.zip,.jpg,.png"/>
-          </div>
-        )}
-        {/* Document Preview Sheet */}
-        <Sheet open={!!previewDoc} onOpenChange={()=>setPreviewDoc(null)}>
-          <SheetContent className="w-full sm:max-w-lg">
-            {previewDoc && (
+
+              {/* File Upload */}
+              <div>
+                <Label className="text-xs">File <span className="text-red-500">*</span></Label>
+                {!uploadFile ? (
+                  <div
+                    className="mt-1 border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-slate-400 hover:bg-slate-50/50 transition-colors cursor-pointer"
+                    onClick={() => document.getElementById('doc-file-input')?.click()}
+                    onDragOver={e => { e.preventDefault(); e.stopPropagation() }}
+                    onDrop={e => {
+                      e.preventDefault(); e.stopPropagation()
+                      const f = e.dataTransfer.files[0]
+                      if (f) setUploadFile(f)
+                    }}
+                  >
+                    <Upload className="h-6 w-6 text-slate-300 mx-auto mb-2"/>
+                    <p className="text-xs text-slate-500">Drag & drop or click to browse</p>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      PDF, JPG, PNG, DOCX • Max {formatFileSize((docTypes.find(d => d.id === uploadForm.documentTypeId)?.maxFileSizeKB || 5120) * 1024)}
+                    </p>
+                    <input id="doc-file-input" type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.docx" onChange={e => { const f = e.target.files?.[0]; if (f) setUploadFile(f) }} />
+                  </div>
+                ) : (
+                  <div className="mt-1 p-3 border border-slate-200 rounded-xl bg-slate-50 flex items-center gap-3">
+                    <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${getFileTypeStyle(uploadFile.type || uploadFile.name).bg}`}>
+                      {React.createElement(getFileTypeStyle(uploadFile.type || uploadFile.name).icon, { className: 'h-5 w-5' })}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium truncate">{uploadFile.name}</p>
+                      <p className="text-[10px] text-slate-400">{formatFileSize(uploadFile.size)}</p>
+                    </div>
+                    <button className="p-1 rounded hover:bg-slate-200 text-slate-400" onClick={() => setUploadFile(null)}><X className="h-4 w-4"/></button>
+                  </div>
+                )}
+                {/* Upload Progress */}
+                {uploading && (
+                  <div className="mt-2">
+                    <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">Uploading... {uploadProgress}%</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Notes */}
+              <div>
+                <Label className="text-xs">Notes / Remarks</Label>
+                <Textarea className="text-xs min-h-[60px]" value={uploadForm.notes} onChange={e => setUploadForm(prev => ({...prev, notes: e.target.value}))} placeholder="Optional notes..." />
+              </div>
+            </div>
+            <DialogFooter className="mt-3 gap-2">
+              <Button variant="outline" size="sm" className="text-xs h-8" onClick={() => setUploadDialogOpen(false)} disabled={uploading}>Cancel</Button>
+              <Button size="sm" className="text-xs h-8 bg-slate-900 hover:bg-slate-800" onClick={handleDocumentUpload} disabled={uploading || !uploadForm.documentTypeId || !uploadFile}>
+                {uploading ? <><Loader2 className="h-3 w-3 mr-1 animate-spin"/>Uploading...</> : <><Upload className="h-3 w-3 mr-1"/>Upload</>}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Document Viewer Sheet */}
+        <Sheet open={!!viewDocId} onOpenChange={() => setViewDocId(null)}>
+          <SheetContent className="w-full sm:max-w-3xl">
+            {viewDoc && (
               <>
                 <SheetHeader>
-                  <SheetTitle className="text-left">{previewDoc.name}</SheetTitle>
+                  <SheetTitle className="text-left text-sm">{viewDoc.title}</SheetTitle>
                 </SheetHeader>
-                <div className="mt-6 space-y-4">
+                <div className="mt-4 space-y-4">
+                  {/* Document Info */}
+                  <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 border">
+                    <div><p className="text-[10px] text-slate-400">Document Type</p><p className="text-xs font-medium">{viewDoc.documentType.name}</p></div>
+                    <div><p className="text-[10px] text-slate-400">Document No.</p><p className="text-xs font-mono">{viewDoc.documentNumber || '—'}</p></div>
+                    <div><p className="text-[10px] text-slate-400">Issue Date</p><p className="text-xs">{viewDoc.issueDate ? formatDate(viewDoc.issueDate) : '—'}</p></div>
+                    <div><p className="text-[10px] text-slate-400">Expiry Date</p><p className="text-xs">{viewDoc.expiryDate ? formatDate(viewDoc.expiryDate) : '—'}</p></div>
+                    <div><p className="text-[10px] text-slate-400">File</p><p className="text-xs">{viewDoc.fileName} ({formatFileSize(viewDoc.fileSize)})</p></div>
+                    <div><p className="text-[10px] text-slate-400">Version</p><p className="text-xs">v{viewDoc.version}</p></div>
+                    <div><p className="text-[10px] text-slate-400">Uploaded By</p><p className="text-xs">{viewDoc.uploadedBy}</p></div>
+                    <div><p className="text-[10px] text-slate-400">Uploaded On</p><p className="text-xs">{formatDate(viewDoc.createdAt)}</p></div>
+                  </div>
+                  {/* Status */}
                   <div className="flex items-center gap-3">
-                    <div className={`h-12 w-12 rounded-lg flex items-center justify-center text-sm font-bold ${previewDoc.type==='pdf'?'bg-red-100 text-red-700':previewDoc.type==='zip'?'bg-amber-100 text-amber-700':'bg-blue-100 text-blue-700'}`}>
-                      {previewDoc.type.toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-medium text-slate-900">{previewDoc.name}</p>
-                      <p className="text-[12px] text-slate-500">Uploaded: {formatDate(previewDoc.uploaded)}</p>
-                      <p className="text-[12px] text-slate-500">Size: {previewDoc.size}</p>
-                    </div>
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${getDocStatusBadge(viewDoc).color}`}>
+                      {React.createElement(getDocStatusBadge(viewDoc).icon, { className: 'h-3 w-3' })}{getDocStatusBadge(viewDoc).label}
+                    </span>
+                    {viewDoc.notes && <span className="text-[11px] text-slate-500 italic">"{viewDoc.notes}"</span>}
                   </div>
                   <Separator />
-                  <div className="bg-slate-50 rounded-xl p-8 text-center">
-                    <FileText className="h-12 w-12 text-slate-300 mx-auto mb-2"/>
-                    <p className="text-sm text-slate-500">Document preview</p>
-                    <p className="text-[11px] text-slate-400 mt-1">File: {previewDoc.name}.{previewDoc.type}</p>
+                  {/* File Preview */}
+                  <div className="bg-white border rounded-xl overflow-hidden" style={{ minHeight: 400 }}>
+                    {viewDoc.fileType.includes('pdf') ? (
+                      <iframe src={`/api/documents/${viewDoc.id}`} className="w-full border-0" style={{ height: 500 }} title={viewDoc.title} />
+                    ) : viewDoc.fileType.includes('image') || viewDoc.fileType.includes('jpg') || viewDoc.fileType.includes('png') ? (
+                      <div className="flex items-center justify-center p-4 bg-slate-50">
+                        <img src={`/api/documents/${viewDoc.id}`} alt={viewDoc.title} className="max-w-full max-h-[500px] object-contain rounded" />
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                        <FileText className="h-12 w-12 mb-3" />
+                        <p className="text-sm font-medium">Preview not available</p>
+                        <p className="text-[11px]">Download to view this file</p>
+                      </div>
+                    )}
+                  </div>
+                  {/* Viewer Actions */}
+                  <div className="flex items-center gap-2">
+                    <a href={`/api/documents/${viewDoc.id}?download=true`} className="flex-1">
+                      <Button variant="outline" size="sm" className="w-full h-8 text-xs"><Download className="h-3 w-3 mr-1"/>Download</Button>
+                    </a>
+                    <Button variant="outline" size="sm" className="flex-1 h-8 text-xs" onClick={() => { setViewDocId(null); setReplaceDocIdNew(viewDoc.id) }}><RefreshCw className="h-3 w-3 mr-1"/>Replace</Button>
                   </div>
                 </div>
               </>
             )}
           </SheetContent>
         </Sheet>
+
+        {/* Delete Confirmation */}
+        <Dialog open={!!deleteDocId} onOpenChange={() => setDeleteDocId(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-sm flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-red-500"/>Delete Document
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-xs text-slate-600">Are you sure you want to delete this document? The file will be archived for audit purposes but removed from the employee record.</p>
+            <DialogFooter className="mt-3 gap-2">
+              <Button variant="outline" size="sm" className="text-xs h-8" onClick={() => setDeleteDocId(null)}>Cancel</Button>
+              <Button size="sm" className="text-xs h-8 bg-red-600 hover:bg-red-700 text-white" onClick={handleDocumentDelete}><Trash2 className="h-3 w-3 mr-1"/>Delete</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     )
   }
@@ -2155,8 +2714,10 @@ export function EmployeeProfile() {
           {/* Tab Navigation */}
           <div className="flex flex-wrap gap-1 bg-white border border-slate-200 rounded-xl p-1.5">
             {tabs.map(t => (
-              <button key={t.key} className={`px-4 py-2 text-xs font-medium rounded-lg transition-colors ${activeTab===t.key?'bg-slate-900 text-white':'text-slate-500 hover:text-slate-700'}`} onClick={()=>setActiveTab(t.key)}>
+              <button key={t.key} className={`px-4 py-2 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${activeTab===t.key?'bg-slate-900 text-white':'text-slate-500 hover:text-slate-700'}`} onClick={()=>{ setActiveTab(t.key); if(t.key==='documents') fetchEmpDocs(); }}>
+                {(t as any).alert && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
                 {t.label}
+                {(t as any).badge && <span className={`ml-0.5 px-1.5 py-0 rounded-full text-[9px] font-bold ${activeTab===t.key?'bg-white/20 text-white':'bg-slate-100 text-slate-600'}`}>{(t as any).badge}</span>}
               </button>
             ))}
           </div>

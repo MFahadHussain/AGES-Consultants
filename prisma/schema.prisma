@@ -766,6 +766,80 @@ model Employee {
   loanRecords       Loan[]
   payrollLines      PayrollBatchLine[]
   finalSettlement   FinalSettlement?
+  documents         EmployeeDocument[]
+}
+
+// ============================================================
+// Document Management
+// ============================================================
+
+model DocumentType {
+  id              String   @id @default(cuid())
+  name            String   @unique            // e.g. "CNIC (Front)", "Employment Contract"
+  code            String   @unique            // e.g. "CNIC_FRONT", "EMPLOYMENT_CONTRACT"
+  isRequired      Boolean  @default(false)    // Mandatory document
+  hasExpiry       Boolean  @default(false)    // Document has expiry date
+  allowedFormats  String   @default("pdf,jpg,jpeg,png,docx") // Comma-separated
+  maxFileSizeKB   Int      @default(5120)     // 5MB default
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  documents       EmployeeDocument[]
+}
+
+model EmployeeDocument {
+  id              String      @id @default(cuid())
+  employeeId      String
+  documentTypeId  String
+  documentType    DocumentType @relation(fields: [documentTypeId], references: [id])
+  employee        Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  title           String                         // Display title
+  documentNumber  String?                         // CNIC: 35202-1234567-1, Contract #: C-2024-001
+  issueDate       DateTime?                       // When document was issued
+  expiryDate      DateTime?                       // When document expires (if hasExpiry)
+  notes           String?                         // Remarks
+
+  // File storage
+  fileName        String                          // Original file name
+  filePath        String                          // Server-side storage path
+  fileSize        Int                             // File size in bytes
+  fileType        String                          // MIME type
+  fileHash        String?                         // SHA-256 hash for integrity
+
+  // Version control
+  version         Int          @default(1)        // Current version number
+  previousVersionId String?                        // ID of previous version (archived)
+  isArchived      Boolean      @default(false)     // Soft archive flag
+
+  // Metadata
+  uploadedBy      String       @default("system")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  auditLogs       DocumentAuditLog[]
+
+  @@index([employeeId])
+  @@index([documentTypeId])
+  @@index([expiryDate])
+}
+
+model DocumentAuditLog {
+  id              String   @id @default(cuid())
+  documentId      String
+  document        EmployeeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  action          String   // UPLOADED, VIEWED, DOWNLOADED, REPLACED, DELETED
+  performedBy     String   @default("system")
+  details         String?  // JSON: {fileName, fileSize, reason, oldVersion, newVersion}
+  ipAddress       String?
+  createdAt       DateTime @default(now())
+
+  @@index([documentId])
+  @@index([action])
+  @@index([createdAt])
 }
 
 model EmployeeSalaryHistory {
