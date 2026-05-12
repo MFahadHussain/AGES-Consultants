@@ -579,6 +579,21 @@ export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
                 </div>
               </div>
             </div>
+
+            {/* Default password hint for first-time users */}
+            {passwordForm.currentPassword.length === 0 && (
+              <div className="rounded-lg border bg-blue-50 border-blue-200 p-3">
+                <div className="flex items-start gap-2">
+                  <Lock className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[11px] font-medium text-blue-800">Default Password</p>
+                    <p className="text-[10px] text-blue-700 mt-0.5">
+                      If this is your first login, your default password is <code className="bg-blue-100 px-1 py-0.5 rounded text-[10px] font-mono">Admin@123</code>. You must change it before continuing.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="gap-2">

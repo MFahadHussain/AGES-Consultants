@@ -52,9 +52,27 @@ import { cn } from '@/lib/utils'
 // Role-Based Module Access Control
 // ============================================================
 
-type UserRole = 'admin' | 'manager' | 'accountant' | 'auditor' | 'viewer'
+type UserRole = 'admin' | 'super_admin' | 'system_admin' | 'manager' | 'accountant' | 'auditor' | 'viewer'
 
 const ROLE_MODULES: Record<UserRole, ModuleKey[]> = {
+  super_admin: [
+    'dashboard', 'chart-of-accounts', 'vouchers', 'ledgers', 'bank-reconciliation',
+    'customers', 'suppliers', 'projects', 'donors', 'locations', 'clients',
+    'budgets', 'taxation', 'aging', 'financial-year',
+    'reports', 'fixed-assets', 'payroll',
+    'employees', 'employee-profile', 'project-assignments', 'allowances', 'attendance',
+    'loans', 'tax-slabs', 'payroll-gl-mapping', 'final-settlement', 'payroll-slips', 'payroll-reports',
+    'user-management', 'rbac', 'security', 'import-export', 'audit-log', 'settings',
+  ],
+  system_admin: [
+    'dashboard', 'chart-of-accounts', 'vouchers', 'ledgers', 'bank-reconciliation',
+    'customers', 'suppliers', 'projects', 'donors', 'locations', 'clients',
+    'budgets', 'taxation', 'aging', 'financial-year',
+    'reports', 'fixed-assets', 'payroll',
+    'employees', 'employee-profile', 'project-assignments', 'allowances', 'attendance',
+    'loans', 'tax-slabs', 'payroll-gl-mapping', 'final-settlement', 'payroll-slips', 'payroll-reports',
+    'user-management', 'rbac', 'security', 'import-export', 'audit-log', 'settings',
+  ],
   admin: [
     'dashboard', 'chart-of-accounts', 'vouchers', 'ledgers', 'bank-reconciliation',
     'customers', 'suppliers', 'projects', 'donors', 'locations', 'clients',
@@ -71,7 +89,7 @@ const ROLE_MODULES: Record<UserRole, ModuleKey[]> = {
     'reports', 'fixed-assets', 'payroll',
     'employees', 'employee-profile', 'project-assignments', 'allowances', 'attendance',
     'loans', 'final-settlement', 'payroll-slips', 'payroll-reports',
-    'audit-log', 'rbac',
+    'audit-log',
   ],
   accountant: [
     'dashboard', 'chart-of-accounts', 'vouchers', 'ledgers', 'bank-reconciliation',
@@ -222,6 +240,8 @@ export function Sidebar() {
 
   const role = (authUser?.role || 'viewer') as UserRole
   const roleBadgeColor: Record<UserRole, string> = {
+    super_admin: 'bg-red-600 text-white',
+    system_admin: 'bg-red-500 text-white',
     admin: 'bg-slate-900 text-white',
     manager: 'bg-blue-100 text-blue-700',
     accountant: 'bg-emerald-100 text-emerald-700',

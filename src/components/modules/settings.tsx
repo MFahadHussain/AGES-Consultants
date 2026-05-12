@@ -123,7 +123,13 @@ const MODULE_PERMISSIONS = [
 // ============================================================
 
 export function SettingsModule() {
-  const { setActiveModule } = useAppStore()
+  const { setActiveModule, authUser } = useAppStore()
+
+  // Only super admin and system admin can see RBAC (Roles & Permissions)
+  const isAdminRole = authUser?.role === 'admin' || authUser?.role === 'super_admin' || authUser?.role === 'system_admin'
+  // Also check if the user has a SUPER_ADMIN or SYSTEM_ADMIN role in their assigned roles
+  const hasAdminRoleCode = (authUser?.roles || []).some((r: any) => r.code === 'SUPER_ADMIN' || r.code === 'SYSTEM_ADMIN')
+  const canViewRBAC = isAdminRole || hasAdminRoleCode
   const [activeTab, setActiveTab] = useState('general')
   const [settingsMap, setSettingsMap] = useState<SettingsMap>({})
   const [users, setUsers] = useState<UserRecord[]>([])
@@ -1670,9 +1676,11 @@ export function SettingsModule() {
             <Users className="h-3 w-3" /> Users
             {users.length > 0 && <Badge variant="secondary" className="text-[8px] h-4 px-1">{users.length}</Badge>}
           </TabsTrigger>
-          <TabsTrigger value="roles" className="text-[10px] h-8 px-3 gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Shield className="h-3 w-3" /> Roles
-          </TabsTrigger>
+          {canViewRBAC && (
+            <TabsTrigger value="roles" className="text-[10px] h-8 px-3 gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Shield className="h-3 w-3" /> Roles
+            </TabsTrigger>
+          )}
           <TabsTrigger value="voucher" className="text-[10px] h-8 px-3 gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <FileText className="h-3 w-3" /> Voucher
           </TabsTrigger>
@@ -1692,7 +1700,7 @@ export function SettingsModule() {
 
         <TabsContent value="general" className="mt-0">{renderGeneralSettings()}</TabsContent>
         <TabsContent value="users" className="mt-0">{renderUserManagement()}</TabsContent>
-        <TabsContent value="roles" className="mt-0">{renderRolesPermissions()}</TabsContent>
+        {canViewRBAC && <TabsContent value="roles" className="mt-0">{renderRolesPermissions()}</TabsContent>}
         <TabsContent value="voucher" className="mt-0">{renderVoucherSettings()}</TabsContent>
         <TabsContent value="security" className="mt-0">{renderSecuritySettings()}</TabsContent>
         <TabsContent value="integration" className="mt-0">{renderIntegrationSettings()}</TabsContent>

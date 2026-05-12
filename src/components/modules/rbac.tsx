@@ -22,6 +22,7 @@ import {
   Clock, ArrowUpDown, UserCheck, Database
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useAppStore } from '@/lib/store'
 
 // ============================================================
 // Types matching actual API response shapes
@@ -182,12 +183,18 @@ function getActionIcon(action: string): React.ReactNode {
 
 export function RBACModule() {
   const { toast } = useToast()
+  const { authUser } = useAppStore()
   const [activeTab, setActiveTab] = useState('roles')
   const [loading, setLoading] = useState(true)
   const [seeding, setSeeding] = useState(false)
   const [roles, setRoles] = useState<RoleRecord[]>([])
   const [permissions, setPermissions] = useState<PermissionRecord[]>([])
   const [users, setUsers] = useState<UserRecord[]>([])
+
+  // Access control: Only super admin and system admin can access RBAC
+  const isAdminRole = authUser?.role === 'admin' || authUser?.role === 'super_admin' || authUser?.role === 'system_admin'
+  const hasAdminRoleCode = (authUser?.roles || []).some((r: any) => r.code === 'SUPER_ADMIN' || r.code === 'SYSTEM_ADMIN')
+  const canAccess = isAdminRole || hasAdminRoleCode
 
   // KPIs
   const kpis = useMemo(() => ({
@@ -281,6 +288,21 @@ export function RBACModule() {
   }, [toast])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // Access denied view — placed after all hooks
+  if (!canAccess) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <Lock className="h-12 w-12 text-muted-foreground/30" />
+          <div>
+            <h2 className="text-lg font-semibold text-muted-foreground">Access Denied</h2>
+            <p className="text-sm text-muted-foreground mt-1">Only Super Admin and System Admin can manage roles and permissions.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (loading) {
     return (
