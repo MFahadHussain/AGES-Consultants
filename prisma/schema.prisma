@@ -2,14 +2,22 @@
 // Supports: Chart of Accounts, Vouchers, Ledgers, Bank Reconciliation,
 // Project/Segment Accounting, Budgets, Taxation, Aging, Financial Years,
 // Integration with Payroll & Fixed Assets
+//
+// NOTE (Future Iteration): Float fields are currently used for monetary values.
+// Prisma maps Float to DOUBLE PRECISION in PostgreSQL, which works for most
+// operations but can introduce rounding errors in financial calculations.
+// Recommendation: Migrate all monetary Float fields to Decimal(@db.Numeric)
+// for exact precision in a future iteration. This is a non-trivial change
+// that requires updating all API routes, calculations, and frontend display logic.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
 }
 
 // ============================================================
@@ -41,7 +49,7 @@ model Department {
   code        String   @unique  // e.g., "FIN", "HR", "IT"
   name        String   // e.g., "Finance", "Human Resources", "Information Technology"
   branchId    String?
-  branch      Branch?  @relation(fields: [branchId], references: [id])
+  branch      Branch?  @relation(fields: [branchId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   headName    String?  // Department head name
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -72,9 +80,9 @@ model User {
 
   // Organization
   branchId        String?
-  branch          Branch?   @relation(fields: [branchId], references: [id])
+  branch          Branch?   @relation(fields: [branchId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   departmentId    String?
-  department      Department? @relation(fields: [departmentId], references: [id])
+  department      Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   employeeId      String?   // Link to Employee record
   designation     String?   // Job title
 
@@ -109,7 +117,7 @@ model Role {
   description     String?
   level           Int      @default(0)   // Hierarchy level: 0=highest (Super Admin), 1=Admin, etc.
   parentRoleId    String?  // For role hierarchy / inheritance
-  parentRole      Role?    @relation("RoleHierarchy", fields: [parentRoleId], references: [id])
+  parentRole      Role?    @relation("RoleHierarchy", fields: [parentRoleId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   childRoles      Role[]   @relation("RoleHierarchy")
   isSystem        Boolean  @default(false) // System roles cannot be deleted
   isActive        Boolean  @default(true)
@@ -149,9 +157,9 @@ model Permission {
 model RolePermission {
   id           String     @id @default(cuid())
   roleId       String
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   permissionId String
-  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   isGranted    Boolean    @default(true) // true=grant, false=deny (deny overrides grant)
   conditions   String?    // JSON: branch-specific, amount-limit, etc.
   createdBy    String?
@@ -166,9 +174,9 @@ model RolePermission {
 model UserRole {
   id        String   @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   roleId    String
-  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   isPrimary Boolean  @default(false) // Primary role determines default permissions
   grantedBy String?  // User ID who granted this role
   grantedAt DateTime @default(now())
@@ -183,9 +191,9 @@ model UserRole {
 model UserPermission {
   id           String     @id @default(cuid())
   userId       String
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   permissionId String
-  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   isGranted    Boolean    // true=grant override, false=deny override
   conditions   String?    // JSON: specific conditions
   grantedBy    String?
@@ -201,7 +209,7 @@ model UserPermission {
 model UserSession {
   id              String    @id @default(cuid())
   userId          String
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   token           String    @unique  // Session token
   refreshToken    String?   @unique  // Refresh token
   deviceInfo      String?   // JSON: {browser, os, device}
@@ -223,7 +231,7 @@ model UserSession {
 model LoginHistory {
   id              String   @id @default(cuid())
   userId          String?
-  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Restrict)
   email           String   // Email used for login attempt
   loginStatus     String   // success, failed, locked, expired_token
   failureReason   String?  // invalid_password, account_locked, account_inactive, etc.
@@ -246,7 +254,7 @@ model LoginHistory {
 model PasswordHistory {
   id           String   @id @default(cuid())
   userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   passwordHash String   // Previous password hash
   changedAt    DateTime @default(now())
   changedBy    String?  // User ID who changed it (admin reset vs self-change)
@@ -326,7 +334,7 @@ model ApprovalWorkflow {
 model WorkflowStep {
   id              String   @id @default(cuid())
   workflowId      String
-  workflow        ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflow        ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   stepNumber      Int      // 1, 2, 3...
   stepName        String   // e.g., "Manager Review", "Finance Approval"
   stepType        String   @default("role") // role, user, condition, auto
@@ -347,7 +355,7 @@ model WorkflowStep {
 model ApprovalInstance {
   id              String   @id @default(cuid())
   workflowId      String
-  workflow        ApprovalWorkflow @relation(fields: [workflowId], references: [id])
+  workflow        ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   entityId        String   // ID of the entity being approved
   entityType      String   // Voucher, Expense, etc.
   entityNumber    String?  // Human-readable reference (e.g., voucher number)
@@ -373,11 +381,11 @@ model ApprovalInstance {
 model ApprovalInstanceStep {
   id              String   @id @default(cuid())
   instanceId      String
-  instance        ApprovalInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  instance        ApprovalInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   stepNumber      Int
   stepName        String
   approverUserId  String?
-  approver        User?    @relation(fields: [approverUserId], references: [id])
+  approver        User?    @relation(fields: [approverUserId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   approverRoleId  String?
   status          String   @default("pending") // pending, approved, rejected, skipped, escalated
   comments        String?
@@ -396,7 +404,7 @@ model ApprovalInstanceStep {
 model AuditLog {
   id              String   @id @default(cuid())
   userId          String?
-  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Restrict)
   username        String?  // Denormalized for quick display
   action          String   // LOGIN, LOGOUT, CREATE, UPDATE, DELETE, APPROVE, REJECT, EXPORT, PRINT, REVERSE, POST, PERMISSION_CHANGE, PASSWORD_CHANGE
   entity          String   // Account, Voucher, User, Role, Permission, etc.
@@ -409,7 +417,7 @@ model AuditLog {
   userAgent       String?
   sessionId       String?  // Link to session
   approvalInstanceId String? // Link to approval workflow
-  approvalInstance ApprovalInstance? @relation(fields: [approvalInstanceId], references: [id])
+  approvalInstance ApprovalInstance? @relation(fields: [approvalInstanceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   severity        String   @default("info") // info, warning, critical
   module          String?  // Module where action occurred
   createdAt       DateTime @default(now())
@@ -434,7 +442,7 @@ model Account {
   accountType   String    // ASSET, LIABILITY, EQUITY, INCOME, EXPENSE
   subType       String?   // CURRENT_ASSET, FIXED_ASSET, CURRENT_LIABILITY, etc.
   parentId      String?   // For hierarchical accounts
-  parent        Account?  @relation("AccountHierarchy", fields: [parentId], references: [id])
+  parent        Account?  @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   children      Account[] @relation("AccountHierarchy")
   level         Int       @default(0)
   isActive      Boolean   @default(true)
@@ -495,7 +503,7 @@ model Project {
   reportingCurrency    String    @default("PKR")
   sortOrder            Int       @default(0) // column ordering in multi-column reports
   parentProjectId      String?   // self-referencing for sub-projects
-  parentProject        Project?  @relation("ProjectHierarchy", fields: [parentProjectId], references: [id])
+  parentProject        Project?  @relation("ProjectHierarchy", fields: [parentProjectId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   subProjects          Project[] @relation("ProjectHierarchy")
   intraCompanyAccountId String?  // FK to Account for intra-company eliminations
   createdAt            DateTime  @default(now())
@@ -629,15 +637,15 @@ model Voucher {
   amountInWords   String?   // Total amount expressed in words
   status          String    @default("draft") // draft, pending, approved, posted, rejected
   financialYearId String
-  financialYear   FinancialYear @relation(fields: [financialYearId], references: [id])
+  financialYear   FinancialYear @relation(fields: [financialYearId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   projectId       String?
-  project         Project?  @relation(fields: [projectId], references: [id])
+  project         Project?  @relation(fields: [projectId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   donorId         String?
-  donor           Donor?    @relation(fields: [donorId], references: [id])
+  donor           Donor?    @relation(fields: [donorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   locationId      String?
-  location        Location? @relation(fields: [locationId], references: [id])
+  location        Location? @relation(fields: [locationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   clientId        String?
-  client          Client?   @relation(fields: [clientId], references: [id])
+  client          Client?   @relation(fields: [clientId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   totalDebit      Float     @default(0)
   totalCredit     Float     @default(0)
   isPayrollPosted Boolean   @default(false) // INTEGRATION: Payroll → GL
@@ -660,16 +668,16 @@ model Voucher {
 model VoucherEntry {
   id          String  @id @default(cuid())
   voucherId   String
-  voucher     Voucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  voucher     Voucher @relation(fields: [voucherId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   lineNumber  Int
   accountId   String
-  account     Account @relation(fields: [accountId], references: [id])
+  account     Account @relation(fields: [accountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   debit       Float   @default(0)
   credit      Float   @default(0)
   customerId  String?
-  customer    Customer? @relation(fields: [customerId], references: [id])
+  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   supplierId  String?
-  supplier    Supplier? @relation(fields: [supplierId], references: [id])
+  supplier    Supplier? @relation(fields: [supplierId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   description String?
   projectId   String? // Override at line level
   donorId     String? // Override at line level
@@ -684,9 +692,9 @@ model VoucherEntry {
 model VoucherApproval {
   id          String   @id @default(cuid())
   voucherId   String
-  voucher     Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  voucher     Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  user        User     @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   action      String   // SUBMIT, REVIEW, APPROVE, REJECT, POST, QUICK_POST, REVOKE
   fromStatus  String?  // Previous status before action
   toStatus    String?  // New status after action
@@ -698,7 +706,7 @@ model VoucherApproval {
 model VoucherAttachment {
   id          String   @id @default(cuid())
   voucherId   String
-  voucher     Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  voucher     Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   fileName    String
   filePath    String   // Secure storage path (not publicly accessible)
   fileSize    Int?
@@ -719,7 +727,7 @@ model VoucherAttachment {
 model BankStatement {
   id            String   @id @default(cuid())
   accountId     String
-  account       Account  @relation(fields: [accountId], references: [id])
+  account       Account  @relation(fields: [accountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   statementDate DateTime
   openingBalance Float
   closingBalance Float
@@ -732,7 +740,7 @@ model BankStatement {
 model BankStatementItem {
   id            String   @id @default(cuid())
   bankStatementId String
-  bankStatement  BankStatement @relation(fields: [bankStatementId], references: [id], onDelete: Cascade)
+  bankStatement  BankStatement @relation(fields: [bankStatementId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   date          DateTime
   description   String
   amount        Float
@@ -746,9 +754,9 @@ model BankStatementItem {
 model BankReconciliationItem {
   id                  String   @id @default(cuid())
   bankStatementItemId String? @unique
-  bankStatementItem   BankStatementItem? @relation(fields: [bankStatementItemId], references: [id])
+  bankStatementItem   BankStatementItem? @relation(fields: [bankStatementItemId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   voucherId           String
-  voucher             Voucher  @relation(fields: [voucherId], references: [id])
+  voucher             Voucher  @relation(fields: [voucherId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   reconciliationDate  DateTime @default(now())
   status              String   @default("matched") // matched, unmatched, outstanding
   reconciledBy        String
@@ -758,7 +766,7 @@ model BankReconciliationItem {
 model BankReconciliation {
   id                String   @id @default(cuid())
   accountId         String
-  account           Account  @relation(fields: [accountId], references: [id])
+  account           Account  @relation(fields: [accountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   period            String   // "2025-01" format (YYYY-MM)
   statementBalance  Float    // User-entered bank statement balance (CR)
   bookBalance       Float    // Computed book balance (DR)
@@ -783,11 +791,11 @@ model Budget {
   id              String   @id @default(cuid())
   name            String
   financialYearId String
-  financialYear   FinancialYear @relation(fields: [financialYearId], references: [id])
+  financialYear   FinancialYear @relation(fields: [financialYearId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   projectId       String?
-  project         Project? @relation(fields: [projectId], references: [id])
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   donorId         String?
-  donor           Donor?   @relation(fields: [donorId], references: [id])
+  donor           Donor?   @relation(fields: [donorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   period          String?  // MONTHLY, QUARTERLY, ANNUAL
   status          String   @default("draft") // draft, approved, active
   totalAmount     Float    @default(0)
@@ -800,9 +808,9 @@ model Budget {
 model BudgetLine {
   id          String   @id @default(cuid())
   budgetId    String
-  budget      Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  budget      Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   accountId   String
-  account     Account  @relation(fields: [accountId], references: [id])
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   period      String   // "2024-01", "2024-Q1", "2024"
   budgetAmount Float
   actualAmount Float    @default(0)
@@ -819,7 +827,7 @@ model TaxRate {
   taxType     String   // INCOME_TAX, SALES_TAX, GST, ZAKAT
   rate        Float
   accountId   String?  // Default tax account
-  account     Account? @relation(fields: [accountId], references: [id])
+  account     Account? @relation(fields: [accountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   effectiveFrom DateTime
   effectiveTo   DateTime?
   isActive    Boolean  @default(true)
@@ -831,7 +839,7 @@ model TaxRate {
 model TaxCalculation {
   id            String   @id @default(cuid())
   taxRateId     String
-  taxRate       TaxRate  @relation(fields: [taxRateId], references: [id])
+  taxRate       TaxRate  @relation(fields: [taxRateId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   voucherId     String?
   baseAmount    Float
   taxAmount     Float
@@ -931,7 +939,7 @@ model FixedAsset {
 model FixedAssetDepreciation {
   id                      String   @id @default(cuid())
   assetId                 String
-  asset                   FixedAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  asset                   FixedAsset @relation(fields: [assetId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   financialYear           String   // "2024-25"
   period                  String   // "Jul-2024"
   monthNumber             Int      // 1-12 (1=July)
@@ -953,7 +961,7 @@ model AssetTransaction {
   id              String   @id @default(cuid())
   txnId           String   @unique  // TXN-YYYY-NNNN
   assetId         String
-  asset           FixedAsset @relation(fields: [assetId], references: [id])
+  asset           FixedAsset @relation(fields: [assetId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   type            String   // Addition, Disposal, Transfer, Adjustment, Reversal
   date            DateTime
   description     String?
@@ -1070,7 +1078,7 @@ model Employee {
   employmentType    String?   // Permanent, Contract, Temporary, Intern, Consultant
   category          String?   // Management, Staff, Worker, Officer
   defaultProjectId  String?   // Default project assignment
-  defaultProject    Project? @relation(fields: [defaultProjectId], references: [id])
+  defaultProject    Project? @relation(fields: [defaultProjectId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   status            String   @default("active") // active, inactive, terminated, resigned, retired
 
   // Banking
@@ -1120,15 +1128,15 @@ model Employee {
 
   // Accounting Configuration (for voucher generation)
   salaryExpenseAccountId  String?  // FK to Account — e.g., 05-01-01-XXXX · Project Salary Cost
-  salaryExpenseAccount    Account? @relation("EmpSalaryExpense", fields: [salaryExpenseAccountId], references: [id])
+  salaryExpenseAccount    Account? @relation("EmpSalaryExpense", fields: [salaryExpenseAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   scExpenseAccountId      String?  // FK to Account — e.g., 05-02-XX-XXXX · Employer SC Cost
-  scExpenseAccount        Account? @relation("EmpScExpense", fields: [scExpenseAccountId], references: [id])
+  scExpenseAccount        Account? @relation("EmpScExpense", fields: [scExpenseAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   salaryPayableAccountId  String?  // FK to Account — e.g., 03-02-02-XXXX · Employee Salary Payable
-  salaryPayableAccount    Account? @relation("EmpSalaryPayable", fields: [salaryPayableAccountId], references: [id])
+  salaryPayableAccount    Account? @relation("EmpSalaryPayable", fields: [salaryPayableAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   scPayableAccountId      String?  // FK to Account — e.g., 03-02-03-XXXX · SC Payable to Authority
-  scPayableAccount        Account? @relation("EmpScPayable", fields: [scPayableAccountId], references: [id])
+  scPayableAccount        Account? @relation("EmpScPayable", fields: [scPayableAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   taxPayableAccountId     String?  // FK to Account — e.g., 03-02-07-XXXX · Income Tax (WHT) Payable
-  taxPayableAccount       Account? @relation("EmpTaxPayable", fields: [taxPayableAccountId], references: [id])
+  taxPayableAccount       Account? @relation("EmpTaxPayable", fields: [taxPayableAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   // System
   isFinancialUsed   Boolean  @default(false) // Cannot delete after financial usage
@@ -1173,8 +1181,8 @@ model EmployeeDocument {
   id              String      @id @default(cuid())
   employeeId      String
   documentTypeId  String
-  documentType    DocumentType @relation(fields: [documentTypeId], references: [id])
-  employee        Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  documentType    DocumentType @relation(fields: [documentTypeId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  employee        Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade, onUpdate: Restrict)
 
   title           String                         // Display title
   documentNumber  String?                         // CNIC: 35202-1234567-1, Contract #: C-2024-001
@@ -1209,7 +1217,7 @@ model EmployeeDocument {
 model DocumentAuditLog {
   id              String   @id @default(cuid())
   documentId      String
-  document        EmployeeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document        EmployeeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade, onUpdate: Restrict)
 
   action          String   // UPLOADED, VIEWED, DOWNLOADED, REPLACED, DELETED
   performedBy     String   @default("system")
@@ -1225,7 +1233,7 @@ model DocumentAuditLog {
 model EmployeeSalaryHistory {
   id              String   @id @default(cuid())
   employeeId      String
-  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   effectiveDate   DateTime // When the salary change took effect
   previousSalary  Float    @default(0)
   newSalary       Float
@@ -1239,9 +1247,9 @@ model EmployeeSalaryHistory {
 model EmployeeProjectAssignment {
   id              String   @id @default(cuid())
   employeeId      String
-  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   projectId       String
-  project         Project  @relation(fields: [projectId], references: [id])
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   role            String?  // Role/Designation on this project
   salaryAmount    Float    @default(0) // Project-specific salary
   allocationType  String   @default("fixed") // fixed, percentage, attendance_based
@@ -1274,9 +1282,9 @@ model Allowance {
 model EmployeeAllowance {
   id              String   @id @default(cuid())
   employeeId      String
-  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   allowanceId     String
-  allowance       Allowance @relation(fields: [allowanceId], references: [id])
+  allowance       Allowance @relation(fields: [allowanceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   customValue     Float?   // Override the default value if set
   projectId       String?  // If project-specific
   isActive        Boolean  @default(true)
@@ -1289,7 +1297,7 @@ model EmployeeAllowance {
 model Attendance {
   id              String   @id @default(cuid())
   employeeId      String
-  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   date            DateTime // The date of attendance
   status          String   @default("P") // P, W, H, CL, SL, EL, CO, T, WH, WW, CD, A
   projectId       String?  // Which project the employee worked on that day (deprecated — use AttendanceDailyProject)
@@ -1316,9 +1324,9 @@ model AttendanceDailyProject {
   projectId  String
   status     String   // The attendance status that triggered this allocation
 
-  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  project    Project  @relation(fields: [projectId], references: [id])
-  attendance Attendance @relation(fields: [employeeId, date], references: [employeeId, date], onDelete: Cascade)
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  attendance Attendance @relation(fields: [employeeId, date], references: [employeeId, date], onDelete: Cascade, onUpdate: Restrict)
 
   @@unique([employeeId, date])
   // One project per employee per day — no hour-splitting
@@ -1346,8 +1354,8 @@ model ProjectCostLedger {
 
   createdAt    DateTime @default(now())
 
-  employee     Employee @relation(fields: [employeeId], references: [id])
-  project      Project  @relation(fields: [projectId], references: [id])
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   @@unique([employeeId, projectId, month])
 }
@@ -1357,7 +1365,7 @@ model Loan {
   id              String   @id @default(cuid())
   loanNumber      String   @unique // LOAN-YYYY-NNNN
   employeeId      String
-  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   loanType        String   // Personal, Emergency, Vehicle, Housing, Advance Salary, Other
   principalAmount Float
   interestRate    Float    @default(0) // Percentage, 0 for interest-free
@@ -1381,7 +1389,7 @@ model Loan {
 model LoanInstallment {
   id              String   @id @default(cuid())
   loanId          String
-  loan            Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  loan            Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   installmentNo   Int      // 1, 2, 3...
   dueDate         DateTime
   amount          Float    // Principal + interest for this installment
@@ -1425,7 +1433,7 @@ model PayrollAccountMapping {
 model FinalSettlement {
   id                    String   @id @default(cuid())
   employeeId            String   @unique
-  employee              Employee @relation(fields: [employeeId], references: [id])
+  employee              Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   leavingDate           DateTime
   settlementType        String   // Resignation, Termination, Retirement, Death
   basicSalary           Float    @default(0)
@@ -1493,7 +1501,7 @@ model PayrollBatch {
 model PayrollBatchLine {
   id              String      @id @default(cuid())
   batchId         String
-  batch           PayrollBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  batch           PayrollBatch @relation(fields: [batchId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   employeeId      String
   employeeName    String
   employeeCode    String?
@@ -1553,7 +1561,7 @@ model PayrollBatchLine {
   contractEarnings   String?  // JSON: [{assignmentId, projectId, projectName, projectCode, contractSalary, dailyRate, daysWorked, earnedSalary, absentDays, designation, scShare, ...}]
 
   // Relations
-  employee        Employee  @relation(fields: [employeeId], references: [id])
+  employee        Employee  @relation(fields: [employeeId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 }
 
 // ============================================================
