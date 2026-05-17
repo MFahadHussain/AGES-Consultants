@@ -163,12 +163,16 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
           {/* Product name */}
           <h1 className="mt-3 text-[18px] font-semibold tracking-tight text-slate-900">
-            Acct<span className="text-blue-600">Fin</span>ERP
+            <span className="text-blue-600">AGES </span>Consultant
           </h1>
 
           {/* Tagline */}
           <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400">
             Accounting &amp; Finance System
+          </p>
+          {/* Tagline */}
+          <p className="mt-1 text-[8px] font-medium uppercase tracking-[0.12em] text-slate-400">
+            Engineered by Fahad Hussain
           </p>
         </div>
 
@@ -214,21 +218,19 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 }}
                 onKeyDown={handleKeyDown}
                 placeholder="name@company.com"
-                className={`h-10 w-full rounded-lg border bg-white px-3 pr-9 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-shadow focus:ring-2 ${
-                  emailError
-                    ? 'border-red-500 focus:ring-red-100'
-                    : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500/20'
-                }`}
+                className={`h-10 w-full rounded-lg border bg-white px-3 pr-9 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-shadow focus:ring-2 ${emailError
+                  ? 'border-red-500 focus:ring-red-100'
+                  : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500/20'
+                  }`}
               />
               <Mail className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             </div>
             {/* Error */}
             <div
-              className={`flex items-center gap-1 mt-1 transition-all duration-200 ${
-                emailError
-                  ? 'opacity-100 translate-y-0'
-                  : 'opacity-0 -translate-y-1 pointer-events-none'
-              }`}
+              className={`flex items-center gap-1 mt-1 transition-all duration-200 ${emailError
+                ? 'opacity-100 translate-y-0'
+                : 'opacity-0 -translate-y-1 pointer-events-none'
+                }`}
             >
               <AlertCircle className="h-3 w-3 shrink-0 text-red-500" />
               <span className="text-[12px] text-red-600">{emailError}</span>
@@ -256,11 +258,10 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 }}
                 onKeyDown={handleKeyDown}
                 placeholder="••••••••"
-                className={`h-10 w-full rounded-lg border bg-white px-3 pr-9 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-shadow focus:ring-2 ${
-                  passwordError
-                    ? 'border-red-500 focus:ring-red-100'
-                    : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500/20'
-                }`}
+                className={`h-10 w-full rounded-lg border bg-white px-3 pr-9 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-shadow focus:ring-2 ${passwordError
+                  ? 'border-red-500 focus:ring-red-100'
+                  : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500/20'
+                  }`}
               />
               <button
                 type="button"
@@ -278,11 +279,10 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             </div>
             {/* Error */}
             <div
-              className={`flex items-center gap-1 mt-1 transition-all duration-200 ${
-                passwordError
-                  ? 'opacity-100 translate-y-0'
-                  : 'opacity-0 -translate-y-1 pointer-events-none'
-              }`}
+              className={`flex items-center gap-1 mt-1 transition-all duration-200 ${passwordError
+                ? 'opacity-100 translate-y-0'
+                : 'opacity-0 -translate-y-1 pointer-events-none'
+                }`}
             >
               <AlertCircle className="h-3 w-3 shrink-0 text-red-500" />
               <span className="text-[12px] text-red-600">{passwordError}</span>
@@ -367,11 +367,10 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
         {/* ── Forgot password overlay ────────────────────────────────────── */}
         <div
-          className={`absolute inset-0 bg-white/[0.97] rounded-2xl flex flex-col transition-opacity duration-200 ${
-            showForgot
-              ? 'opacity-100 pointer-events-auto'
-              : 'opacity-0 pointer-events-none'
-          }`}
+          className={`absolute inset-0 bg-white/[0.97] rounded-2xl flex flex-col transition-opacity duration-200 ${showForgot
+            ? 'opacity-100 pointer-events-auto'
+            : 'opacity-0 pointer-events-none'
+            }`}
         >
           <div className="flex-1 flex flex-col px-7 pt-8 pb-7">
             {/* Back button */}
@@ -446,9 +445,10 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
       {/* ── Page footer ──────────────────────────────────────────────────── */}
       <div className="mt-6 text-center font-mono text-[11px] text-slate-400 leading-relaxed">
-        <div>v1.0.0 &bull; Multi-Project &bull; Multi-Donor</div>
+        <div>v1.0.0 &bull; Multi-Project &bull; Multi-Client</div>
         <div>Multi-Currency &bull; Multi-Location</div>
-        <div className="text-slate-300">Build by Fahad Hussain</div>
+        <div>Engineered by Fahad Hussain</div>
+
       </div>
 
     </div>

@@ -244,7 +244,20 @@ async function payrollSummary(searchParams: URLSearchParams) {
     }
   }
 
-  return NextResponse.json({ month, summary, lines })
+  // Deduplicate lines: if same employee appears in multiple batches for the same period,
+  // keep the one from the most advanced batch status (voucher-created > approved > reviewed > draft)
+  const statusRank: Record<string, number> = { 'voucher-created': 4, approved: 3, reviewed: 2, draft: 1 }
+  const dedupedLines = new Map<string, Record<string, unknown>>()
+  for (const line of lines) {
+    const existing = dedupedLines.get(line.employeeId as string)
+    const existingRank = statusRank[(existing?.batchStatus as string) || ''] || 0
+    const newRank = statusRank[(line.batchStatus as string) || ''] || 0
+    if (!existing || newRank > existingRank) {
+      dedupedLines.set(line.employeeId as string, line)
+    }
+  }
+
+  return NextResponse.json({ month, summary, lines: Array.from(dedupedLines.values()) })
 }
 
 // 2. project-cost — Project-wise Cost Report
@@ -317,15 +330,65 @@ async function projectCost(searchParams: URLSearchParams) {
   }
 
   // Also aggregate from PayrollBatchLine.projectAllocations for social charges
+  // AND as primary source if ProjectCostLedger is empty (new batches without cost ledger)
   const lineSocialCharges = new Map<string, { employerCharges: number; gratuity: number }>()
+
   for (const batch of batches) {
     for (const line of batch.lines) {
-      const allocations = safeParseJson<Array<{ projectId: string; salaryShare: number; scShare: number }>>(
+      const allocations = safeParseJson<Array<{ projectId: string; projectCode: string; projectName: string; days: number; weight: number; salaryShare: number; scShare: number }>>(
         line.projectAllocations, []
       )
-      const totalSalaryInAllocations = allocations.reduce((s, a) => s + a.salaryShare, 0)
-      for (const alloc of allocations) {
-        const weight = totalSalaryInAllocations > 0 ? alloc.salaryShare / totalSalaryInAllocations : 0
+      // Also check contractEarnings as fallback
+      const contracts = safeParseJson<Array<{ projectId: string; projectCode: string; projectName: string; daysWorked: number; earnedSalary: number; scShare: number }>>(
+        line.contractEarnings, []
+      )
+      const effectiveAllocs = allocations.length > 0 ? allocations : contracts.map(c => ({
+        projectId: c.projectId,
+        projectCode: c.projectCode,
+        projectName: c.projectName,
+        days: c.daysWorked || 0,
+        weight: 0,
+        salaryShare: c.earnedSalary || 0,
+        scShare: c.scShare || 0,
+      }))
+
+      const totalSalaryInAllocations = effectiveAllocs.reduce((s, a) => s + (a.salaryShare || 0), 0)
+
+      for (const alloc of effectiveAllocs) {
+        if (!alloc.projectId || (alloc.salaryShare || 0) === 0) continue
+        const weight = totalSalaryInAllocations > 0 ? (alloc.salaryShare || 0) / totalSalaryInAllocations : 0
+
+        // Build projectMap from batch lines if cost ledger is empty
+        if (!projectMap.has(alloc.projectId)) {
+          projectMap.set(alloc.projectId, {
+            projectId: alloc.projectId,
+            projectCode: alloc.projectCode || '',
+            projectName: alloc.projectName || '',
+            projectType: 'Other',
+            employeeCount: new Set<string>(),
+            totalSalaryAllocated: 0,
+            totalScAllocated: 0,
+            totalCost: 0,
+            details: [],
+          })
+        }
+        const proj = projectMap.get(alloc.projectId)!
+        // Only add from batch lines if not already populated from cost ledger
+        if (costLedgerEntries.length === 0) {
+          proj.employeeCount.add(line.employeeId)
+          proj.totalSalaryAllocated += alloc.salaryShare || 0
+          proj.totalScAllocated += alloc.scShare || 0
+          proj.totalCost += (alloc.salaryShare || 0) + (alloc.scShare || 0)
+          proj.details.push({
+            employeeId: line.employeeId,
+            employeeName: line.employeeName,
+            employeeCode: line.employeeCode || '',
+            totalDays: alloc.days || 0,
+            salaryShare: roundPKR(alloc.salaryShare || 0),
+            scShare: roundPKR(alloc.scShare || 0),
+          })
+        }
+
         if (!lineSocialCharges.has(alloc.projectId)) {
           lineSocialCharges.set(alloc.projectId, { employerCharges: 0, gratuity: 0 })
         }
@@ -1467,13 +1530,14 @@ async function taxPsid(searchParams: URLSearchParams) {
       totalTaxAmount += taxAmount
 
       records.push({
-        Payment_Section: 'Salary Income',
+        Payment_Section: '149',
         TaxPayer_NTN: emp.ntn || '',
-        TaxPayer_CNIC: emp.cnic || '',
+        TaxPayer_CNIC: (emp.cnic || '').replace(/-/g, '').trim(),
+        TaxPayer_CNIC_Display: emp.cnic || '',
         TaxPayer_Name: emp.name,
         TaxPayer_City: emp.taxCity || '',
         TaxPayer_Address: emp.presentAddress || emp.permanentAddress || '',
-        TaxPayer_Status: emp.taxFilingStatus || 'filer',
+        TaxPayer_Status: emp.taxFilingStatus === 'filer' ? 'Filer' : 'Non-Filer',
         TaxPayer_Business_Name: emp.department || '',
         Taxable_Amount: taxableAmount,
         Tax_Amount: taxAmount,

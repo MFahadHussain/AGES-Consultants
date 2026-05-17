@@ -1,604 +1,501 @@
 'use client'
 
-import React, { useEffect, useState, useCallback } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Separator } from '@/components/ui/separator'
-import { toast } from 'sonner'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { useToast } from '@/hooks/use-toast'
 import {
   Shield, Search, Download, RefreshCw, ChevronDown, ChevronUp, Filter,
-  Clock, AlertTriangle, FileText, Activity
+  Clock, AlertTriangle, FileText, Activity, X, EyeOff, Lock,
+  Database, Users, Settings, Info, CheckCircle, AlertCircle,
+  Loader2, ChevronRight
 } from 'lucide-react'
 
-// Types
+// ── Types ─────────────────────────────────────────────────────
 interface AuditLog {
   id: string
-  userId?: string
-  username?: string
+  userId?: string | null
+  username?: string | null
   action: string
   entity: string
-  entityId?: string
-  entityName?: string
-  details?: string
-  oldValues?: string
-  newValues?: string
-  ipAddress?: string
+  entityId?: string | null
+  entityName?: string | null
+  details?: unknown
+  ipAddress?: string | null
+  userAgent?: string | null
+  sessionId?: string | null
   severity: string
-  module?: string
+  module?: string | null
   createdAt: string
-  user?: { name: string; email: string }
+  user?: { name: string; email: string } | null
+  payloadVisible?: boolean
 }
 
 interface AuditResponse {
   data: AuditLog[]
-  pagination: {
-    page: number
-    pageSize: number
-    total: number
-    totalPages: number
-  }
-  statistics?: {
-    total: number
-    actionBreakdown: { action: string; count: number }[]
-  }
+  pagination: { page: number; pageSize: number; total: number; totalPages: number }
 }
 
-// Color maps
-const actionColors: Record<string, string> = {
-  CREATE: 'bg-green-100 text-green-800',
-  UPDATE: 'bg-blue-100 text-blue-800',
-  DELETE: 'bg-red-100 text-red-800',
-  APPROVE: 'bg-emerald-100 text-emerald-800',
-  REJECT: 'bg-rose-100 text-rose-800',
-  LOGIN: 'bg-slate-100 text-slate-700',
-  LOGOUT: 'bg-slate-100 text-slate-700',
-  EXPORT: 'bg-amber-100 text-amber-800',
-  PERMISSION_CHANGE: 'bg-purple-100 text-purple-800',
-  PASSWORD_CHANGE: 'bg-orange-100 text-orange-800',
-  PRINT: 'bg-cyan-100 text-cyan-800',
-  REVERSE: 'bg-pink-100 text-pink-800',
-  POST: 'bg-teal-100 text-teal-800',
-  REVIEW: 'bg-yellow-100 text-yellow-800',
+// ── Action badge config ───────────────────────────────────────
+const ACTION_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
+  CREATE:            { color: '#16A34A', bg: '#F0FDF4', label: 'Create' },
+  UPDATE:            { color: '#2563EB', bg: '#EFF6FF', label: 'Update' },
+  DELETE:            { color: '#DC2626', bg: '#FEF2F2', label: 'Delete' },
+  APPROVE:           { color: '#0891B2', bg: '#ECFEFF', label: 'Approve' },
+  REJECT:            { color: '#DC2626', bg: '#FEF2F2', label: 'Reject' },
+  POST:              { color: '#7C3AED', bg: '#F5F3FF', label: 'Post' },
+  QUICK_POST:        { color: '#7C3AED', bg: '#F5F3FF', label: 'Quick Post' },
+  REVERSE:           { color: '#D97706', bg: '#FFFBEB', label: 'Reverse' },
+  LOGIN:             { color: '#6B7280', bg: '#F9FAFB', label: 'Login' },
+  LOGOUT:            { color: '#6B7280', bg: '#F9FAFB', label: 'Logout' },
+  PASSWORD_CHANGE:   { color: '#D97706', bg: '#FFFBEB', label: 'Pwd Change' },
+  PERMISSION_CHANGE: { color: '#7C3AED', bg: '#F5F3FF', label: 'Perm Change' },
+  EXPORT:            { color: '#0891B2', bg: '#ECFEFF', label: 'Export' },
+  PRINT:             { color: '#6B7280', bg: '#F9FAFB', label: 'Print' },
+  SUBMIT:            { color: '#2563EB', bg: '#EFF6FF', label: 'Submit' },
 }
 
-const severityColors: Record<string, string> = {
-  info: 'bg-blue-100 text-blue-800',
-  warning: 'bg-amber-100 text-amber-800',
-  critical: 'bg-red-100 text-red-800',
+const SEVERITY_CONFIG: Record<string, { color: string; bg: string; icon: React.ReactNode }> = {
+  info:     { color: '#2563EB', bg: '#EFF6FF', icon: <Info className="w-3 h-3" /> },
+  warning:  { color: '#D97706', bg: '#FFFBEB', icon: <AlertTriangle className="w-3 h-3" /> },
+  critical: { color: '#DC2626', bg: '#FEF2F2', icon: <AlertCircle className="w-3 h-3" /> },
 }
 
-const severityIcons: Record<string, string> = {
-  info: 'ℹ',
-  warning: '⚠',
-  critical: '🔴',
+function ActionBadge({ action }: { action: string }) {
+  const cfg = ACTION_CONFIG[action] ?? { color: '#6B7280', bg: '#F9FAFB', label: action }
+  return (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold"
+      style={{ color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.color}33` }}>
+      {cfg.label}
+    </span>
+  )
 }
 
-export function AuditTrail() {
-  // Filters
-  const [entityFilter, setEntityFilter] = useState('all')
-  const [actionFilter, setActionFilter] = useState('all')
-  const [moduleFilter, setModuleFilter] = useState('all')
-  const [severityFilter, setSeverityFilter] = useState('all')
-  const [userFilter, setUserFilter] = useState('all')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
+function SeverityBadge({ severity }: { severity: string }) {
+  const cfg = SEVERITY_CONFIG[severity] ?? SEVERITY_CONFIG.info
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
+      style={{ color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.color}33` }}>
+      {cfg.icon}
+      {severity.charAt(0).toUpperCase() + severity.slice(1)}
+    </span>
+  )
+}
 
-  // Data
-  const [data, setData] = useState<AuditResponse | null>(null)
-  const [users, setUsers] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [expandedRow, setExpandedRow] = useState<string | null>(null)
-  const [pageSize, setPageSize] = useState(50)
-  const [page, setPage] = useState(1)
+function UserAvatar({ name }: { name: string }) {
+  const colors = ['#1A7A4A', '#2563EB', '#7C3AED', '#D97706', '#DC2626', '#0891B2']
+  const color = colors[name.charCodeAt(0) % colors.length]
+  const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+  return (
+    <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+      style={{ background: color }}>
+      {initials}
+    </div>
+  )
+}
 
-  // Real-time indicator
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
-  const [secondsAgo, setSecondsAgo] = useState(0)
-
-  // Quick filters
-  const [quickFilter, setQuickFilter] = useState<string | null>(null)
-
-  const fetchAuditLogs = useCallback(async () => {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams()
-      if (entityFilter !== 'all') params.set('entity', entityFilter)
-      if (actionFilter !== 'all') params.set('action', actionFilter)
-      if (moduleFilter !== 'all') params.set('module', moduleFilter)
-      if (severityFilter !== 'all') params.set('severity', severityFilter)
-      if (userFilter !== 'all') params.set('userId', userFilter)
-      if (dateFrom) params.set('dateFrom', dateFrom)
-      if (dateTo) params.set('dateTo', dateTo)
-      if (searchQuery) params.set('search', searchQuery)
-      params.set('page', page.toString())
-      params.set('pageSize', pageSize.toString())
-      params.set('includeStats', 'true')
-
-      const res = await fetch(`/api/audit?${params}`)
-      const json = await res.json()
-      setData(json)
-      setLastUpdated(new Date())
-    } catch (e) {
-      console.error('Failed to fetch audit logs:', e)
-      toast.error('Failed to load audit logs')
-    }
-    setLoading(false)
-  }, [entityFilter, actionFilter, moduleFilter, severityFilter, userFilter, dateFrom, dateTo, searchQuery, page, pageSize])
-
-  const fetchUsers = useCallback(async () => {
-    try {
-      const res = await fetch('/api/users')
-      const raw = await res.json()
-      setUsers(Array.isArray(raw) ? raw : raw.data || [])
-    } catch { /* ignore */ }
-  }, [])
-
-  useEffect(() => {
-    const load = async () => { fetchAuditLogs() }
-    load()
-  }, [fetchAuditLogs])
-
-  useEffect(() => {
-    const load = async () => { fetchUsers() }
-    load()
-  }, [])
-
-  // Real-time seconds counter
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSecondsAgo(Math.floor((Date.now() - lastUpdated.getTime()) / 1000))
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [lastUpdated])
-
-  // Auto-refresh every 60 seconds
-  useEffect(() => {
-    const interval = setInterval(fetchAuditLogs, 60000)
-    return () => clearInterval(interval)
-  }, [fetchAuditLogs])
-
-  // Quick filter handlers
-  const applyQuickFilter = (filter: string) => {
-    const now = new Date()
-    const today = now.toISOString().slice(0, 10)
-
-    // Reset all filters first
-    setEntityFilter('all')
-    setActionFilter('all')
-    setModuleFilter('all')
-    setUserFilter('all')
-    setSearchQuery('')
-
-    if (filter === quickFilter) {
-      setQuickFilter(null)
-      setSeverityFilter('all')
-      setDateFrom('')
-      setDateTo('')
-      return
-    }
-
-    setQuickFilter(filter)
-    switch (filter) {
-      case 'critical':
-        setSeverityFilter('critical')
-        setDateFrom('')
-        setDateTo('')
-        break
-      case 'today':
-        setSeverityFilter('all')
-        setDateFrom(today)
-        setDateTo(today)
-        break
-      case 'week': {
-        setSeverityFilter('all')
-        const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString().slice(0, 10)
-        setDateFrom(weekAgo)
-        setDateTo(today)
-        break
-      }
-      case 'month': {
-        setSeverityFilter('all')
-        const monthAgo = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10)
-        setDateFrom(monthAgo)
-        setDateTo(today)
-        break
-      }
-    }
-    setPage(1)
-  }
-
-  const exportCsv = () => {
-    if (!data?.data) return
-    const headers = ['Timestamp', 'User', 'Action', 'Module', 'Entity', 'Entity Name', 'Details', 'IP Address', 'Severity']
-    const rows = data.data.map(log => [
-      new Date(log.createdAt).toLocaleString(),
-      log.user?.name || log.username || 'System',
-      log.action,
-      log.module || '',
-      log.entity,
-      log.entityName || '',
-      typeof log.details === 'object' ? JSON.stringify(log.details) : (log.details || ''),
-      log.ipAddress || '',
-      log.severity,
-    ])
-    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = `audit-trail-${new Date().toISOString().slice(0, 10)}.csv`; a.click()
-    URL.revokeObjectURL(url)
-    toast.success('Audit trail exported to CSV')
-  }
-
-  const parseJsonSafe = (str: string | null | undefined): any => {
-    if (!str) return null
-    try { return JSON.parse(str) } catch { return str }
-  }
-
-  const renderDiffValues = (oldVal: any, newVal: any) => {
-    if (!oldVal && !newVal) return null
-    const oldObj = typeof oldVal === 'string' ? parseJsonSafe(oldVal) : oldVal
-    const newObj = typeof newVal === 'string' ? parseJsonSafe(newVal) : newVal
-
-    if (!oldObj || !newObj) {
-      return (
-        <div className="grid grid-cols-2 gap-4">
-          {oldObj && <div><p className="text-[10px] font-medium text-red-700 mb-1">Old Values</p><pre className="text-xs bg-red-50 p-2 rounded border border-red-100 overflow-auto max-h-40">{typeof oldObj === 'object' ? JSON.stringify(oldObj, null, 2) : String(oldObj)}</pre></div>}
-          {newObj && <div><p className="text-[10px] font-medium text-green-700 mb-1">New Values</p><pre className="text-xs bg-green-50 p-2 rounded border border-green-100 overflow-auto max-h-40">{typeof newObj === 'object' ? JSON.stringify(newObj, null, 2) : String(newObj)}</pre></div>}
-        </div>
-      )
-    }
-
-    // Field-by-field diff
-    const allKeys = Array.from(new Set([...Object.keys(oldObj || {}), ...Object.keys(newObj || {})]))
-    return (
-      <div className="space-y-1">
-        <div className="grid grid-cols-3 gap-2 text-[10px] font-medium text-muted-foreground">
-          <span>Field</span><span className="text-red-600">Old</span><span className="text-green-600">New</span>
-        </div>
-        {allKeys.map(key => {
-          const oldV = oldObj?.[key]
-          const newV = newObj?.[key]
-          const changed = JSON.stringify(oldV) !== JSON.stringify(newV)
-          return (
-            <div key={key} className={`grid grid-cols-3 gap-2 text-xs py-0.5 ${changed ? 'bg-amber-50' : ''}`}>
-              <span className="font-medium">{key}</span>
-              <span className={changed ? 'text-red-600 line-through' : 'text-muted-foreground'}>{String(oldV ?? '-')}</span>
-              <span className={changed ? 'text-green-600 font-medium' : 'text-muted-foreground'}>{String(newV ?? '-')}</span>
-            </div>
-          )
-        })}
+// ── KPI Card ──────────────────────────────────────────────────
+function KpiCard({ label, value, icon, color, bg }: {
+  label: string; value: number; icon: React.ReactNode; color: string; bg: string
+}) {
+  return (
+    <div className="rounded-xl p-4 flex flex-col gap-1" style={{ background: '#fff', border: '1px solid #E5E7EB', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: '#6B7280' }}>{label}</span>
+        <span className="p-1.5 rounded-lg" style={{ background: bg, color }}>{icon}</span>
       </div>
-    )
-  }
+      <div className="text-2xl font-bold" style={{ color: '#1a1a2e', fontFamily: 'monospace' }}>
+        {value.toLocaleString()}
+      </div>
+    </div>
+  )
+}
 
-  const entities = ['Account', 'Voucher', 'VoucherEntry', 'Customer', 'Supplier', 'Budget', 'FixedAsset', 'PayrollBatch', 'User', 'Role', 'Permission', 'SecurityPolicy', 'ApprovalWorkflow']
-  const actions = ['CREATE', 'UPDATE', 'DELETE', 'APPROVE', 'REJECT', 'LOGIN', 'LOGOUT', 'EXPORT', 'PERMISSION_CHANGE', 'PASSWORD_CHANGE', 'PRINT', 'REVERSE', 'POST', 'REVIEW']
-  const modules = ['accounts', 'vouchers', 'users', 'security', 'payroll', 'reports', 'settings', 'budgets', 'import-export']
-  const severities = ['info', 'warning', 'critical']
+// ── Detail Drawer ─────────────────────────────────────────────
+function AuditDetailDrawer({ log, onClose }: { log: AuditLog; onClose: () => void }) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', h)
+    return () => document.removeEventListener('keydown', h)
+  }, [onClose])
 
-  const totalLogs = data?.pagination?.total || 0
-  const actionBreakdown = data?.statistics?.actionBreakdown || []
+  const displayName = log.user?.name || log.username || 'System'
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Shield className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-bold">Audit Trail</h2>
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md flex flex-col h-full"
+        style={{ background: '#fff', borderLeft: '1px solid #E5E7EB', boxShadow: '-4px 0 24px rgba(0,0,0,0.08)' }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: '#E5E7EB' }}>
+          <div className="flex items-center gap-3">
+            <UserAvatar name={displayName} />
+            <div>
+              <p className="text-sm font-semibold" style={{ color: '#1a1a2e' }}>{displayName}</p>
+              <p className="text-[11px]" style={{ color: '#6B7280' }}>{log.user?.email || 'No email'}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+            <X className="w-4 h-4" style={{ color: '#6B7280' }} />
+          </button>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Real-time indicator */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                  <span>Updated {secondsAgo < 5 ? 'just now' : `${secondsAgo}s ago`}</span>
+
+        <ScrollArea className="flex-1">
+          <div className="p-5 space-y-5">
+            {/* Badges */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <ActionBadge action={log.action} />
+              <SeverityBadge severity={log.severity} />
+              {log.module && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
+                  style={{ background: '#F3F4F6', color: '#374151', border: '1px solid #E5E7EB' }}>
+                  <Settings className="w-3 h-3" />
+                  {log.module}
+                </span>
+              )}
+            </div>
+
+            {/* Details grid */}
+            <div className="rounded-xl p-4 space-y-3" style={{ background: '#F9FAFB', border: '1px solid #E5E7EB' }}>
+              <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#6B7280' }}>Event Details</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  ['Entity', log.entity],
+                  ['Entity Name', log.entityName || '—'],
+                  ['IP Address', log.ipAddress || '—'],
+                  ['Timestamp', new Date(log.createdAt).toLocaleString('en-PK')],
+                ].map(([k, v]) => (
+                  <div key={k as string}>
+                    <p className="text-[10px] font-medium mb-0.5" style={{ color: '#9CA3AF' }}>{k}</p>
+                    <p className="text-xs font-medium" style={{ color: '#1a1a2e' }}>{v}</p>
+                  </div>
+                ))}
+                {log.entityId && (
+                  <div className="col-span-2">
+                    <p className="text-[10px] font-medium mb-0.5" style={{ color: '#9CA3AF' }}>Entity ID</p>
+                    <p className="text-[11px] font-mono break-all" style={{ color: '#6B7280' }}>{log.entityId}</p>
+                  </div>
+                )}
+                {log.userAgent && (
+                  <div className="col-span-2">
+                    <p className="text-[10px] font-medium mb-0.5" style={{ color: '#9CA3AF' }}>User Agent</p>
+                    <p className="text-[10px] break-all" style={{ color: '#6B7280' }}>{log.userAgent}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Payload */}
+            {log.details && (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: '#6B7280' }}>Payload</p>
+                <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #E5E7EB' }}>
+                  <div className="px-3 py-2 flex items-center justify-between" style={{ background: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
+                    <span className="text-[10px] font-mono" style={{ color: '#6B7280' }}>JSON</span>
+                  </div>
+                  <pre className="text-[11px] font-mono p-3 overflow-auto max-h-48 leading-relaxed"
+                    style={{ background: '#fff', color: '#1A7A4A', whiteSpace: 'pre-wrap' }}>
+                    {typeof log.details === 'string' ? log.details : JSON.stringify(log.details, null, 2)}
+                  </pre>
                 </div>
-              </TooltipTrigger>
-              <TooltipContent>Auto-refreshes every 60 seconds</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <Button variant="outline" size="sm" onClick={fetchAuditLogs}>
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh
-          </Button>
-          <Button variant="outline" size="sm" onClick={exportCsv} disabled={!data?.data?.length}>
-            <Download className="h-3.5 w-3.5 mr-1.5" /> Export CSV
-          </Button>
-        </div>
-      </div>
-
-      {/* Quick Filter Buttons */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs text-muted-foreground flex items-center gap-1"><Filter className="h-3 w-3" /> Quick:</span>
-        {[
-          { key: 'critical', label: 'Critical Only', icon: AlertTriangle },
-          { key: 'today', label: 'Today', icon: Clock },
-          { key: 'week', label: 'This Week', icon: Activity },
-          { key: 'month', label: 'This Month', icon: FileText },
-        ].map(f => (
-          <Button key={f.key} variant={quickFilter === f.key ? 'default' : 'outline'} size="sm" className="h-7 text-xs"
-            onClick={() => applyQuickFilter(f.key)}>
-            <f.icon className="h-3 w-3 mr-1" /> {f.label}
-          </Button>
-        ))}
-      </div>
-
-      {/* Professional Filter Bar */}
-      <Card>
-        <CardContent className="p-3">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Entity</Label>
-              <Select value={entityFilter} onValueChange={v => { setEntityFilter(v); setPage(1) }}>
-                <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="All Entities" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Entities</SelectItem>
-                  {entities.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Action</Label>
-              <Select value={actionFilter} onValueChange={v => { setActionFilter(v); setPage(1) }}>
-                <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="All Actions" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Actions</SelectItem>
-                  {actions.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Module</Label>
-              <Select value={moduleFilter} onValueChange={v => { setModuleFilter(v); setPage(1) }}>
-                <SelectTrigger className="h-8 w-32 text-xs"><SelectValue placeholder="All Modules" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Modules</SelectItem>
-                  {modules.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Severity</Label>
-              <Select value={severityFilter} onValueChange={v => { setSeverityFilter(v); setPage(1) }}>
-                <SelectTrigger className="h-8 w-28 text-xs"><SelectValue placeholder="All" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  {severities.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">User</Label>
-              <Select value={userFilter} onValueChange={v => { setUserFilter(v); setPage(1) }}>
-                <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="All Users" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Users</SelectItem>
-                  {users.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">From</Label>
-              <Input type="date" className="h-8 w-32 text-xs" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1) }} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">To</Label>
-              <Input type="date" className="h-8 w-32 text-xs" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1) }} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Search</Label>
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                <Input className="h-8 w-44 text-xs pl-7" placeholder="Search details..." value={searchQuery}
-                  onChange={e => { setSearchQuery(e.target.value); setPage(1) }} />
               </div>
+            )}
+
+            {/* Immutability notice */}
+            <div className="flex items-start gap-2 p-3 rounded-xl" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+              <Lock className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#16A34A' }} />
+              <p className="text-[10px] leading-relaxed" style={{ color: '#15803D' }}>
+                This audit record is immutable and cannot be modified or deleted by any user.
+              </p>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Statistics Bar */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-1.5 text-xs">
-          <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="font-medium">{totalLogs.toLocaleString()}</span>
-          <span className="text-muted-foreground">total logs</span>
-        </div>
-        {actionBreakdown.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <Separator orientation="vertical" className="h-4" />
-            {actionBreakdown.slice(0, 6).map(ab => (
-              <div key={ab.action} className="flex items-center gap-1">
-                <Badge className={`text-[9px] h-4 ${actionColors[ab.action] || 'bg-gray-100 text-gray-800'}`}>{ab.action}</Badge>
-                <span className="text-[10px] font-medium">{ab.count}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        </ScrollArea>
       </div>
+    </div>
+  )
+}
 
-      {/* Data Table */}
-      <Card>
-        <CardContent className="p-0">
+// ── Main Component ────────────────────────────────────────────
+export function AuditTrail() {
+  const { toast } = useToast()
+  const [logs, setLogs] = useState<AuditLog[]>([])
+  const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
+  const [search, setSearch] = useState('')
+  const [filterAction, setFilterAction] = useState('all')
+  const [filterSeverity, setFilterSeverity] = useState('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
+
+  const fetchLogs = useCallback(async (p = 1) => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ page: String(p), pageSize: '50' })
+      if (search) params.set('search', search)
+      if (filterAction !== 'all') params.set('action', filterAction)
+      if (filterSeverity !== 'all') params.set('severity', filterSeverity)
+      if (dateFrom) params.set('dateFrom', dateFrom)
+      if (dateTo) params.set('dateTo', dateTo)
+      const res = await fetch(`/api/audit?${params}`)
+      if (!res.ok) throw new Error('Failed')
+      const data: AuditResponse = await res.json()
+      setLogs(data.data || [])
+      setTotalPages(data.pagination?.totalPages || 1)
+      setTotal(data.pagination?.total || 0)
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load audit trail', variant: 'destructive' })
+    } finally {
+      setLoading(false)
+    }
+  }, [search, filterAction, filterSeverity, dateFrom, dateTo, toast])
+
+  useEffect(() => { fetchLogs(1); setPage(1) }, [fetchLogs])
+
+  const handleExport = async () => {
+    try {
+      const res = await fetch(`/api/audit?pageSize=10000`)
+      const data = await res.json()
+      const rows: AuditLog[] = data.data || []
+      if (!rows.length) { toast({ title: 'No data to export' }); return }
+      const headers = ['Date', 'User', 'Action', 'Entity', 'Entity Name', 'Severity', 'Module', 'IP']
+      const csv = [headers.join(','), ...rows.map(r => [
+        new Date(r.createdAt).toLocaleString(),
+        r.username || r.user?.name || '',
+        r.action, r.entity, r.entityName || '',
+        r.severity, r.module || '', r.ipAddress || '',
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\n')
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+      a.download = `audit-trail-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      toast({ title: 'Exported', description: `${rows.length} records exported` })
+    } catch {
+      toast({ title: 'Export failed', variant: 'destructive' })
+    }
+  }
+
+  const criticalCount = logs.filter(l => l.severity === 'critical').length
+  const warningCount = logs.filter(l => l.severity === 'warning').length
+  const infoCount = logs.filter(l => l.severity === 'info').length
+
+  return (
+    <div style={{ background: '#F5F7FA', minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-5">
+
+        {/* Page Header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-xl font-semibold flex items-center gap-2" style={{ color: '#1a1a2e' }}>
+              <Shield className="w-5 h-5" style={{ color: '#1A7A4A' }} />
+              Audit Trail
+            </h1>
+            <p className="text-sm mt-0.5" style={{ color: '#6B7280' }}>
+              Complete log of all system actions and security events
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => fetchLogs(page)} disabled={loading} className="h-8 text-xs">
+              {loading ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+              Refresh
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleExport} className="h-8 text-xs">
+              <Download className="w-3.5 h-3.5 mr-1" />
+              Export CSV
+            </Button>
+          </div>
+        </div>
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <KpiCard label="Total Events" value={total} icon={<FileText className="w-4 h-4" />} color="#1A7A4A" bg="#F0FDF4" />
+          <KpiCard label="Critical" value={criticalCount} icon={<AlertCircle className="w-4 h-4" />} color="#DC2626" bg="#FEF2F2" />
+          <KpiCard label="Warnings" value={warningCount} icon={<AlertTriangle className="w-4 h-4" />} color="#D97706" bg="#FFFBEB" />
+          <KpiCard label="Info" value={infoCount} icon={<Info className="w-4 h-4" />} color="#2563EB" bg="#EFF6FF" />
+        </div>
+
+        {/* Search & Filters */}
+        <div className="rounded-xl p-4 space-y-3" style={{ background: '#fff', border: '1px solid #E5E7EB', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#9CA3AF' }} />
+              <Input
+                placeholder="Search by user, action, entity, IP address..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9 h-8 text-xs"
+              />
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="h-8 text-xs">
+              <Filter className="w-3.5 h-3.5 mr-1" />
+              Filters
+              {showFilters ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
+            </Button>
+          </div>
+
+          {showFilters && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t" style={{ borderColor: '#F3F4F6' }}>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: '#6B7280' }}>Action</p>
+                <Select value={filterAction} onValueChange={setFilterAction}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Actions</SelectItem>
+                    {['LOGIN','LOGOUT','CREATE','UPDATE','DELETE','APPROVE','REJECT','POST','REVERSE','EXPORT','PRINT','PASSWORD_CHANGE','PERMISSION_CHANGE'].map(a => (
+                      <SelectItem key={a} value={a} className="text-xs">{a}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: '#6B7280' }}>Severity</p>
+                <Select value={filterSeverity} onValueChange={setFilterSeverity}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Severities</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                    <SelectItem value="warning">Warning</SelectItem>
+                    <SelectItem value="info">Info</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: '#6B7280' }}>From Date</p>
+                <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 text-xs" />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: '#6B7280' }}>To Date</p>
+                <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-8 text-xs" />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Table */}
+        <div className="rounded-xl overflow-hidden" style={{ background: '#fff', border: '1px solid #E5E7EB', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          {/* Table header bar */}
+          <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: '#E5E7EB' }}>
+            <span className="text-xs font-medium" style={{ color: '#6B7280' }}>
+              {loading ? 'Loading...' : `${total.toLocaleString()} events`}
+            </span>
+            <div className="flex items-center gap-1 text-xs" style={{ color: '#6B7280' }}>
+              <span>Page {page} of {totalPages}</span>
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs"
+                onClick={() => { const p = Math.max(1, page - 1); setPage(p); fetchLogs(p) }}
+                disabled={page <= 1 || loading}>
+                ‹
+              </Button>
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs"
+                onClick={() => { const p = Math.min(totalPages, page + 1); setPage(p); fetchLogs(p) }}
+                disabled={page >= totalPages || loading}>
+                ›
+              </Button>
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs w-[160px]">Timestamp</TableHead>
-                  <TableHead className="text-xs">User</TableHead>
-                  <TableHead className="text-xs">Action</TableHead>
-                  <TableHead className="text-xs">Module</TableHead>
-                  <TableHead className="text-xs">Entity</TableHead>
-                  <TableHead className="text-xs">Entity Name</TableHead>
-                  <TableHead className="text-xs">Details</TableHead>
-                  <TableHead className="text-xs">IP Address</TableHead>
-                  <TableHead className="text-xs">Severity</TableHead>
-                  <TableHead className="text-xs w-10"></TableHead>
+                <TableRow style={{ background: '#F9FAFB' }}>
+                  {['Timestamp', 'User', 'Action', 'Entity', 'Severity', 'Module', 'IP Address', ''].map(h => (
+                    <TableHead key={h} className="text-[10px] font-semibold uppercase tracking-wide h-9"
+                      style={{ color: '#6B7280' }}>
+                      {h}
+                    </TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-12">
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="h-6 w-6 animate-spin rounded-full border-3 border-primary border-t-transparent" />
-                        <p className="text-xs text-muted-foreground">Loading audit logs...</p>
-                      </div>
+                    <TableCell colSpan={8} className="text-center py-16">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" style={{ color: '#1A7A4A' }} />
+                      <p className="text-sm" style={{ color: '#6B7280' }}>Loading audit logs...</p>
                     </TableCell>
                   </TableRow>
-                ) : !data?.data?.length ? (
+                ) : logs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-12">
-                      <div className="flex flex-col items-center gap-2">
-                        <Shield className="h-8 w-8 text-muted-foreground/50" />
-                        <p className="text-sm text-muted-foreground">No audit logs found</p>
-                        <p className="text-xs text-muted-foreground">Try adjusting your filters</p>
-                      </div>
+                    <TableCell colSpan={8} className="text-center py-16">
+                      <Shield className="w-10 h-10 mx-auto mb-3" style={{ color: '#D1D5DB' }} />
+                      <p className="text-sm font-medium" style={{ color: '#6B7280' }}>No audit logs found</p>
+                      <p className="text-xs mt-1" style={{ color: '#9CA3AF' }}>Try adjusting your filters</p>
                     </TableCell>
                   </TableRow>
-                ) : data.data.map(log => (
-                  <React.Fragment key={log.id}>
-                    <TableRow
-                      className={`cursor-pointer hover:bg-muted/50 transition-colors ${log.severity === 'critical' ? 'bg-red-50/50' : ''}`}
-                      onClick={() => setExpandedRow(expandedRow === log.id ? null : log.id)}
-                    >
-                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(log.createdAt).toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary shrink-0">
-                            {(log.user?.name || log.username || 'S').charAt(0).toUpperCase()}
+                ) : logs.map((log, idx) => (
+                  <TableRow
+                    key={log.id}
+                    className="cursor-pointer transition-colors hover:bg-gray-50"
+                    style={{ borderBottom: '1px solid #F3F4F6' }}
+                    onClick={() => setSelectedLog(selectedLog?.id === log.id ? null : log)}
+                  >
+                    <TableCell className="py-2.5 text-[11px] font-mono whitespace-nowrap" style={{ color: '#6B7280' }}>
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3 h-3 flex-shrink-0" style={{ color: '#D1D5DB' }} />
+                        {new Date(log.createdAt).toLocaleString('en-PK', { dateStyle: 'short', timeStyle: 'short' })}
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2.5">
+                      <div className="flex items-center gap-2">
+                        <UserAvatar name={log.username || log.user?.name || 'S'} />
+                        <div>
+                          <div className="text-xs font-medium" style={{ color: '#1a1a2e' }}>
+                            {log.username || log.user?.name || 'System'}
                           </div>
-                          <span className="text-xs font-medium">{log.user?.name || log.username || 'System'}</span>
+                          {log.user?.email && (
+                            <div className="text-[10px]" style={{ color: '#9CA3AF' }}>{log.user.email}</div>
+                          )}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={`text-[9px] ${actionColors[log.action] || 'bg-gray-100 text-gray-800'}`}>
-                          {log.action}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs capitalize">{log.module || '-'}</TableCell>
-                      <TableCell className="text-xs font-medium">{log.entity}</TableCell>
-                      <TableCell className="text-xs text-primary cursor-pointer hover:underline max-w-[200px] truncate">
-                        {log.entityName || log.entityId?.slice(0, 8) || '-'}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[250px] truncate">
-                        {log.details ? (() => {
-                          const parsed = typeof log.details === 'string' ? parseJsonSafe(log.details) : log.details
-                          if (parsed && typeof parsed === 'object' && parsed.summary) return parsed.summary
-                          if (typeof parsed === 'string') return parsed.slice(0, 60)
-                          const str = JSON.stringify(parsed)
-                          return str.length > 60 ? str.slice(0, 60) + '…' : str
-                        })() : '-'}
-                      </TableCell>
-                      <TableCell className="text-xs font-mono">{log.ipAddress || '-'}</TableCell>
-                      <TableCell>
-                        <Badge className={`text-[9px] ${severityColors[log.severity] || 'bg-gray-100 text-gray-800'}`}>
-                          {severityIcons[log.severity]} {log.severity}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {expandedRow === log.id ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                      </TableCell>
-                    </TableRow>
-                    {expandedRow === log.id && (
-                      <TableRow key={`${log.id}-detail`}>
-                        <TableCell colSpan={10} className="bg-muted/20 p-4">
-                          <div className="space-y-3">
-                            {/* Full details */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                              <div><span className="text-muted-foreground">Log ID:</span> <span className="font-mono">{log.id.slice(0, 16)}...</span></div>
-                              <div><span className="text-muted-foreground">Entity ID:</span> <span className="font-mono">{log.entityId || '-'}</span></div>
-                              <div><span className="text-muted-foreground">IP Address:</span> <span className="font-mono">{log.ipAddress || '-'}</span></div>
-                              <div><span className="text-muted-foreground">Timestamp:</span> {new Date(log.createdAt).toLocaleString()}</div>
-                            </div>
-
-                            {/* Details JSON */}
-                            {log.details && (
-                              <div>
-                                <p className="text-[10px] font-medium text-muted-foreground mb-1">Details</p>
-                                <pre className="text-xs bg-muted/50 p-2 rounded border max-h-32 overflow-auto">
-                                  {(() => { const parsed = typeof log.details === 'string' ? parseJsonSafe(log.details) : log.details; return typeof parsed === 'object' ? JSON.stringify(parsed, null, 2) : String(parsed) })()}
-                                </pre>
-                              </div>
-                            )}
-
-                            {/* Diff view */}
-                            {(log.oldValues || log.newValues) && (
-                              <div>
-                                <p className="text-[10px] font-medium text-muted-foreground mb-1">Value Changes</p>
-                                {renderDiffValues(log.oldValues, log.newValues)}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </React.Fragment>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2.5">
+                      <ActionBadge action={log.action} />
+                    </TableCell>
+                    <TableCell className="py-2.5">
+                      <div className="text-xs font-medium" style={{ color: '#374151' }}>{log.entity}</div>
+                      {log.entityName && (
+                        <div className="text-[10px] truncate max-w-[130px]" style={{ color: '#9CA3AF' }}>{log.entityName}</div>
+                      )}
+                    </TableCell>
+                    <TableCell className="py-2.5">
+                      <SeverityBadge severity={log.severity} />
+                    </TableCell>
+                    <TableCell className="py-2.5 text-[11px]" style={{ color: '#6B7280' }}>
+                      {log.module ? (
+                        <span className="flex items-center gap-1">
+                          <Settings className="w-3 h-3" />
+                          <span className="capitalize">{log.module}</span>
+                        </span>
+                      ) : '—'}
+                    </TableCell>
+                    <TableCell className="py-2.5 text-[11px] font-mono" style={{ color: '#9CA3AF' }}>
+                      {log.ipAddress || '—'}
+                    </TableCell>
+                    <TableCell className="py-2.5">
+                      <ChevronRight className="w-3.5 h-3.5" style={{ color: '#D1D5DB' }} />
+                    </TableCell>
+                  </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <Label className="text-xs text-muted-foreground">Per page</Label>
-            <Select value={pageSize.toString()} onValueChange={v => { setPageSize(+v); setPage(1) }}>
-              <SelectTrigger className="h-7 w-16 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="25">25</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-                <SelectItem value="100">100</SelectItem>
-                <SelectItem value="500">500</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <span className="text-xs text-muted-foreground">
-            {data?.pagination ? `${((page - 1) * pageSize) + 1}-${Math.min(page * pageSize, data.pagination.total)} of ${data.pagination.total.toLocaleString()}` : '0 results'}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
-          {data?.pagination && (
-            <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(data.pagination.totalPages, 5) }, (_, i) => {
-                let pageNum: number
-                if (data.pagination.totalPages <= 5) {
-                  pageNum = i + 1
-                } else if (page <= 3) {
-                  pageNum = i + 1
-                } else if (page >= data.pagination.totalPages - 2) {
-                  pageNum = data.pagination.totalPages - 4 + i
-                } else {
-                  pageNum = page - 2 + i
-                }
-                return (
-                  <Button key={pageNum} variant={pageNum === page ? 'default' : 'outline'} size="sm" className="h-7 w-7 p-0 text-xs"
-                    onClick={() => setPage(pageNum)}>
-                    {pageNum}
-                  </Button>
-                )
-              })}
-            </div>
-          )}
-          <Button variant="outline" size="sm" disabled={!data?.pagination || page >= data.pagination.totalPages} onClick={() => setPage(p => p + 1)}>Next</Button>
         </div>
       </div>
+
+      {/* Detail Drawer */}
+      {selectedLog && (
+        <AuditDetailDrawer
+          log={selectedLog}
+          onClose={() => setSelectedLog(null)}
+        />
+      )}
     </div>
   )
 }

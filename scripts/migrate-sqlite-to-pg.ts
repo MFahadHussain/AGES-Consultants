@@ -194,36 +194,27 @@ function parseInt_(val: unknown): number | null {
 let sqliteDb: any = null
 
 async function openSQLite(dbPath: string): Promise<any> {
-  try {
-    const Database = (await import('better-sqlite3')).default
-    if (!fs.existsSync(dbPath)) {
-      throw new Error(`SQLite database not found at: ${dbPath}`)
-    }
-    sqliteDb = new Database(dbPath, { readonly: true })
-    sqliteDb.pragma('journal_mode = WAL')
-    logSuccess(`Opened SQLite database: ${dbPath}`)
-    return sqliteDb
-  } catch (error: any) {
-    if (error.code === 'ERR_MODULE_NOT_FOUND' || error.message?.includes('Cannot find')) {
-      logError('better-sqlite3 is not installed. Install it with: bun add -d better-sqlite3 @types/better-sqlite3')
-      process.exit(1)
-    }
-    throw error
+  if (!fs.existsSync(dbPath)) {
+    throw new Error(`SQLite database not found at: ${dbPath}`)
   }
+  const { Database } = await import('bun:sqlite')
+  sqliteDb = new Database(dbPath, { readonly: true })
+  logSuccess(`Opened SQLite database: ${dbPath}`)
+  return sqliteDb
 }
 
 function getSQLiteTables(db: any): string[] {
-  const rows = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_prisma%'").all()
+  const rows = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_prisma%'").all()
   return rows.map((r: any) => r.name)
 }
 
 function getSQLiteRowCount(db: any, tableName: string): number {
-  const row = db.prepare(`SELECT COUNT(*) as count FROM "${tableName}"`).get() as any
+  const row = db.query(`SELECT COUNT(*) as count FROM "${tableName}"`).get() as any
   return row?.count || 0
 }
 
 function getSQLiteRows(db: any, tableName: string, offset: number, limit: number): any[] {
-  return db.prepare(`SELECT * FROM "${tableName}" LIMIT ? OFFSET ?`).all(limit, offset)
+  return db.query(`SELECT * FROM "${tableName}" LIMIT ?1 OFFSET ?2`).all(limit, offset)
 }
 
 // ============================================================
@@ -353,6 +344,7 @@ const BOOLEAN_FIELDS: Record<string, string[]> = {
   'Role': ['isSystem', 'isActive'],
   'Permission': ['isActive'],
   'RolePermission': ['isGranted'],
+  'UserRole': ['isPrimary'],
   'UserPermission': ['isGranted'],
   'UserSession': ['isActive'],
   'SecurityPolicy': [
@@ -374,8 +366,9 @@ const BOOLEAN_FIELDS: Record<string, string[]> = {
   'TaxCalculation': ['postedToGL'],
   'FixedAsset': ['isDonorFunded'],
   'FixedAssetDepreciation': ['isPosted', 'isTaxDepreciation'],
-  'Allowance': ['isTaxable', 'isProjectSpecific', 'isActive'],
+  'Allowance': ['isTaxable', 'isProjectSpecific', 'isActive', 'baseOnSalary'],
   'EmployeeAllowance': ['isActive'],
+  'EmployeeProjectAssignment': ['isActive'],
   'Employee': ['eobiEnabled', 'pfEnabled', 'incomeTaxEnabled', 'essiEnabled', 'gratuityEnabled', 'applyToAllProjects', 'isFinancialUsed'],
   'DocumentType': ['isRequired', 'hasExpiry', 'isActive'],
   'EmployeeDocument': ['isArchived'],
@@ -497,6 +490,8 @@ function transformRow(tableName: string, row: Record<string, any>): Record<strin
         transformed[key] = ''
       } else if (value === '' && key === 'narration') {
         transformed[key] = ''
+      } else if (value === null && key === 'value' && tableName === 'SystemSetting') {
+        transformed[key] = ''  // SystemSetting.value is required, default to empty string
       } else {
         transformed[key] = value === '' ? null : value
       }
@@ -511,12 +506,21 @@ function transformRow(tableName: string, row: Record<string, any>): Record<strin
       continue
     }
 
-    // Transform date fields
+    // Transform date fields (explicit list)
     const dateFields = DATE_FIELDS_PER_MODEL[tableName] || []
     if (dateFields.includes(key)) {
       const dateVal = parseDate(value)
       transformed[key] = dateVal
       continue
+    }
+
+    // Auto-detect: SQLite stores DateTime as integer milliseconds via Prisma
+    if (typeof value === 'number' && value > 1_000_000_000_000 && Number.isInteger(value)) {
+      const d = new Date(value)
+      if (!isNaN(d.getTime())) {
+        transformed[key] = d
+        continue
+      }
     }
 
     // Transform float fields

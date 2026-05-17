@@ -1,0 +1,621 @@
+03-02-02 | Salary Payable
+Type: LIABILITY | Group: PAYROLL LIABILITY | Status: Active | Type: Control Account
+
+03-02-02-0001 | Salary Payable Partners
+(LIABILITY | PAYROLL LIABILITY | Active | Posting)
+
+No individual staff listed
+
+03-02-02-0002 | Salary Payable Key Staff
+(LIABILITY | PAYROLL LIABILITY | Active | Posting)
+
+No individual staff listed
+
+03-02-02-0003 | Salary Payable Technical Staff
+(LIABILITY | PAYROLL LIABILITY | Active | Posting)
+
+03-02-02-0003-01 | Abdul Rehman
+
+03-02-02-0003-02 | Aftab Ahmad
+
+03-02-02-0003-03 | Ahmad Tariq
+
+03-02-02-0003-04 | Ahsen Ali
+
+03-02-02-0003-05 | Amjad Saeed
+
+03-02-02-0003-06 | Anfal Khan
+
+03-02-02-0003-07 | Assad Ali Khan
+
+03-02-02-0003-08 | Babar Alam
+
+03-02-02-0003-09 | Behram Khan
+
+03-02-02-0003-10 | Danyal Khan
+
+03-02-02-0003-11 | Fakhr uz Zaman
+
+03-02-02-0003-12 | Farhat Ali Shah Banori
+
+03-02-02-0003-13 | Habib Ullah
+
+03-02-02-0003-14 | Habib-Ur-Rehman
+
+03-02-02-0003-15 | Hamad Ali
+
+03-02-02-0003-16 | Hamid Iqbal Khan
+
+03-02-02-0003-17 | Hammad Hassan
+
+03-02-02-0003-18 | Hassan Tajdar Gilani
+
+03-02-02-0003-19 | Iftikhar Ud Din Syed
+
+03-02-02-0003-20 | Irfan Ullah
+
+03-02-02-0003-21 | Khan Sardar
+
+03-02-02-0003-22 | Muhammad Abdul Munaim
+
+03-02-02-0003-23 | Muhammad Asif
+
+03-02-02-0003-24 | Muhammad Hussain
+
+03-02-02-0003-25 | Muhammad Saud Al Faisal
+
+03-02-02-0003-26 | Muhammad Sohaib
+
+03-02-02-0003-27 | Muhammad Tauqeer
+
+03-02-02-0003-28 | Muhammad Umer Azeem
+
+03-02-02-0003-29 | Rashid Ahmad
+
+03-02-02-0003-30 | Rehmat Shah
+
+03-02-02-0003-31 | Shahzaman Mustafa
+
+03-02-02-0003-32 | Shakir Ullah
+
+03-02-02-0003-33 | Rashid Ahmad
+
+03-02-02-0003-34 | Syed Muhammad Ammar Zaidi
+
+03-02-02-0003-35 | Syed Sibt-Ul-Hasan Naqvi
+
+03-02-02-0003-36 | Syed Zia Hussain Shah
+
+03-02-02-0003-37 | Tahir Kamran Marwat
+
+03-02-02-0003-38 | Taqweem Khan
+
+03-02-02-0003-39 | Tariq Mehmood
+
+03-02-02-0003-40 | Umair Anwar Awan
+
+03-02-02-0003-41 | Waqar Ul Mulk
+
+03-02-02-0003-42 | Zafar Alam Khan
+
+03-02-02-0003-43 | Zubair Ahmad
+
+03-02-02-0003-44 | Zulfiqar Alam
+
+03-02-02-0004 | Salary Payable Technical Support Staff
+(LIABILITY | PAYROLL LIABILITY | Active | Posting)
+
+03-02-02-0004-01 | Abbas Ali
+
+03-02-02-0004-02 | Abdur Rahim
+
+03-02-02-0004-03 | Amir Aziz
+
+03-02-02-0004-04 | Amjad Ali Khan
+
+03-02-02-0004-05 | Asad Hayat
+
+03-02-02-0004-06 | Asad Ullah
+
+03-02-02-0004-07 | Fakhar ul Islam
+
+03-02-02-0004-08 | Hafiz Abdul Basit Miana
+
+03-02-02-0004-09 | Hamza Ahmad
+
+03-02-02-0004-10 | Izhar Ul Haq
+
+03-02-02-0004-11 | Jalal Khan
+
+03-02-02-0004-12 | Javed Sarwar Baloch
+
+03-02-02-0004-13 | Junaid Alam
+
+03-02-02-0004-14 | Khalid Hameed
+
+03-02-02-0004-15 | Kifayat Ullah
+
+03-02-02-0004-16 | Muhammad Haroon
+
+03-02-02-0004-17 | Mohsin Ullah
+
+03-02-02-0004-18 | Muhammad Ali
+
+03-02-02-0004-19 | Muhammad Bilal
+
+03-02-02-0004-20 | Muhammad Ikram Ullah
+
+03-02-02-0004-21 | Muhammad Sohail
+
+03-02-02-0004-22 | Muhammad Yasir
+
+03-02-02-0004-23 | Najum Us Saqib
+
+03-02-02-0004-24 | Nasir Khan
+
+03-02-02-0004-25 | Niaz Faraz
+
+03-02-02-0004-26 | Raja Asim Zubair
+
+03-02-02-0004-27 | Shafiq Ahmad
+
+03-02-02-0004-28 | Shah Mansoor
+
+03-02-02-0004-29 | Shaukat Ali
+
+03-02-02-0004-30 | Shehryar Khan
+
+03-02-02-0004-31 | Sultan Zaib
+
+03-02-02-0004-32 | Wazir Ali
+
+03-02-02-0004-33 | Zakir Ullah
+
+03-02-02-0005 | Salary Payable Admin & Finance Staff
+(LIABILITY | PAYROLL LIABILITY | Active | Posting)
+
+03-02-02-0005-01 | Ihsan Ullah
+
+03-02-02-0005-02 | Imdad Ullah
+
+03-02-02-0005-03 | Izhar Ali
+
+03-02-02-0005-04 | Jamil Hussain
+
+03-02-02-0005-05 | Muhammad Ibrahim
+
+03-02-02-0005-06 | Nasir Alam
+
+03-02-02-0005-07 | Nouman Gul
+
+03-02-02-0005-08 | Salman Khan
+
+03-02-02-0005-09 | Sana Ullah
+
+03-02-02-0005-10 | Shah Nawaz Khan
+
+03-02-02-0005-11 | Tauheed Ur Rehman
+
+03-02-02-0005-12 | Zahir Gul
+
+03-02-02-0005-13 | Zia Muhammad
+
+03-02-02-0006 | Salary Payable Support Staff
+(LIABILITY | PAYROLL LIABILITY | Active | Posting)
+
+03-02-02-0006-01 | Abdul Basit
+
+03-02-02-0006-02 | Aftab Ahmad Shah
+
+03-02-02-0006-03 | Asad Ali Shahzad
+
+03-02-02-0006-04 | Asad Rehman
+
+03-02-02-0006-05 | Badshah Rehman
+
+03-02-02-0006-06 | Bashir Ahmad Khan
+
+03-02-02-0006-07 | Fahad Shahzad
+
+03-02-02-0006-08 | Fareed Ullah Khan
+
+03-02-02-0006-09 | Farmanullah
+
+03-02-02-0006-10 | Farooq
+
+03-02-02-0006-11 | Fazal Khani Gul
+
+03-02-02-0006-12 | Fazal Raheem
+
+03-02-02-0006-13 | Fida Hussain
+
+03-02-02-0006-14 | Humayun
+
+03-02-02-0006-15 | Hussain Ahmed
+
+03-02-02-0006-16 | Ibrar Hussain Shah
+
+03-02-02-0006-17 | Ihteram Ul Haq
+
+03-02-02-0006-18 | Ikramullah
+
+03-02-02-0006-19 | Imran Hussain Bangash
+
+03-02-02-0006-20 | Imran Ullah
+
+03-02-02-0006-21 | Inam Ali
+
+03-02-02-0006-22 | Jamal Shah
+
+03-02-02-0006-23 | Javed Iqbal
+
+03-02-02-0006-24 | Jehangir Badshah
+
+03-02-02-0006-25 | Lal Shahzad Abbas
+
+03-02-02-0006-26 | Mahir Gul
+
+03-02-02-0006-27 | Muhammad Abbas Azeem
+
+03-02-02-0006-28 | Muhammad Gul
+
+03-02-02-0006-29 | Muhammad Israr
+
+03-02-02-0006-30 | Muhammad Kamran
+
+03-02-02-0006-31 | Muhammad Siddique
+
+03-02-02-0006-32 | Muhammad Tawab
+
+03-02-02-0006-33 | Muhammad Yusaf Shah
+
+03-02-02-0006-34 | Mukhtiar Ali
+
+03-02-02-0006-35 | Mushtaq
+
+03-02-02-0006-36 | Muslim Khan
+
+03-02-02-0006-37 | Nabi Ul Haq
+
+03-02-02-0006-38 | Nadeem Khan
+
+03-02-02-0006-39 | Nizar Khan
+
+03-02-02-0006-40 | Nowsher Khan
+
+03-02-02-0006-41 | Rahim Ud Din
+
+03-02-02-0006-42 | Rozi Khan
+
+03-02-02-0006-43 | Sahil Shah
+
+03-02-02-0006-44 | Sajjad Hussain Shah
+
+03-02-02-0006-45 | Saqib Shah
+
+03-02-02-0006-46 | Shahab Khan
+
+03-02-02-0006-47 | Sher Rahman
+
+03-02-02-0006-48 | Syed Amir Shah
+
+03-02-02-0006-49 | Tahir Zaman
+
+03-02-02-0006-50 | Usama Naeem
+
+03-02-02-0006-51 | Waheed Ullah
+
+03-02-02-0007 | Salary Payable Geo Tech Staff
+
+
+03-02-03 | Social Charges Payable
+Type: LIABILITY | Group: PAYROLL LIABILITY | Status: Active | Type: Control Account
+
+03-02-03-0001 | Social Charges Payable Partners
+(LIABILITY | PAYROLL LIABILITY | Active | Posting)
+
+No individual staff listed
+
+03-02-03-0002 | Social Charges Payable Key Staff
+(LIABILITY | PAYROLL LIABILITY | Active | Posting)
+
+No individual staff listed
+
+03-02-03-0003 | Social Charges Payable Technical Staff
+(LIABILITY | PAYROLL LIABILITY | Active | Posting)
+
+03-02-03-0003-01 | Abdul Rehman
+
+03-02-03-0003-02 | Aftab Ahmad
+
+03-02-03-0003-03 | Ahmad Tariq
+
+03-02-03-0003-04 | Ahsen Ali
+
+03-02-03-0003-05 | Amjad Saeed
+
+03-02-03-0003-06 | Anfal Khan
+
+03-02-03-0003-07 | Assad Ali Khan
+
+03-02-03-0003-08 | Babar Alam
+
+03-02-03-0003-09 | Behram Khan
+
+03-02-03-0003-10 | Danyal Khan
+
+03-02-03-0003-11 | Fakhr uz Zaman
+
+03-02-03-0003-12 | Farhat Ali Shah Banori
+
+03-02-03-0003-13 | Habib Ullah
+
+03-02-03-0003-14 | Habib-Ur-Rehman
+
+03-02-03-0003-15 | Hamad Ali
+
+03-02-03-0003-16 | Hamid Iqbal Khan
+
+03-02-03-0003-17 | Hammad Hassan
+
+03-02-03-0003-18 | Hassan Tajdar Gilani
+
+03-02-03-0003-19 | Iftikhar Ud Din Syed
+
+03-02-03-0003-20 | Irfan Ullah
+
+03-02-03-0003-21 | Khan Sardar
+
+03-02-03-0003-22 | Muhammad Abdul Munaim
+
+03-02-03-0003-23 | Muhammad Asif
+
+03-02-03-0003-24 | Muhammad Hussain
+
+03-02-03-0003-25 | Muhammad Saud Al Faisal
+
+03-02-03-0003-26 | Muhammad Sohaib
+
+03-02-03-0003-27 | Muhammad Tauqeer
+
+03-02-03-0003-28 | Muhammad Umer Azeem
+
+03-02-03-0003-29 | Rashid Ahmad
+
+03-02-03-0003-30 | Rehmat Shah
+
+03-02-03-0003-31 | Shahzaman Mustafa
+
+03-02-03-0003-32 | Shakir Ullah
+
+03-02-03-0003-33 | Rashid Ahmad
+
+03-02-03-0003-34 | Syed Muhammad Ammar Zaidi
+
+03-02-03-0003-35 | Syed Sibt-Ul-Hasan Naqvi
+
+03-02-03-0003-36 | Syed Zia Hussain Shah
+
+03-02-03-0003-37 | Tahir Kamran Marwat
+
+03-02-03-0003-38 | Taqweem Khan
+
+03-02-03-0003-39 | Tariq Mehmood
+
+03-02-03-0003-40 | Umair Anwar Awan
+
+03-02-03-0003-41 | Waqar Ul Mulk
+
+03-02-03-0003-42 | Zafar Alam Khan
+
+03-02-03-0003-43 | Zubair Ahmad
+
+03-02-03-0003-44 | Zulfiqar Alam
+
+03-02-03-0004 | Social Charges Payable Technical Support Staff
+(LIABILITY | PAYROLL LIABILITY | Active | Posting)
+
+03-02-03-0004-01 | Abbas Ali
+
+03-02-03-0004-02 | Abdur Rahim
+
+03-02-03-0004-03 | Amir Aziz
+
+03-02-03-0004-04 | Amjad Ali Khan
+
+03-02-03-0004-05 | Asad Hayat
+
+03-02-03-0004-06 | Asad Ullah
+
+03-02-03-0004-07 | Fakhar ul Islam
+
+03-02-03-0004-08 | Hafiz Abdul Basit Miana
+
+03-02-03-0004-09 | Hamza Ahmad
+
+03-02-03-0004-10 | Izhar Ul Haq
+
+03-02-03-0004-11 | Jalal Khan
+
+03-02-03-0004-12 | Javed Sarwar Baloch
+
+03-02-03-0004-13 | Junaid Alam
+
+03-02-03-0004-14 | Khalid Hameed
+
+03-02-03-0004-15 | Kifayat Ullah
+
+03-02-03-0004-16 | Muhammad Haroon
+
+03-02-03-0004-17 | Mohsin Ullah
+
+03-02-03-0004-18 | Muhammad Ali
+
+03-02-03-0004-19 | Muhammad Bilal
+
+03-02-03-0004-20 | Muhammad Ikram Ullah
+
+03-02-03-0004-21 | Muhammad Sohail
+
+03-02-03-0004-22 | Muhammad Yasir
+
+03-02-03-0004-23 | Najum Us Saqib
+
+03-02-03-0004-24 | Nasir Khan
+
+03-02-03-0004-25 | Niaz Faraz
+
+03-02-03-0004-26 | Raja Asim Zubair
+
+03-02-03-0004-27 | Shafiq Ahmad
+
+03-02-03-0004-28 | Shah Mansoor
+
+03-02-03-0004-29 | Shaukat Ali
+
+03-02-03-0004-30 | Shehryar Khan
+
+03-02-03-0004-31 | Sultan Zaib
+
+03-02-03-0004-32 | Wazir Ali
+
+03-02-03-0004-33 | Zakir Ullah
+
+03-02-03-0005 | Social Charges Payable Admin & Finance Staff
+(LIABILITY | PAYROLL LIABILITY | Active | Posting)
+
+03-02-03-0005-01 | Ihsan Ullah
+
+03-02-03-0005-02 | Imdad Ullah
+
+03-02-03-0005-03 | Izhar Ali
+
+03-02-03-0005-04 | Jamil Hussain
+
+03-02-03-0005-05 | Muhammad Ibrahim
+
+03-02-03-0005-06 | Nasir Alam
+
+03-02-03-0005-07 | Nouman Gul
+
+03-02-03-0005-08 | Salman Khan
+
+03-02-03-0005-09 | Sana Ullah
+
+03-02-03-0005-10 | Shah Nawaz Khan
+
+03-02-03-0005-11 | Tauheed Ur Rehman
+
+03-02-03-0005-12 | Zahir Gul
+
+03-02-03-0005-13 | Zia Muhammad
+
+03-02-03-0006 | Social Charges Payable Support Staff
+(LIABILITY | PAYROLL LIABILITY | Active | Posting)
+
+03-02-03-0006-01 | Abdul Basit
+
+03-02-03-0006-02 | Aftab Ahmad Shah
+
+03-02-03-0006-03 | Asad Ali Shahzad
+
+03-02-03-0006-04 | Asad Rehman
+
+03-02-03-0006-05 | Badshah Rehman
+
+03-02-03-0006-06 | Bashir Ahmad Khan
+
+03-02-03-0006-07 | Fahad Shahzad
+
+03-02-03-0006-08 | Fareed Ullah Khan
+
+03-02-03-0006-09 | Farmanullah
+
+03-02-03-0006-10 | Farooq
+
+03-02-03-0006-11 | Fazal Khani Gul
+
+03-02-03-0006-12 | Fazal Raheem
+
+03-02-03-0006-13 | Fida Hussain
+
+03-02-03-0006-14 | Humayun
+
+03-02-03-0006-15 | Hussain Ahmed
+
+03-02-03-0006-16 | Ibrar Hussain Shah
+
+03-02-03-0006-17 | Ihteram Ul Haq
+
+03-02-03-0006-18 | Ikramullah
+
+03-02-03-0006-19 | Imran Hussain Bangash
+
+03-02-03-0006-20 | Imran Ullah
+
+03-02-03-0006-21 | Inam Ali
+
+03-02-03-0006-22 | Jamal Shah
+
+03-02-03-0006-23 | Javed Iqbal
+
+03-02-03-0006-24 | Jehangir Badshah
+
+03-02-03-0006-25 | Lal Shahzad Abbas
+
+03-02-03-0006-26 | Mahir Gul
+
+03-02-03-0006-27 | Muhammad Abbas Azeem
+
+03-02-03-0006-28 | Muhammad Gul
+
+03-02-03-0006-29 | Muhammad Israr
+
+03-02-03-0006-30 | Muhammad Kamran
+
+03-02-03-0006-31 | Muhammad Siddique
+
+03-02-03-0006-32 | Muhammad Tawab
+
+03-02-03-0006-33 | Muhammad Yusaf Shah
+
+03-02-03-0006-34 | Mukhtiar Ali
+
+03-02-03-0006-35 | Mushtaq
+
+03-02-03-0006-36 | Muslim Khan
+
+03-02-03-0006-37 | Nabi Ul Haq
+
+03-02-03-0006-38 | Nadeem Khan
+
+03-02-03-0006-39 | Nizar Khan
+
+03-02-03-0006-40 | Nowsher Khan
+
+03-02-03-0006-41 | Rahim Ud Din
+
+03-02-03-0006-42 | Rozi Khan
+
+03-02-03-0006-43 | Sahil Shah
+
+03-02-03-0006-44 | Sajjad Hussain Shah
+
+03-02-03-0006-45 | Saqib Shah
+
+03-02-03-0006-46 | Shahab Khan
+
+03-02-03-0006-47 | Sher Rahman
+
+03-02-03-0006-48 | Syed Amir Shah
+
+03-02-03-0006-49 | Tahir Zaman
+
+03-02-03-0006-50 | Usama Naeem
+
+03-02-03-0006-51 | Waheed Ullah
+
+03-02-03-0007 | Social Charges Payable Geo Tech Staff
+(LIABILITY | PAYROLL LIABILITY | Active | Posting)
+
+No individual staff listed

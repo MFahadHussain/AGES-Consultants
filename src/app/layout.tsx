@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "next-themes";
+import { Toaster } from "@/components/ui/toaster";
+import "./globals.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,15 +15,19 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AcctFin ERP - Accounting & Financial Management System",
-  description: "Comprehensive ERP system for accounting, financial management, payroll integration, and fixed assets management.",
+  title: {
+    template: "%s | AcctFin ERP",
+    default: "AcctFin ERP",
+  },
+  description: "Enterprise Accounting & Financial Management System",
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body

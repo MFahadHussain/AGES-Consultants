@@ -515,6 +515,7 @@ model Project {
   defaultEmployees    Employee[] // Employees with this as default project
   dailyProjectRecords AttendanceDailyProject[]
   costLedgerEntries  ProjectCostLedger[]
+  salaryVouchers     SalaryVoucher[]
 }
 
 model FinancialReportConfig {
@@ -1153,6 +1154,7 @@ model Employee {
   costLedgerEntries ProjectCostLedger[]
   loanRecords       Loan[]
   payrollLines      PayrollBatchLine[]
+  salaryVouchers    SalaryVoucher[]
   finalSettlement   FinalSettlement?
   documents         EmployeeDocument[]
 }
@@ -1485,17 +1487,15 @@ model PayrollBatch {
   totalEssiEmployer     Float    @default(0)
 
   // Workflow
-  status          String   @default("draft") // draft, reviewed, approved, posted
-  postedToGL      Boolean  @default(false)
-  postedVoucherId String?  // Reference to GL voucher
+  status          String   @default("draft") // draft, reviewed, approved, voucher-created
   reviewedBy      String?
   approvedBy      String?
-  postedBy        String?
   createdBy       String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   lines           PayrollBatchLine[]
+  salaryVouchers  SalaryVoucher[]
 }
 
 model PayrollBatchLine {
@@ -1547,7 +1547,7 @@ model PayrollBatchLine {
 
   // SC Calculation breakdown
   scBreakdown     String?     // JSON: {monthlySC, workingRatio, earnedSC, leaveDeduction, finalSC}
-  lineStatus      String      @default("draft") // draft, approved — individual line approval for Draft to GL
+  lineStatus      String      @default("draft") // draft, reviewed, approved, voucher-created
 
   // Project & Cost Center
   projectId       String?
@@ -1588,6 +1588,93 @@ model ExportLog {
   parameters  String?  // JSON string of export parameters
   exportedBy  String
   createdAt   DateTime @default(now())
+}
+
+// ============================================================
+// SALARY VOUCHERS (Payroll → GL Integration)
+// ============================================================
+
+model SalaryVoucher {
+  id               String              @id @default(cuid())
+  voucherNumber    String              @unique
+  date             DateTime
+  period           String              // "2025-05"
+  status           String              @default("draft") // draft, submitted, approved, posted, reversed, cancelled
+  narration        String
+  totalDebit       Float               @default(0)
+  totalCredit      Float               @default(0)
+  isBalanced       Boolean             @default(false)
+
+  // Employee & Project (denormalized for fast queries)
+  projectId        String
+  projectCode      String
+  projectName      String
+  employeeId       String
+  employeeName     String
+  employeeCode     String              @default("")
+  designation      String              @default("")
+
+  // Amounts (for display without joining lines)
+  grossShare       Float               @default(0)
+  taxShare         Float               @default(0)
+  netSalaryShare   Float               @default(0)
+  scShare          Float               @default(0)
+  eobiShare        Float               @default(0)
+  pfShare          Float               @default(0)
+  essiShare        Float               @default(0)
+  loanShare        Float               @default(0)
+
+  // Allocation info
+  allocationDays   Int                 @default(0)
+  allocationWeight Float               @default(0)
+
+  // Batch reference
+  payrollBatchId   String
+  payrollBatchNumber String            @default("")
+
+  // Workflow
+  createdBy        String
+  submittedBy      String?
+  submittedAt      DateTime?
+  approvedBy       String?
+  approvedAt       DateTime?
+  postedBy         String?
+  postedAt         DateTime?
+  reversedBy       String?
+  reversedAt       DateTime?
+  reversalReason   String?
+
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  lines            SalaryVoucherLine[]
+  project          Project             @relation(fields: [projectId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  employee         Employee            @relation(fields: [employeeId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  payrollBatch     PayrollBatch        @relation(fields: [payrollBatchId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([period])
+  @@index([projectId, period])
+  @@index([employeeId])
+  @@index([payrollBatchId])
+  @@index([status])
+}
+
+model SalaryVoucherLine {
+  id           String        @id @default(cuid())
+  voucherId    String
+  lineNumber   Int
+  accountId    String
+  accountCode  String
+  accountName  String
+  description  String
+  debit        Float         @default(0)
+  credit       Float         @default(0)
+  lineType     String        // SALARY_EXPENSE, SC_EXPENSE, SALARY_PAYABLE, TAX_PAYABLE, SC_PAYABLE, EOBI_PAYABLE, PF_PAYABLE, ESSI_PAYABLE, LOAN_PAYABLE
+
+  voucher      SalaryVoucher @relation(fields: [voucherId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+
+  @@index([voucherId])
+  @@index([accountId])
 }
 
 // ============================================================

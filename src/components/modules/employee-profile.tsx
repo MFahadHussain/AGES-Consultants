@@ -504,9 +504,27 @@ export function EmployeeProfile() {
     const fetchSalaryHistory = async () => {
       setSalaryHistoryLoading(true)
       try {
-        const res = await fetch(`/api/payroll`)
-        if (res.ok) {
-          const batches = await res.json()
+        // Fetch payroll batches (for salary amounts)
+        const batchRes = await fetch(`/api/payroll`)
+        // Fetch salary vouchers for this employee (for true paid status)
+        const svRes = await fetch(`/api/salary-vouchers?employeeId=${selectedId}`)
+
+        if (batchRes.ok) {
+          const batches = await batchRes.json()
+          const svData = svRes.ok ? await svRes.json() : []
+          const salaryVouchers: any[] = Array.isArray(svData) ? svData : []
+
+          // Build a map: period → highest salary voucher status for this employee
+          // Status priority: posted > approved > submitted > draft
+          const svStatusRank: Record<string, number> = { posted: 4, approved: 3, submitted: 2, draft: 1 }
+          const svByPeriod = new Map<string, string>()
+          for (const sv of salaryVouchers) {
+            const existing = svByPeriod.get(sv.period)
+            const existingRank = svStatusRank[existing || ''] || 0
+            const newRank = svStatusRank[sv.status] || 0
+            if (newRank > existingRank) svByPeriod.set(sv.period, sv.status)
+          }
+
           const allRows: SalaryRow[] = []
           const lines: Record<string, unknown>[] = []
 
@@ -529,6 +547,17 @@ export function EmployeeProfile() {
             const period = (line.period as string) || ''
             const batchStatus = (line.batchStatus as string) || 'draft'
 
+            // Salary voucher status takes priority over batch status
+            const svStatus = svByPeriod.get(period)
+            let rowStatus: 'Paid' | 'Pending' | 'Draft'
+            if (svStatus === 'posted') {
+              rowStatus = 'Paid'
+            } else if (svStatus === 'approved' || svStatus === 'submitted' || svStatus === 'draft') {
+              rowStatus = 'Pending'
+            } else {
+              rowStatus = batchStatus === 'voucher-created' ? 'Pending' : batchStatus === 'approved' ? 'Pending' : 'Draft'
+            }
+
             allRows.push({
               month: period,
               workingDays: (line.workingDays as number) || 0,
@@ -541,7 +570,7 @@ export function EmployeeProfile() {
               loanDeduction: (line.loanDeduction as number) || 0,
               totalDeductions: (line.totalDeductions as number) || 0,
               netPaid: (line.netPay as number) || 0,
-              status: batchStatus === 'posted' ? 'Paid' : batchStatus === 'approved' ? 'Pending' : 'Draft',
+              status: rowStatus,
               earnings: { basic, housing, transport, other: Math.max(0, other) },
               deductionBreakdown: {
                 absentDeduction: Math.round(((line.absentDays as number) || 0) * ((line.dailyRate as number) || 0)),
@@ -555,14 +584,25 @@ export function EmployeeProfile() {
             })
           }
 
-          // Sort by month desc
+          // Sort by month desc, then deduplicate by period (keep most advanced status)
           allRows.sort((a, b) => b.month.localeCompare(a.month))
-          setSalaryHistory(allRows)
 
-          // Build SC ledger from salary history
+          const statusRank: Record<string, number> = { 'Paid': 3, 'Pending': 2, 'Draft': 1 }
+          const deduped = new Map<string, SalaryRow>()
+          for (const row of allRows) {
+            const existing = deduped.get(row.month)
+            if (!existing || (statusRank[row.status] || 0) > (statusRank[existing.status] || 0)) {
+              deduped.set(row.month, row)
+            }
+          }
+          const dedupedRows = Array.from(deduped.values()).sort((a, b) => b.month.localeCompare(a.month))
+
+          setSalaryHistory(dedupedRows)
+
+          // Build SC ledger from deduplicated salary history
           const scLedger: ScLedgerEntry[] = []
           let cumOutstanding = 0
-          const sortedAsc = [...allRows].sort((a, b) => a.month.localeCompare(b.month))
+          const sortedAsc = [...dedupedRows].sort((a, b) => a.month.localeCompare(b.month))
           for (const row of sortedAsc) {
             const scAmount = Math.round(row.earnedSalary * 0.20)
             cumOutstanding += scAmount
@@ -1462,10 +1502,10 @@ export function EmployeeProfile() {
                 </tr>
               </thead>
               <tbody>
-                {salaryHistory.map(row => {
+                {salaryHistory.map((row, idx) => {
                   const isExp = expandedPayslip === row.month
                   return (
-                    <React.Fragment key={row.month}>
+                    <React.Fragment key={`${row.month}-${idx}`}>
                       <tr className={`border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${isExp?'bg-slate-50/50':''}`}>
                         <td className="py-2.5 px-3 font-medium text-slate-900">{fmtMonth(row.month)}</td>
                         <td className="py-2.5 px-3 text-center text-slate-600">{row.workingDays}</td>

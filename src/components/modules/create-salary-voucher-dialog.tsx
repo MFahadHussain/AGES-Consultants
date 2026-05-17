@@ -553,9 +553,22 @@ export function CreateSalaryVoucherDialog({
 
       onVouchersGenerated(vouchers)
 
+      // Mark batch as voucher-created
+      if (batch?.id && vouchers.length > 0) {
+        try {
+          await fetch('/api/payroll', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'mark-voucher-created', batchId: batch.id }),
+          })
+        } catch {
+          // non-critical — batch status update failure doesn't block voucher creation
+        }
+      }
+
       toast({
-        title: 'Vouchers Generated',
-        description: `${vouchers.length} Salary Voucher(s) Created`,
+        title: `${vouchers.length} Voucher(s) Created`,
+        description: `Salary vouchers generated successfully. Go to Voucher Management to submit and post to GL.`,
       })
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' })

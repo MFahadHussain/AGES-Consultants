@@ -232,12 +232,14 @@ const REPORT_COLUMNS: Record<string, ColumnDef[]> = {
     { key: 'message', label: 'Message' },
   ],
   'tax-psid': [
-    { key: 'employeeCode', label: 'Emp Code', align: 'center' },
-    { key: 'employeeName', label: 'Employee Name' },
-    { key: 'cnic', label: 'CNIC', align: 'center' },
-    { key: 'grossSalary', label: 'Gross Salary', align: 'right', format: 'currency' },
-    { key: 'incomeTax', label: 'Tax Deducted', align: 'right', format: 'currency' },
-    { key: 'psidStatus', label: 'PSID Status', format: 'badge', badgeColors: { Generated: 'bg-emerald-100 text-emerald-800', Pending: 'bg-amber-100 text-amber-800' } },
+    { key: 'TaxPayer_Name', label: 'Employee Name' },
+    { key: 'TaxPayer_CNIC', label: 'CNIC', align: 'center' as const },
+    { key: 'TaxPayer_NTN', label: 'NTN', align: 'center' as const },
+    { key: 'TaxPayer_City', label: 'City', align: 'center' as const },
+    { key: 'TaxPayer_Status', label: 'Filing Status', align: 'center' as const },
+    { key: 'Payment_Section', label: 'Section' },
+    { key: 'Taxable_Amount', label: 'Taxable Amount', align: 'right' as const, format: 'currency' as const },
+    { key: 'Tax_Amount', label: 'Tax Deducted', align: 'right' as const, format: 'currency' as const },
   ],
 }
 
@@ -367,7 +369,7 @@ function normalizeResponse(reportType: string, json: Record<string, unknown>): {
     }
     case 'tax-psid':
       return {
-        data: (json.employees || json.lines || []) as Record<string, unknown>[],
+        data: (json.records || json.employees || json.lines || []) as Record<string, unknown>[],
         totals: (json.totals || {}) as Record<string, unknown>,
         meta: { month: json.month },
       }

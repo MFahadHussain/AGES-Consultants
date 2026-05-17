@@ -6,7 +6,8 @@ import { findAccountByRole, findFirstBankAccount } from '@/lib/account-roles'
 // ============================================================
 // Enhanced Payroll Engine API v2.0
 // Supports: create batch, run-payroll, add-line, update-line,
-// delete-line, review, approve, post-to-gl, draft-to-gl,
+// delete-line, review, approve, mark-voucher-created,
+// recalculate
 // recalculate
 // ============================================================
 
@@ -711,295 +712,30 @@ export async function POST(request: Request) {
     }
 
     // ----------------------------------------------------------
-    // 9c. DRAFT TO GL — Post only approved lines to GL (creates a draft voucher)
+    // 9c. VOUCHER CREATED — Mark batch as voucher-created after salary vouchers are generated
     // ----------------------------------------------------------
-    if (action === 'draft-to-gl') {
-      const { batchId, financialYearId, lineIds } = data
-      if (!batchId) return NextResponse.json({ error: 'Batch ID required' }, { status: 400 })
-      if (!financialYearId) return NextResponse.json({ error: 'Financial Year ID required' }, { status: 400 })
-
-      const batch = await db.payrollBatch.findUnique({ where: { id: batchId } })
-      if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
-      if (batch.postedToGL) return NextResponse.json({ error: 'Already posted to GL' }, { status: 400 })
-
-      // Determine which lines to include
-      const lineFilter: Record<string, unknown> = lineIds?.length > 0
-        ? { id: { in: lineIds }, lineStatus: 'approved' }
-        : { lineStatus: 'approved' }
-      lineFilter.batchId = batchId
-
-      const approvedLines = await db.payrollBatchLine.findMany({ where: lineFilter as any })
-      if (approvedLines.length === 0) {
-        return NextResponse.json({ error: 'No approved lines found to post' }, { status: 400 })
-      }
-
-      // Calculate totals from approved lines only
-      const totals = approvedLines.reduce(
-        (acc, l) => ({
-          totalBasicSalary: acc.totalBasicSalary + l.basicSalary,
-          totalAllowances: acc.totalAllowances + l.allowances,
-          totalGross: acc.totalGross + l.grossSalary,
-          totalIncomeTax: acc.totalIncomeTax + l.incomeTax,
-          totalEobiEmployee: acc.totalEobiEmployee + l.eobiEmployee,
-          totalEobiEmployer: acc.totalEobiEmployer + l.eobiEmployer,
-          totalEssiEmployee: acc.totalEssiEmployee + l.essiEmployee,
-          totalEssiEmployer: acc.totalEssiEmployer + l.essiEmployer,
-          totalPfEmployee: acc.totalPfEmployee + l.pfEmployee,
-          totalPfEmployer: acc.totalPfEmployer + l.pfEmployer,
-          totalLoanDeduction: acc.totalLoanDeduction + l.loanDeduction,
-          totalAdvanceDeduction: acc.totalAdvanceDeduction + l.advanceDeduction,
-          totalOtherDeductions: acc.totalOtherDeductions + l.otherDeductions,
-          totalDeductions: acc.totalDeductions + l.totalDeductions,
-          totalNetPay: acc.totalNetPay + l.netPay,
-          totalSocialCharges: acc.totalSocialCharges + l.socialCharges,
-          totalGratuity: acc.totalGratuity + l.gratuity,
-          totalEmployerCharges: acc.totalEmployerCharges + l.eobiEmployer + l.pfEmployer + l.essiEmployer + l.socialCharges + l.gratuity,
-        }),
-        {
-          totalBasicSalary: 0, totalAllowances: 0, totalGross: 0, totalIncomeTax: 0,
-          totalEobiEmployee: 0, totalEobiEmployer: 0, totalEssiEmployee: 0, totalEssiEmployer: 0,
-          totalPfEmployee: 0, totalPfEmployer: 0,
-          totalLoanDeduction: 0, totalAdvanceDeduction: 0, totalOtherDeductions: 0, totalDeductions: 0,
-          totalNetPay: 0, totalSocialCharges: 0, totalGratuity: 0, totalEmployerCharges: 0,
-        }
-      )
-
-      // Build GL entries using shared helper
-      const { entries, totalDebit, totalCredit } = await buildGlEntries(batch, totals)
-
-      if (entries.length === 0) {
-        return NextResponse.json({ error: 'No journal entries could be created. Check GL account mappings.' }, { status: 400 })
-      }
-
-      // Create a DRAFT voucher (not posted)
-      const voucher = await db.voucher.create({
-        data: {
-          voucherNumber: `JV-PAYROLL-${batch.batchNumber}`,
-          voucherType: 'JV',
-          voucherTypeName: 'Journal Voucher',
-          date: new Date(),
-          narration: `Payroll draft posting for batch ${batch.batchNumber} - ${batch.name} (approved lines only)`,
-          status: 'draft',
-          financialYearId,
-          projectId: batch.projectId,
-          isPayrollPosted: true,
-          totalDebit,
-          totalCredit,
-          createdBy: 'system',
-          entries: { create: entries },
-        },
-      })
-
-      // Audit cross-charging for approved lines
-      for (const line of approvedLines) {
-        if (line.projectId && line.projectId !== batch.projectId) {
-          await db.auditLog.create({
-            data: {
-              userId: await getSystemUserId(),
-              action: 'CREATE',
-              entity: 'VoucherEntry',
-              entityId: voucher.id,
-              details: `Cross-charged salary to project ${line.projectId}: ${line.grossSalary}`,
-            },
-          })
-        }
-      }
-
-      // Mark batch as draft-to-gl (not fully posted yet — voucher is draft)
-      await db.payrollBatch.update({
-        where: { id: batchId },
-        data: {
-          postedToGL: true, postedVoucherId: voucher.id, status: 'draft-to-gl', postedBy: 'system',
-        },
-      })
-
-      // Fetch voucher entries with account names for display
-      const voucherWithEntries = await db.voucher.findUnique({
-        where: { id: voucher.id },
-        include: {
-          entries: {
-            include: { account: { select: { id: true, name: true, code: true } } },
-            orderBy: { lineNumber: 'asc' },
-          },
-        },
-      })
-
-      const displayEntries = (voucherWithEntries?.entries || []).map(e => ({
-        lineNumber: e.lineNumber,
-        accountId: e.accountId,
-        accountCode: e.account?.code || '',
-        accountName: e.account?.name || 'Unknown',
-        debit: e.debit,
-        credit: e.credit,
-        description: e.description,
-      }))
-
-      return NextResponse.json({
-        message: 'Payroll draft posted to GL (approved lines only)',
-        voucherId: voucher.id,
-        voucherNumber: voucher.voucherNumber,
-        voucherStatus: 'draft',
-        totalDebit, totalCredit,
-        entryCount: entries.length,
-        approvedLineCount: approvedLines.length,
-        voucherEntries: displayEntries,
-      })
-    }
-
-    // ----------------------------------------------------------
-    // 10. POST TO GL — Post approved batch to GL (creates voucher)
-    // ----------------------------------------------------------
-    if (action === 'post-to-gl') {
-      const { batchId, financialYearId } = data
-      if (!batchId) return NextResponse.json({ error: 'Batch ID required' }, { status: 400 })
-
-      const batch = await db.payrollBatch.findUnique({
-        where: { id: batchId },
-        include: { lines: true },
-      })
-      if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
-      if (batch.status !== 'approved') return NextResponse.json({ error: 'Only approved batches can be posted to GL' }, { status: 400 })
-      if (batch.postedToGL) return NextResponse.json({ error: 'Already posted to GL' }, { status: 400 })
-
-      // Check that all lines have lineStatus = 'approved'
-      const unapprovedLines = batch.lines.filter(l => l.lineStatus !== 'approved')
-      if (unapprovedLines.length > 0) {
-        return NextResponse.json({ error: `All lines must be approved before posting to GL. ${unapprovedLines.length} line(s) still in '${unapprovedLines[0].lineStatus}' status` }, { status: 400 })
-      }
-
-      if (!financialYearId) {
-        return NextResponse.json({ error: 'Financial Year ID required' }, { status: 400 })
-      }
-
-      // Build totals from batch
-      const batchTotals = {
-        totalBasicSalary: batch.totalBasicSalary,
-        totalAllowances: batch.totalAllowances,
-        totalGross: batch.totalGross,
-        totalIncomeTax: batch.totalIncomeTax,
-        totalEobiEmployee: batch.totalEobiEmployee,
-        totalEobiEmployer: batch.totalEobiEmployer,
-        totalEssiEmployee: batch.totalEssiEmployee,
-        totalEssiEmployer: batch.totalEssiEmployer,
-        totalPfEmployee: batch.totalPfEmployee,
-        totalPfEmployer: batch.totalPfEmployer,
-        totalLoanDeduction: batch.totalLoanDeduction,
-        totalAdvanceDeduction: batch.totalAdvanceDeduction,
-        totalOtherDeductions: batch.totalOtherDeductions,
-        totalDeductions: batch.totalDeductions,
-        totalNetPay: batch.totalNetPay,
-        totalSocialCharges: batch.totalSocialCharges,
-        totalGratuity: batch.totalGratuity,
-        totalEmployerCharges: batch.totalEmployerCharges,
-      }
-
-      // Build GL entries using shared helper
-      const { entries, totalDebit, totalCredit } = await buildGlEntries(batch, batchTotals)
-
-      if (entries.length === 0) {
-        return NextResponse.json({ error: 'No journal entries could be created. Check GL account mappings.' }, { status: 400 })
-      }
-
-      // Create the voucher
-      const voucher = await db.voucher.create({
-        data: {
-          voucherNumber: `JV-PAYROLL-${batch.batchNumber}`,
-          voucherType: 'JV',
-          voucherTypeName: 'Journal Voucher',
-          date: new Date(),
-          narration: `Payroll posting for batch ${batch.batchNumber} - ${batch.name}`,
-          status: 'draft',
-          financialYearId,
-          projectId: batch.projectId,
-          isPayrollPosted: true,
-          totalDebit,
-          totalCredit,
-          createdBy: 'system',
-          entries: { create: entries },
-        },
-      })
-
-      // Audit cross-charging
-      for (const line of batch.lines) {
-        if (line.projectId && line.projectId !== batch.projectId) {
-          await db.auditLog.create({
-            data: {
-              userId: await getSystemUserId(),
-              action: 'CREATE',
-              entity: 'VoucherEntry',
-              entityId: voucher.id,
-              details: `Cross-charged salary to project ${line.projectId}: ${line.grossSalary}`,
-            },
-          })
-        }
-      }
-
-      // Mark batch as posted
-      await db.payrollBatch.update({
-        where: { id: batchId },
-        data: {
-          postedToGL: true,
-          postedVoucherId: voucher.id,
-          status: 'posted',
-          postedBy: 'system',
-        },
-      })
-
-      return NextResponse.json({
-        message: 'Payroll posted to GL',
-        voucherId: voucher.id,
-        voucherNumber: voucher.voucherNumber,
-        totalDebit,
-        totalCredit,
-        entryCount: entries.length,
-      })
-    }
-
-    // ----------------------------------------------------------
-    // 11. MARK POSTED — Mark batch as posted to GL after vouchers are posted
-    // ----------------------------------------------------------
-    if (action === 'mark-posted') {
+    if (action === 'mark-voucher-created') {
       const { batchId } = data
       if (!batchId) return NextResponse.json({ error: 'Batch ID required' }, { status: 400 })
 
-      const batch = await db.payrollBatch.findUnique({
-        where: { id: batchId },
-      })
+      const batch = await db.payrollBatch.findUnique({ where: { id: batchId } })
       if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
 
-      // Update batch status to posted
       await db.payrollBatch.update({
         where: { id: batchId },
-        data: {
-          status: 'posted',
-          postedToGL: true,
-          postedBy: 'system',
-        },
+        data: { status: 'voucher-created' },
       })
 
-      // Update all lines to posted status
       await db.payrollBatchLine.updateMany({
         where: { batchId },
-        data: { lineStatus: 'posted' },
+        data: { lineStatus: 'voucher-created' },
       })
 
-      // Mark all related vouchers as isPayrollPosted
-      const vouchers = await db.voucher.findMany({
-        where: { narration: { contains: batch.period }, isPayrollPosted: false, status: 'posted' },
-        select: { id: true },
-      })
-      if (vouchers.length > 0) {
-        await db.voucher.updateMany({
-          where: { id: { in: vouchers.map(v => v.id) } },
-          data: { isPayrollPosted: true },
-        })
-      }
-
-      return NextResponse.json({ message: 'Batch marked as posted to GL', batchId })
+      return NextResponse.json({ message: 'Batch marked as vouchers created', batchId })
     }
 
-    // ----------------------------------------------------------
-    // 12. RECALCULATE — Re-run payroll calculation for all lines
+        // ----------------------------------------------------------
+    // 10. RECALCULATE — Re-run payroll calculation for all lines
     //     Useful when tax slabs change or YTD data updates
     // ----------------------------------------------------------
     if (action === 'recalculate') {
@@ -1154,7 +890,7 @@ export async function PUT(request: Request) {
     const data = await request.json()
     const batch = await db.payrollBatch.findUnique({ where: { id } })
     if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
-    if (batch.postedToGL) return NextResponse.json({ error: 'Cannot modify a posted batch' }, { status: 400 })
+    if (batch.status === 'voucher-created') return NextResponse.json({ error: 'Cannot modify a batch with vouchers created' }, { status: 400 })
 
     const updated = await db.payrollBatch.update({
       where: { id },
@@ -1183,7 +919,7 @@ export async function DELETE(request: Request) {
 
     const batch = await db.payrollBatch.findUnique({ where: { id } })
     if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
-    if (batch.postedToGL) return NextResponse.json({ error: 'Cannot delete a posted batch' }, { status: 400 })
+    if (batch.status === 'voucher-created') return NextResponse.json({ error: 'Cannot delete a batch with vouchers created' }, { status: 400 })
     if (batch.status !== 'draft') return NextResponse.json({ error: 'Can only delete draft batches' }, { status: 400 })
 
     await db.payrollBatchLine.deleteMany({ where: { batchId: id } })

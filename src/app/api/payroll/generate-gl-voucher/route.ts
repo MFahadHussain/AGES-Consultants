@@ -52,6 +52,10 @@ interface EmployeePayrollData {
   tax: number
   netSalary: number
   sc: number
+  eobiEmployee: number
+  pfEmployee: number
+  essiEmployee: number
+  loanDeduction: number
   salaryExpenseAccountId: string | null
   scExpenseAccountId: string | null
   salaryPayableAccountId: string | null
@@ -252,6 +256,10 @@ async function fetchEmployeePayrollData(
         tax: Math.round(payroll.deductions.incomeTax),
         netSalary: Math.round(payroll.netPay),
         sc: Math.round(payroll.finalSC),
+        eobiEmployee: Math.round(payroll.deductions.eobiEmployee),
+        pfEmployee: Math.round(payroll.deductions.pfEmployee),
+        essiEmployee: Math.round(payroll.deductions.essiEmployee),
+        loanDeduction: Math.round(payroll.deductions.loanDeduction),
         salaryExpenseAccountId: employee?.salaryExpenseAccountId ?? null,
         scExpenseAccountId: employee?.scExpenseAccountId ?? null,
         salaryPayableAccountId: employee?.salaryPayableAccountId ?? null,
@@ -294,6 +302,10 @@ async function fetchBatchLinePayrollData(
     contractEarnings: string | null
     projectId: string | null
     payableDays: number
+    eobiEmployee: number
+    pfEmployee: number
+    essiEmployee: number
+    loanDeduction: number
   }>
 ): Promise<EmployeePayrollData[]> {
   const results: EmployeePayrollData[] = []
@@ -373,6 +385,10 @@ async function fetchBatchLinePayrollData(
       tax: Math.round(line.incomeTax),
       netSalary: Math.round(line.netPay),
       sc: Math.round(line.socialCharges),
+      eobiEmployee: Math.round(line.eobiEmployee ?? 0),
+      pfEmployee: Math.round(line.pfEmployee ?? 0),
+      essiEmployee: Math.round(line.essiEmployee ?? 0),
+      loanDeduction: Math.round(line.loanDeduction ?? 0),
       salaryExpenseAccountId: emp?.salaryExpenseAccountId ?? null,
       scExpenseAccountId: emp?.scExpenseAccountId ?? null,
       salaryPayableAccountId: emp?.salaryPayableAccountId ?? null,
@@ -480,6 +496,17 @@ async function generateSalaryVouchers(
       })
     }
 
+    // Check project allocation totals 100%
+    const allocTotalWeight = emp.projectAllocations.reduce((sum, pa) => sum + pa.weight, 0)
+    if (emp.projectAllocations.length > 0 && Math.abs(allocTotalWeight - 1) > 0.02) {
+      validationErrors.push({
+        employeeId: emp.employeeId,
+        employeeName: emp.employeeName,
+        field: 'projectAllocations',
+        message: `Employee ${emp.employeeName} project allocation totals ${(allocTotalWeight * 100).toFixed(1)}%. Must be exactly 100%.`,
+      })
+    }
+
     // Filter by project if specified
     const filteredAllocs = projectFilter
       ? emp.projectAllocations.filter(pa => projectFilter.includes(pa.projectId))
@@ -487,23 +514,79 @@ async function generateSalaryVouchers(
 
     if (filteredAllocs.length === 0) continue
 
+    // ── Use pre-computed per-project shares directly ──
+    // For multi-contract employees, salaryShare/scShare are already the correct
+    // per-project earned amounts — do NOT re-split from totals using weight.
+    // Only use weight-based distribution as fallback when salaryShare is missing.
+    const useDirectShares = filteredAllocs.every(a => a.salaryShare > 0)
+
+    // Rounding-safe distribution (fallback only)
+    const distributeWithRounding = (total: number, allocs: typeof filteredAllocs): number[] => {
+      const shares = allocs.map(a => Math.round(total * a.weight))
+      const distributed = shares.reduce((s, v) => s + v, 0)
+      const diff = Math.round(total) - distributed
+      const lastIdx = allocs.reduce((last, a, i) => (a.weight > 0 ? i : last), -1)
+      if (lastIdx >= 0) shares[lastIdx] += diff
+      return shares
+    }
+
+    // Deduction totals for distribution
+    const eobiEmpTotal = emp.eobiEmployee ?? 0
+    const pfEmpTotal = emp.pfEmployee ?? 0
+    const essiEmpTotal = emp.essiEmployee ?? 0
+    const loanTotal = emp.loanDeduction ?? 0
+
+    // Compute gross shares: prefer stored salaryShare, fall back to weight-based
+    const grossShares = useDirectShares
+      ? filteredAllocs.map(a => Math.round(a.salaryShare))
+      : distributeWithRounding(emp.grossSalary, filteredAllocs)
+
+    // SC shares: prefer stored scShare
+    const scShares = filteredAllocs.map(a => Math.round(a.scShare ?? 0))
+
+    // Deductions: always distribute by weight (they are employee-level totals)
+    const taxShares = distributeWithRounding(emp.tax, filteredAllocs)
+    const eobiShares = distributeWithRounding(eobiEmpTotal, filteredAllocs)
+    const pfShares = distributeWithRounding(pfEmpTotal, filteredAllocs)
+    const essiShares = distributeWithRounding(essiEmpTotal, filteredAllocs)
+    const loanShares = distributeWithRounding(loanTotal, filteredAllocs)
+
     // ── Generate one voucher per project ──
-    for (const alloc of filteredAllocs) {
-      // Project-wise amount split
-      const salaryShare = Math.round(emp.grossSalary * alloc.weight)
-      const taxShare = Math.round(emp.tax * alloc.weight)
-      const netSalaryShare = salaryShare - taxShare
-      const scShare = Math.round(emp.sc * alloc.weight)
+    for (let allocIdx = 0; allocIdx < filteredAllocs.length; allocIdx++) {
+      const alloc = filteredAllocs[allocIdx]
+
+      // Use rounding-safe pre-computed shares
+      const salaryShare = grossShares[allocIdx]
+      const taxShare = taxShares[allocIdx]
+      const eobiShare = eobiShares[allocIdx]
+      const pfShare = pfShares[allocIdx]
+      const essiShare = essiShares[allocIdx]
+      const loanShare = loanShares[allocIdx]
+      const scShare = scShares[allocIdx]
+
+      // Net salary = Gross − all employee deductions (tax + EOBI + PF + ESSI + loan)
+      const netSalaryShare = salaryShare - taxShare - eobiShare - pfShare - essiShare - loanShare
 
       // Skip if no amounts
       if (salaryShare === 0 && scShare === 0) continue
 
+      // Validate net salary is not negative
+      if (netSalaryShare < 0) {
+        validationErrors.push({
+          employeeId: emp.employeeId,
+          employeeName: emp.employeeName,
+          field: 'netSalary',
+          message: `Employee ${emp.employeeName} net salary is negative after deductions (Rs ${netSalaryShare}) for project ${alloc.projectCode}. Please review tax and deduction amounts.`,
+        })
+        continue
+      }
+
       // ── Duplicate Prevention ──
-      const projectSuffix = formatProjectSuffix(alloc.projectCode)
-      const voucherPrefix = `SV-${period}-${projectSuffix}`
+      const projectSuffixCheck = formatProjectSuffix(alloc.projectCode)
+      const voucherPrefixCheck = `SV-${projectSuffixCheck}-${period}`
       const existingVoucher = await db.voucher.findFirst({
         where: {
-          voucherNumber: { startsWith: voucherPrefix },
+          voucherNumber: { startsWith: voucherPrefixCheck },
           projectId: alloc.projectId,
         },
         select: { id: true, voucherNumber: true, narration: true },
@@ -511,7 +594,6 @@ async function generateSalaryVouchers(
 
       // Check if this specific employee already has a voucher for this project/period
       if (existingVoucher) {
-        // Check the voucher entries for this employee's name
         const existingEntries = await db.voucherEntry.findFirst({
           where: {
             voucherId: existingVoucher.id,
@@ -529,7 +611,7 @@ async function generateSalaryVouchers(
         emp.salaryExpenseAccountId, 'SALARY_EXPENSE', 'SALARY_EXPENSE', '05-01-01', 'Salary'
       )
       const scExpenseAccount = await resolveCached(
-        emp.scExpenseAccountId, 'SOCIAL_CHARGES', 'SOCIAL_CHARGES', '05-02', 'Social Charges'
+        emp.scExpenseAccountId, 'SOCIAL_CHARGES', 'SOCIAL_CHARGES', '05-01-02', 'Social Charges'
       )
       const salaryPayableAccount = await resolveCached(
         emp.salaryPayableAccountId, 'SALARY_PAYABLE', 'SALARY_PAYABLE', '03-02-02', 'Salary Payable'
@@ -537,13 +619,40 @@ async function generateSalaryVouchers(
       const scPayableAccount = await resolveCached(
         emp.scPayableAccountId, 'SOCIAL_CHARGES_PAYABLE', 'SOCIAL_CHARGES_PAYABLE', '03-02-03', 'Social Charges Payable'
       )
-      // taxPayableAccount already resolved above, but resolve per-project with cache
+      const eobiPayableAccount = await resolveCached(
+        null, 'EOBI_EMPLOYEE', 'EOBI_PAYABLE', '03-02-03-0001', 'EOBI Payable'
+      )
+      const pfPayableAccount = await resolveCached(
+        null, 'PF_EMPLOYEE', 'PROVIDENT_FUND_PAYABLE', '03-02-03-0002', 'Provident Fund Payable'
+      )
+      const essiPayableAccount = await resolveCached(
+        null, 'ESSI_EMPLOYEE', 'ESSI_PAYABLE', '03-02-03', 'ESSI Payable'
+      )
+      const loanPayableAccount = await resolveCached(
+        null, 'LOAN_DEDUCTION', 'LOAN_RECEIVABLE', '01-02-12', 'Loan Receivable'
+      )
 
-      // Skip if critical accounts missing
-      if (!salaryExpenseAccount) continue
-      if (!salaryPayableAccount) continue
+      // Validate critical accounts
+      if (!salaryExpenseAccount) {
+        validationErrors.push({
+          employeeId: emp.employeeId,
+          employeeName: emp.employeeName,
+          field: 'salaryExpenseAccountId',
+          message: `Employee ${emp.employeeName} is missing Salary Expense account. Please configure GL accounts before generating vouchers.`,
+        })
+        continue
+      }
+      if (!salaryPayableAccount) {
+        validationErrors.push({
+          employeeId: emp.employeeId,
+          employeeName: emp.employeeName,
+          field: 'salaryPayableAccountId',
+          message: `Employee ${emp.employeeName} is missing Salary Payable account. Please configure GL accounts before generating vouchers.`,
+        })
+        continue
+      }
 
-      // ── Build 5-line entries ──
+      // ── Build journal lines ──
       const entries: {
         lineNumber: number
         accountId: string
@@ -556,7 +665,9 @@ async function generateSalaryVouchers(
 
       let lineNumber = 0
       const projLabel = ` — ${alloc.projectCode}`
-      const payrollRef = `SV-${emp.employeeCode}-${period}-${projectSuffix}`
+      const payrollRef = `SV-${emp.employeeCode}-${period}-${formatProjectSuffix(alloc.projectCode)}`
+
+      // ── DEBIT LINES (expense side) ──
 
       // Line 1: DR Salary Expense — [Project]
       lineNumber++
@@ -584,21 +695,21 @@ async function generateSalaryVouchers(
         })
       }
 
-      // Line 3: CR Salary Payable → Net Salary (Gross − Tax)
-      if (netSalaryShare > 0 && salaryPayableAccount) {
-        lineNumber++
-        entries.push({
-          lineNumber,
-          accountId: salaryPayableAccount,
-          debit: 0,
-          credit: netSalaryShare,
-          description: `Salary Payable${projLabel} — ${emp.employeeName}`,
-          payrollRef,
-          projectId: alloc.projectId,
-        })
-      }
+      // ── CREDIT LINES (liability side) ──
 
-      // Line 4: CR Tax Payable → Tax Amount
+      // Line 3: CR Salary Payable → Net Salary (Gross − all employee deductions)
+      lineNumber++
+      entries.push({
+        lineNumber,
+        accountId: salaryPayableAccount,
+        debit: 0,
+        credit: netSalaryShare,
+        description: `Net Salary Payable${projLabel} — ${emp.employeeName}`,
+        payrollRef,
+        projectId: alloc.projectId,
+      })
+
+      // Line 4: CR Tax Payable → Income Tax
       if (taxShare > 0 && taxPayableAccount) {
         lineNumber++
         entries.push({
@@ -606,13 +717,13 @@ async function generateSalaryVouchers(
           accountId: taxPayableAccount,
           debit: 0,
           credit: taxShare,
-          description: `Tax Payable${projLabel} — ${emp.employeeName}`,
+          description: `Income Tax Payable${projLabel} — ${emp.employeeName}`,
           payrollRef,
           projectId: alloc.projectId,
         })
       }
 
-      // Line 5: CR SC Payable → SC Amount
+      // Line 5: CR SC Payable → Social Charges
       if (scShare > 0 && scPayableAccount) {
         lineNumber++
         entries.push({
@@ -626,13 +737,99 @@ async function generateSalaryVouchers(
         })
       }
 
-      // Calculate totals
+      // Line 6: CR EOBI Payable → EOBI Employee Contribution
+      if (eobiShare > 0 && eobiPayableAccount) {
+        lineNumber++
+        entries.push({
+          lineNumber,
+          accountId: eobiPayableAccount,
+          debit: 0,
+          credit: eobiShare,
+          description: `EOBI Payable${projLabel} — ${emp.employeeName}`,
+          payrollRef,
+          projectId: alloc.projectId,
+        })
+      }
+
+      // Line 7: CR PF Payable → Provident Fund Employee Contribution
+      if (pfShare > 0 && pfPayableAccount) {
+        lineNumber++
+        entries.push({
+          lineNumber,
+          accountId: pfPayableAccount,
+          debit: 0,
+          credit: pfShare,
+          description: `PF Payable${projLabel} — ${emp.employeeName}`,
+          payrollRef,
+          projectId: alloc.projectId,
+        })
+      }
+
+      // Line 8: CR ESSI Payable → ESSI Employee Contribution
+      if (essiShare > 0 && essiPayableAccount) {
+        lineNumber++
+        entries.push({
+          lineNumber,
+          accountId: essiPayableAccount,
+          debit: 0,
+          credit: essiShare,
+          description: `ESSI Payable${projLabel} — ${emp.employeeName}`,
+          payrollRef,
+          projectId: alloc.projectId,
+        })
+      }
+
+      // Line 9: CR Loan Receivable → Loan Recovery
+      if (loanShare > 0 && loanPayableAccount) {
+        lineNumber++
+        entries.push({
+          lineNumber,
+          accountId: loanPayableAccount,
+          debit: 0,
+          credit: loanShare,
+          description: `Loan Recovery${projLabel} — ${emp.employeeName}`,
+          payrollRef,
+          projectId: alloc.projectId,
+        })
+      }
+
+      // ── VALIDATE BALANCE BEFORE SAVING ──
       const totalDebit = entries.reduce((s, e) => s + e.debit, 0)
       const totalCredit = entries.reduce((s, e) => s + e.credit, 0)
 
+      if (Math.abs(totalDebit - totalCredit) > 1) {
+        validationErrors.push({
+          employeeId: emp.employeeId,
+          employeeName: emp.employeeName,
+          field: 'balance',
+          message: `Voucher does not balance for ${emp.employeeName} / ${alloc.projectCode}: Debits Rs ${totalDebit.toLocaleString()} ≠ Credits Rs ${totalCredit.toLocaleString()}. Difference: Rs ${Math.abs(totalDebit - totalCredit).toLocaleString()}`,
+        })
+        continue
+      }
+
       if (entries.length === 0) continue
 
-      // ── Generate voucher number ──
+      // ── Validate all account IDs exist before inserting ──
+      const entryAccountIds = [...new Set(entries.map(e => e.accountId))]
+      const existingAccounts = await db.account.findMany({
+        where: { id: { in: entryAccountIds } },
+        select: { id: true, code: true, name: true },
+      })
+      const existingAccountIds = new Set(existingAccounts.map(a => a.id))
+      const missingAccountIds = entryAccountIds.filter(id => !existingAccountIds.has(id))
+      if (missingAccountIds.length > 0) {
+        validationErrors.push({
+          employeeId: emp.employeeId,
+          employeeName: emp.employeeName,
+          field: 'accounts',
+          message: `${missingAccountIds.length} GL account(s) not found for ${emp.employeeName} / ${alloc.projectCode}. Please configure GL accounts in PayrollAccountMapping or Employee profile.`,
+        })
+        continue
+      }
+
+      // ── Generate voucher number: SV-PROJECTCODE-YYYY-MM-SEQ ──
+      const projectSuffix = formatProjectSuffix(alloc.projectCode)
+      const voucherPrefix = `SV-${projectSuffix}-${period}`
       const seq = await getNextVoucherSequence(voucherPrefix)
       const voucherNumber = `${voucherPrefix}-${String(seq).padStart(3, '0')}`
 
@@ -656,24 +853,28 @@ async function generateSalaryVouchers(
       })
 
       // Fetch voucher with account details for display
-      const voucherWithEntries = await db.voucher.findUnique({
-        where: { id: voucher.id },
-        include: {
-          entries: {
-            include: { account: { select: { id: true, name: true, code: true } } },
-            orderBy: { lineNumber: 'asc' },
-          },
-        },
+      // Use a raw approach to avoid null-relation crash when an accountId doesn't exist
+      const voucherEntryRows = await db.voucherEntry.findMany({
+        where: { voucherId: voucher.id },
+        orderBy: { lineNumber: 'asc' },
       })
 
-      const displayEntries = (voucherWithEntries?.entries || []).map(e => ({
+      // Batch-fetch accounts (only those that exist)
+      const accountIds = [...new Set(voucherEntryRows.map(e => e.accountId))]
+      const accounts = await db.account.findMany({
+        where: { id: { in: accountIds } },
+        select: { id: true, name: true, code: true },
+      })
+      const accountMap = new Map(accounts.map(a => [a.id, a]))
+
+      const displayEntries = voucherEntryRows.map(e => ({
         lineNumber: e.lineNumber,
         accountId: e.accountId,
-        accountCode: e.account?.code || '',
-        accountName: e.account?.name || 'Unknown',
+        accountCode: accountMap.get(e.accountId)?.code || e.accountId.slice(0, 8),
+        accountName: accountMap.get(e.accountId)?.name || `Account ${e.accountId.slice(0, 8)}`,
         debit: e.debit,
         credit: e.credit,
-        description: e.description,
+        description: e.description || '',
       }))
 
       vouchers.push({
@@ -694,6 +895,10 @@ async function generateSalaryVouchers(
         breakdown: {
           grossSalary: salaryShare,
           tax: taxShare,
+          eobi: eobiShare,
+          pf: pfShare,
+          essi: essiShare,
+          loan: loanShare,
           netSalary: netSalaryShare,
           sc: scShare,
           weightPct: alloc.weightPct,
@@ -761,10 +966,10 @@ export async function POST(request: NextRequest) {
 
       employees = await fetchBatchLinePayrollData(approvedLines)
 
-      // Mark batch
+      // Mark batch as voucher-created
       await db.payrollBatch.update({
         where: { id: batchId },
-        data: { status: 'draft-to-gl' },
+        data: { status: 'voucher-created' },
       })
     }
 

@@ -1,759 +1,654 @@
 'use client'
 
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
-import { toast } from 'sonner'
 import {
-  Printer, FileText, Building2, User, Calendar, Download,
-  Loader2, ChevronDown, ChevronUp
+  FileText, Download, Eye, Printer, RefreshCw, X, Search,
+  Building2, Landmark, Users, DollarSign, AlertCircle,
+  CheckCircle2, CheckSquare, Square, Mail, Loader2,
+  TrendingDown, TrendingUp, Shield, Receipt
 } from 'lucide-react'
+import { useToast } from '@/hooks/use-toast'
 
-// ── TYPES ───────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────
 
-interface EmployeeInfo {
-  id: string; name: string; employeeCode: string; designation: string | null
-  department: string | null; cnic: string; ntn: string | null
-  joiningDate: string | null; employmentType: string | null
-  bankName: string | null; bankAccountNumber: string | null
-  baseSalary: number; taxFilingStatus: string | null; taxCity: string | null
-}
-
-interface PayrollLine {
-  id: string; employeeId: string; employeeName: string; employeeCode: string | null
-  basicSalary: number; dailyRate: number; workingDays: number; eligibleDays: number
-  leaveDays: number; absentDays: number; calendarDays: number; payableDays: number
-  allowances: number; grossSalary: number
-  incomeTax: number; eobiEmployee: number; eobiEmployer: number
-  pfEmployee: number; pfEmployer: number; essiEmployee: number; essiEmployer: number
-  loanDeduction: number; advanceDeduction: number; otherDeductions: number; totalDeductions: number
-  netPay: number; socialCharges: number; gratuity: number
-  allowanceDetails: string | null; taxBreakdown: string | null; projectAllocations: string | null
-  contractEarnings: string | null
-  lineStatus: string
-}
-
-interface BatchInfo {
-  id: string; batchNumber: string; name: string; period: string; status: string
-  lines: PayrollLine[]
-}
-
-// ── HELPERS ───────────────────────────────────────────────────────────────
-
-function fmtPKR(n: number): string {
-  if (n === 0) return '—'
-  return 'PKR ' + Math.round(n).toLocaleString('en-PK')
-}
-
-function fmtPKRNum(n: number): string {
+function fmt(n: number): string {
   return Math.round(n).toLocaleString('en-PK')
 }
 
-function fmtDate(d: string | null): string {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' })
+function fmtPKR(n: number): string {
+  return `Rs ${fmt(n)}`
 }
 
-function fmtMonth(ms: string): string {
-  const [y, m] = ms.split('-').map(Number)
-  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+function periodLabel(period: string): string {
+  if (!period) return ''
+  const [y, m] = period.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 }
 
-/** Convert number to words (PKR format with Lakh/Crore) */
-function numberToWordsPKR(num: number): string {
-  if (num === 0) return 'Zero'
-  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
-    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']
-  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
+// ── KPI Card ─────────────────────────────────────────────────
 
-  function convert(n: number): string {
-    if (n < 20) return ones[n]
-    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '')
-    if (n < 1000) return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' and ' + convert(n % 100) : '')
-    if (n < 100000) return convert(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 ? ' ' + convert(n % 1000) : '')
-    if (n < 10000000) return convert(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 ? ' ' + convert(n % 100000) : '')
-    return convert(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 ? ' ' + convert(n % 10000000) : '')
-  }
-
-  const rupees = Math.floor(num)
-  const paisa = Math.round((num - rupees) * 100)
-  let result = 'Rupees ' + convert(rupees)
-  if (paisa > 0) result += ' and ' + convert(paisa) + ' Paisa'
-  result += ' Only'
-  return result
+function KpiCard({ label, value, icon, color }: { label: string; value: string; icon: React.ReactNode; color: string }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{label}</span>
+        <span style={{ color }}>{icon}</span>
+      </div>
+      <div className="text-lg font-bold font-mono" style={{ color }}>{value}</div>
+    </div>
+  )
 }
 
-function parseJSON<T>(str: string | null, fallback: T): T {
-  if (!str) return fallback
-  try { return JSON.parse(str) } catch { return fallback }
+// ── Preview Modal ─────────────────────────────────────────────
+
+function PreviewModal({ url, title, onClose }: { url: string; title: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-green-600" />
+            <span className="font-semibold text-sm text-gray-900">{title}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <a href={url} target="_blank" rel="noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+              <Download className="w-3.5 h-3.5" /> Open in new tab
+            </a>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-all">
+              <X className="w-4 h-4 text-gray-500" />
+            </button>
+          </div>
+        </div>
+        <iframe src={url} className="flex-1 border-0 rounded-b-2xl" title={title} />
+      </div>
+    </div>
+  )
 }
 
-function maskAccount(acc: string | null): string {
-  if (!acc) return '—'
-  if (acc.length <= 4) return acc
-  return '****' + acc.slice(-4)
+// ── Empty State ───────────────────────────────────────────────
+
+function EmptyState({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl py-16 text-center shadow-sm">
+      <div className="flex justify-center mb-3 text-gray-300">{icon}</div>
+      <p className="text-gray-500 font-medium">{title}</p>
+      <p className="text-gray-400 text-sm mt-1">{desc}</p>
+    </div>
+  )
 }
 
-// ── COMPONENT ────────────────────────────────────────────────────────────
+// ── SALARY SLIPS TAB ──────────────────────────────────────────
 
-export function PayrollSlips() {
-  const [batches, setBatches] = useState<BatchInfo[]>([])
-  const [employees, setEmployees] = useState<EmployeeInfo[]>([])
-  const [selectedBatchId, setSelectedBatchId] = useState('')
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [docType, setDocType] = useState<'slip' | 'letter'>('slip')
-  const [showPreview, setShowPreview] = useState(false)
-  const printRef = useRef<HTMLDivElement>(null)
+function SalarySlipsTab() {
+  const { toast } = useToast()
+  const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7))
+  const [search, setSearch] = useState('')
+  const [employees, setEmployees] = useState<any[]>([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(false)
+  const [downloading, setDownloading] = useState<Record<string, boolean>>({})
+  const [preview, setPreview] = useState<{ url: string; title: string } | null>(null)
+  const [bulkLoading, setBulkLoading] = useState(false)
 
-  // ── Fetch data ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
-      try {
-        const [batchRes, empRes] = await Promise.all([
-          fetch('/api/payroll'),
-          fetch('/api/employees?pageSize=200'),
-        ])
-        if (batchRes.ok) {
-          const batchData = await batchRes.json()
-          setBatches(Array.isArray(batchData) ? batchData : [])
-        }
-        if (empRes.ok) {
-          const empData = await empRes.json()
-          const rawEmps = empData.data || empData.employees || empData || []
-          setEmployees(rawEmps.map((e: Record<string, unknown>) => ({
-            id: e.id as string,
-            name: e.name as string,
-            employeeCode: (e.employeeCode as string) || '',
-            designation: (e.designation as string) || null,
-            department: (e.department as string) || null,
-            cnic: (e.cnic as string) || '',
-            ntn: (e.ntn as string) || null,
-            joiningDate: e.joiningDate ? new Date(e.joiningDate as string).toISOString() : null,
-            employmentType: (e.employmentType as string) || null,
-            bankName: (e.bankName as string) || null,
-            bankAccountNumber: (e.bankAccountNumber as string) || null,
-            baseSalary: (e.baseSalary as number) || 0,
-            taxFilingStatus: (e.taxFilingStatus as string) || null,
-            taxCity: (e.taxCity as string) || null,
-          })))
-        }
-      } catch (err) {
-        console.error('Failed to fetch data:', err)
-        toast.error('Failed to load payroll data')
-      } finally {
-        setLoading(false)
+  const handleLoad = async () => {
+    if (!period) { toast({ title: 'Select a period', variant: 'destructive' }); return }
+    setLoading(true)
+    setEmployees([])
+    setSelected(new Set())
+    try {
+      const res = await fetch(`/api/payroll/slips/employees?period=${period}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to load')
+      setEmployees(data.employees || [])
+      if ((data.employees || []).length === 0) {
+        toast({ title: 'No employees found', description: `No approved payroll for ${periodLabel(period)}` })
       }
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    } finally {
+      setLoading(false)
     }
-    fetchData()
-  }, [])
+  }
 
-  // ── Derived ─────────────────────────────────────────────────────────────
-  const approvedBatches = useMemo(() =>
-    batches.filter(b => b.status === 'approved' || b.status === 'posted'),
-    [batches]
-  )
-
-  const selectedBatch = useMemo(() =>
-    batches.find(b => b.id === selectedBatchId),
-    [batches, selectedBatchId]
-  )
-
-  const filteredLines = useMemo(() => {
-    if (!selectedBatch) return []
-    if (selectedEmployeeId === 'all') return selectedBatch.lines
-    return selectedBatch.lines.filter(l => l.employeeId === selectedEmployeeId)
-  }, [selectedBatch, selectedEmployeeId])
-
-  const batchEmployees = useMemo(() => {
-    if (!selectedBatch) return []
-    return selectedBatch.lines.map(l => ({
-      id: l.employeeId,
-      name: l.employeeName,
-      code: l.employeeCode || '',
-    }))
-  }, [selectedBatch])
-
-  // ── Print Handler ───────────────────────────────────────────────────────
-  const handlePrint = useCallback(() => {
-    const printContent = printRef.current
-    if (!printContent) return
-
-    const printWindow = window.open('', '_blank', 'width=800,height=600')
-    if (!printWindow) {
-      toast.error('Please allow popups to print')
-      return
+  const handleDownload = async (emp: any) => {
+    setDownloading(p => ({ ...p, [emp.employeeId]: true }))
+    try {
+      const url = `/api/payroll/slips/${emp.employeeId}?period=${period}&format=html`
+      window.open(url, '_blank')
+      toast({ title: 'Slip opened', description: `${emp.employeeName} — use browser print to save as PDF` })
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    } finally {
+      setDownloading(p => ({ ...p, [emp.employeeId]: false }))
     }
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>${docType === 'slip' ? 'Salary Slip' : 'Bank Disbursement Letter'}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #1e293b; padding: 20px; }
-          .slip-container { max-width: 800px; margin: 0 auto; border: 2px solid #1e293b; padding: 24px; }
-          .header { text-align: center; border-bottom: 2px solid #1e293b; padding-bottom: 12px; margin-bottom: 16px; }
-          .header h1 { font-size: 18px; font-weight: 700; letter-spacing: 2px; }
-          .header h2 { font-size: 14px; font-weight: 600; color: #475569; margin-top: 4px; }
-          .header .month { font-size: 12px; color: #64748b; margin-top: 4px; }
-          .section { margin-bottom: 16px; }
-          .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
-            background: #f1f5f9; padding: 6px 10px; border-left: 3px solid #1e293b; margin-bottom: 8px; }
-          .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; }
-          .info-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dotted #e2e8f0; }
-          .info-label { color: #64748b; font-size: 10px; min-width: 120px; }
-          .info-value { font-weight: 600; font-size: 10px; text-align: right; }
-          table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-          th { background: #1e293b; color: white; padding: 6px 10px; text-align: left; font-size: 10px; font-weight: 600; }
-          td { padding: 5px 10px; border-bottom: 1px solid #e2e8f0; font-size: 10px; }
-          tr:nth-child(even) { background: #f8fafc; }
-          .amount { text-align: right; font-family: 'Courier New', monospace; }
-          .total-row { background: #f1f5f9 !important; font-weight: 700; border-top: 2px solid #1e293b; }
-          .net-pay { font-size: 14px; font-weight: 700; text-align: center; padding: 10px;
-            background: #ecfdf5; border: 2px solid #10b981; border-radius: 4px; margin: 12px 0; }
-          .footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid #e2e8f0; }
-          .footer p { font-size: 9px; color: #94a3b8; text-align: center; }
-          .signature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 30px; }
-          .signature-line { border-top: 1px solid #1e293b; padding-top: 6px; font-size: 10px; text-align: center; }
-          .letter-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
-          .letter-date { text-align: right; font-size: 11px; }
-          .letter-subject { font-weight: 700; font-size: 12px; margin: 16px 0 12px; }
-          .letter-body { font-size: 11px; line-height: 1.6; margin-bottom: 16px; }
-          .amount-words { font-size: 10px; color: #475569; font-style: italic; margin-top: 8px; }
-          @media print { body { padding: 0; } .slip-container { border: none; } }
-        </style>
-      </head>
-      <body>
-        ${printContent.innerHTML}
-      </body>
-      </html>
-    `)
-
-    printWindow.document.close()
-    setTimeout(() => {
-      printWindow.print()
-    }, 500)
-  }, [docType])
-
-  // ── Render: Loading ────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-      </div>
-    )
   }
 
-  // ── Render: No Data ────────────────────────────────────────────────────
-  if (approvedBatches.length === 0) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="w-full max-w-md">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Printer className="h-12 w-12 text-muted-foreground/30 mb-4" />
-            <h3 className="text-lg font-semibold">No Approved Batches</h3>
-            <p className="text-sm text-muted-foreground mt-2 text-center">
-              Approve a payroll batch first to generate salary slips and bank letters.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    )
+  const handlePreview = (emp: any) => {
+    setPreview({
+      url: `/api/payroll/slips/${emp.employeeId}?period=${period}&format=html`,
+      title: `Salary Slip — ${emp.employeeName} — ${periodLabel(period)}`,
+    })
   }
 
-  // ── Render: Controls ───────────────────────────────────────────────────
-  const renderControls = () => (
-    <Card className="mb-6">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Printer className="h-5 w-5" />
-          Payroll Slips & Letters Generator
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Batch Selector */}
-          <div>
-            <label className="text-xs font-medium text-slate-500 mb-1 block">Payroll Batch</label>
-            <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="Select batch..." />
-              </SelectTrigger>
-              <SelectContent>
-                {approvedBatches.map(b => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.batchNumber} — {fmtMonth(b.period)} ({b.status})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+  const handleBulkPrint = () => {
+    const ids = selected.size > 0 ? Array.from(selected) : employees.map((e: any) => e.employeeId)
+    if (ids.length === 0) { toast({ title: 'No employees selected', variant: 'destructive' }); return }
+    // Open first slip — user can print all by navigating
+    const emp = employees.find((e: any) => e.employeeId === ids[0])
+    if (emp) handlePreview(emp)
+    toast({ title: 'Tip', description: 'Open each slip and use Ctrl+P to print' })
+  }
 
-          {/* Employee Selector */}
-          <div>
-            <label className="text-xs font-medium text-slate-500 mb-1 block">Employee</label>
-            <Select
-              value={selectedEmployeeId}
-              onValueChange={setSelectedEmployeeId}
-              disabled={!selectedBatchId}
-            >
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="Select employee..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Employees</SelectItem>
-                {batchEmployees.map(e => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.code} — {e.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Document Type */}
-          <div>
-            <label className="text-xs font-medium text-slate-500 mb-1 block">Document Type</label>
-            <Select value={docType} onValueChange={(v) => setDocType(v as 'slip' | 'letter')}>
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="slip">Salary Slip</SelectItem>
-                <SelectItem value="letter">Bank Disbursement Letter</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Generate Button */}
-          <div className="flex items-end gap-2">
-            <Button
-              className="flex-1 h-9 text-xs bg-slate-900 text-white hover:bg-slate-800"
-              disabled={!selectedBatchId || !selectedEmployeeId}
-              onClick={() => setShowPreview(true)}
-            >
-              <FileText className="h-3.5 w-3.5 mr-1.5" />
-              Generate
-            </Button>
-            {showPreview && filteredLines.length > 0 && (
-              <Button
-                variant="outline"
-                className="h-9 text-xs"
-                onClick={handlePrint}
-              >
-                <Printer className="h-3.5 w-3.5 mr-1.5" />
-                Print
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+  const filtered = employees.filter(e =>
+    !search || e.employeeName?.toLowerCase().includes(search.toLowerCase()) ||
+    e.employeeCode?.toLowerCase().includes(search.toLowerCase())
   )
 
-  // ── Render: Salary Slip ────────────────────────────────────────────────
-  const renderSalarySlip = (line: PayrollLine) => {
-    const emp = employees.find(e => e.id === line.employeeId)
-    const allowances = parseJSON<Array<{name: string; amount: number}>>(line.allowanceDetails, [])
-    const taxInfo = parseJSON<Record<string, number>>(line.taxBreakdown, {})
-    const projectAllocs = parseJSON<Array<{projectName: string; projectCode: string; days: number; weightPct: string; salaryShare: number; scShare: number}>>(line.projectAllocations, [])
-    const contractEarnings = parseJSON<Array<{projectName: string; projectCode: string; contractSalary: number; dailyRate: number; daysWorked: number; earnedSalary: number; absentDays: number; designation: string | null}>>(line.contractEarnings, [])
+  const totals = filtered.reduce((acc, e) => ({
+    gross: acc.gross + (e.grossSalary || 0),
+    tax: acc.tax + (e.incomeTax || 0),
+    net: acc.net + (e.netSalary || 0),
+    sc: acc.sc + (e.totalSC || 0),
+  }), { gross: 0, tax: 0, net: 0, sc: 0 })
 
-    return (
-      <div key={line.id} className="slip-container" style={{
-        maxWidth: 800, margin: '0 auto 24px', border: '2px solid #1e293b', padding: 24,
-        fontFamily: "'Segoe UI', Arial, sans-serif", fontSize: 11, color: '#1e293b'
-      }}>
-        {/* Header */}
-        <div style={{ textAlign: 'center', borderBottom: '2px solid #1e293b', paddingBottom: 12, marginBottom: 16 }}>
-          <h1 style={{ fontSize: 18, fontWeight: 700, letterSpacing: 2 }}>AcctFin ERP</h1>
-          <h2 style={{ fontSize: 14, fontWeight: 600, color: '#475569', marginTop: 4 }}>SALARY SLIP</h2>
-          <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
-            {selectedBatch ? fmtMonth(selectedBatch.period) : ''} — {line.employeeCode || line.employeeId}
-          </div>
-        </div>
-
-        {/* Employee Details */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
-            background: '#f1f5f9', padding: '6px 10px', borderLeft: '3px solid #1e293b', marginBottom: 8 }}>
-            Employee Details
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 24px' }}>
-            {[
-              ['Name', emp?.name || line.employeeName],
-              ['Employee Code', line.employeeCode || '—'],
-              ['Designation', emp?.designation || '—'],
-              ['Department', emp?.department || '—'],
-              ['CNIC', emp?.cnic || '—'],
-              ['NTN', emp?.ntn || '—'],
-              ['Joining Date', fmtDate(emp?.joiningDate || null)],
-              ['Employment Type', emp?.employmentType || '—'],
-              ['Bank', emp?.bankName || '—'],
-              ['Account', maskAccount(emp?.bankAccountNumber || null)],
-              ['Tax Filing', emp?.taxFilingStatus === 'filer' ? 'Filer' : emp?.taxFilingStatus === 'non-filer' ? 'Non-Filer' : '—'],
-              ['Tax City', emp?.taxCity || '—'],
-            ].map(([label, value]) => (
-              <div key={String(label)} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px dotted #e2e8f0' }}>
-                <span style={{ color: '#64748b', fontSize: 10, minWidth: 120 }}>{label}</span>
-                <span style={{ fontWeight: 600, fontSize: 10, textAlign: 'right' }}>{value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Attendance Summary */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
-            background: '#f1f5f9', padding: '6px 10px', borderLeft: '3px solid #1e293b', marginBottom: 8 }}>
-            Attendance Summary
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px 24px' }}>
-            {[
-              ['Calendar Days', String(line.calendarDays || '—')],
-              ['Present Days', String(line.eligibleDays - line.leaveDays)],
-              ['Leave Days', String(line.leaveDays)],
-              ['Absent Days', String(line.absentDays)],
-              ['Payable Days', String(line.payableDays || line.eligibleDays)],
-              ['Daily Rate', fmtPKR(line.dailyRate)],
-            ].map(([label, value]) => (
-              <div key={String(label)} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px dotted #e2e8f0' }}>
-                <span style={{ color: '#64748b', fontSize: 10 }}>{label}</span>
-                <span style={{ fontWeight: 600, fontSize: 10 }}>{value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Earnings */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
-            background: '#f1f5f9', padding: '6px 10px', borderLeft: '3px solid #1e293b', marginBottom: 8 }}>
-            Earnings
-          </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={{ background: '#1e293b', color: 'white', padding: '6px 10px', textAlign: 'left', fontSize: 10 }}>Component</th>
-                <th style={{ background: '#1e293b', color: 'white', padding: '6px 10px', textAlign: 'right', fontSize: 10 }}>Amount (PKR)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td style={{ padding: '5px 10px', borderBottom: '1px solid #e2e8f0', fontSize: 10 }}>Basic Salary</td><td style={{ padding: '5px 10px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 10 }}>{fmtPKRNum(line.basicSalary)}</td></tr>
-              {allowances.map((a, i) => (
-                <tr key={i}><td style={{ padding: '5px 10px', borderBottom: '1px solid #e2e8f0', fontSize: 10 }}>{a.name}</td><td style={{ padding: '5px 10px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 10 }}>{fmtPKRNum(a.amount)}</td></tr>
-              ))}
-              <tr style={{ background: '#f1f5f9', fontWeight: 700 }}>
-                <td style={{ padding: '6px 10px', borderTop: '2px solid #1e293b', fontSize: 10 }}>Gross Salary</td>
-                <td style={{ padding: '6px 10px', borderTop: '2px solid #1e293b', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 10 }}>{fmtPKRNum(line.grossSalary)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* Deductions */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
-            background: '#f1f5f9', padding: '6px 10px', borderLeft: '3px solid #1e293b', marginBottom: 8 }}>
-            Deductions
-          </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={{ background: '#1e293b', color: 'white', padding: '6px 10px', textAlign: 'left', fontSize: 10 }}>Component</th>
-                <th style={{ background: '#1e293b', color: 'white', padding: '6px 10px', textAlign: 'right', fontSize: 10 }}>Amount (PKR)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ['Income Tax', line.incomeTax],
-                ['EOBI (Employee)', line.eobiEmployee],
-                ['ESSI (Employee)', line.essiEmployee],
-                ['Provident Fund (Employee)', line.pfEmployee],
-                ['Loan Deduction', line.loanDeduction],
-                ['Advance Deduction', line.advanceDeduction],
-                ['Other Deductions', line.otherDeductions],
-              ].filter(([, amt]) => amt > 0).map(([label, amt]) => (
-                <tr key={String(label)}><td style={{ padding: '5px 10px', borderBottom: '1px solid #e2e8f0', fontSize: 10 }}>{label}</td><td style={{ padding: '5px 10px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 10 }}>{fmtPKRNum(amt)}</td></tr>
-              ))}
-              <tr style={{ background: '#f1f5f9', fontWeight: 700 }}>
-                <td style={{ padding: '6px 10px', borderTop: '2px solid #1e293b', fontSize: 10 }}>Total Deductions</td>
-                <td style={{ padding: '6px 10px', borderTop: '2px solid #1e293b', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 10 }}>{fmtPKRNum(line.totalDeductions)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* Net Pay */}
-        <div style={{ fontSize: 14, fontWeight: 700, textAlign: 'center', padding: 10,
-          background: '#ecfdf5', border: '2px solid #10b981', borderRadius: 4, margin: '12px 0' }}>
-          NET PAY: PKR {fmtPKRNum(line.netPay)}
-        </div>
-
-        {/* Multi-Contract Earnings */}
-        {contractEarnings.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
-              background: '#ecfdf5', padding: '6px 10px', borderLeft: '3px solid #10b981', marginBottom: 8 }}>
-              Multi-Contract Earnings
-            </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'left', fontSize: 9 }}>Contract / Project</th>
-                  <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'right', fontSize: 9 }}>Monthly Salary</th>
-                  <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'right', fontSize: 9 }}>Daily Rate</th>
-                  <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'center', fontSize: 9 }}>Days Worked</th>
-                  <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'center', fontSize: 9 }}>Abs</th>
-                  <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'right', fontSize: 9 }}>Earned Salary</th>
-                </tr>
-              </thead>
-              <tbody>
-                {contractEarnings.map((ce, i) => (
-                  <tr key={i}>
-                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #e2e8f0', fontSize: 9 }}>{ce.projectName || ce.projectCode}{ce.designation ? ` (${ce.designation})` : ''}</td>
-                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 9 }}>{fmtPKRNum(ce.contractSalary)}</td>
-                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 9 }}>{fmtPKRNum(ce.dailyRate)}</td>
-                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #e2e8f0', textAlign: 'center', fontSize: 9 }}>{ce.daysWorked}</td>
-                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #e2e8f0', textAlign: 'center', fontSize: 9, color: '#dc2626' }}>{ce.absentDays}</td>
-                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 9, fontWeight: 600 }}>{fmtPKRNum(ce.earnedSalary)}</td>
-                  </tr>
-                ))}
-                <tr style={{ background: '#ecfdf5', fontWeight: 700 }}>
-                  <td colSpan={5} style={{ padding: '6px 8px', borderTop: '2px solid #10b981', fontSize: 9, textAlign: 'right' }}>Total Combined Earnings</td>
-                  <td style={{ padding: '6px 8px', borderTop: '2px solid #10b981', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 9 }}>{fmtPKRNum(contractEarnings.reduce((s,c) => s + c.earnedSalary, 0))}</td>
-                </tr>
-              </tbody>
-            </table>
-            <div style={{ fontSize: 8, color: '#64748b', marginTop: 4, fontStyle: 'italic' }}>
-              Multi-Contract Payroll: Earned = (Contract Salary ÷ {line.calendarDays || 30} calendar days) × Days Worked. All incomes combined before tax.
-            </div>
-          </div>
-        )}
-
-        {/* Project Allocation (fallback when no contract earnings) */}
-        {!contractEarnings.length && projectAllocs.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
-              background: '#f1f5f9', padding: '6px 10px', borderLeft: '3px solid #1e293b', marginBottom: 8 }}>
-              Project Allocation Breakdown
-            </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'left', fontSize: 9 }}>Project</th>
-                  <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'center', fontSize: 9 }}>Days</th>
-                  <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'center', fontSize: 9 }}>Weight</th>
-                  <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'right', fontSize: 9 }}>Salary Share</th>
-                  <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'right', fontSize: 9 }}>SC Share</th>
-                </tr>
-              </thead>
-              <tbody>
-                {projectAllocs.map((pa, i) => (
-                  <tr key={i}>
-                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #e2e8f0', fontSize: 9 }}>{pa.projectName || pa.projectCode}</td>
-                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #e2e8f0', textAlign: 'center', fontSize: 9 }}>{pa.days}</td>
-                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #e2e8f0', textAlign: 'center', fontSize: 9 }}>{pa.weightPct}%</td>
-                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 9 }}>{fmtPKRNum(pa.salaryShare)}</td>
-                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 9 }}>{fmtPKRNum(pa.scShare)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Employer Cost */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
-            background: '#f1f5f9', padding: '6px 10px', borderLeft: '3px solid #1e293b', marginBottom: 8 }}>
-            Employer Cost
-          </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={{ background: '#1e293b', color: 'white', padding: '6px 10px', textAlign: 'left', fontSize: 10 }}>Component</th>
-                <th style={{ background: '#1e293b', color: 'white', padding: '6px 10px', textAlign: 'right', fontSize: 10 }}>Amount (PKR)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ['EOBI (Employer)', line.eobiEmployer],
-                ['ESSI (Employer)', line.essiEmployer],
-                ['Provident Fund (Employer)', line.pfEmployer],
-                ['Gratuity Provision', line.gratuity],
-                ['Social Charges', line.socialCharges],
-              ].filter(([, amt]) => amt > 0).map(([label, amt]) => (
-                <tr key={String(label)}><td style={{ padding: '5px 10px', borderBottom: '1px solid #e2e8f0', fontSize: 10 }}>{label}</td><td style={{ padding: '5px 10px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 10 }}>{fmtPKRNum(amt)}</td></tr>
-              ))}
-              <tr style={{ background: '#f1f5f9', fontWeight: 700 }}>
-                <td style={{ padding: '6px 10px', borderTop: '2px solid #1e293b', fontSize: 10 }}>Total Employer Cost</td>
-                <td style={{ padding: '6px 10px', borderTop: '2px solid #1e293b', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 10 }}>{fmtPKRNum(line.eobiEmployer + line.essiEmployer + line.pfEmployer + line.gratuity + line.socialCharges)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* YTD Tax Info */}
-        {taxInfo.ytdIncome && (
-          <div style={{ marginBottom: 16, padding: 10, background: '#fffbeb', borderRadius: 4, border: '1px solid #fbbf24' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 6, color: '#92400e' }}>YTD Tax Information</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 9 }}>
-              <div>YTD Income: <strong>{fmtPKR(taxInfo.ytdIncome || 0)}</strong></div>
-              <div>Projected Annual: <strong>{fmtPKR(taxInfo.projectedAnnualIncome || 0)}</strong></div>
-              <div>Tax Paid YTD: <strong>{fmtPKR(taxInfo.taxPaidYtd || 0)}</strong></div>
-              <div>Months Worked: <strong>{taxInfo.monthsWorkedYtd || 0}</strong></div>
-            </div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div style={{ marginTop: 20, paddingTop: 12, borderTop: '1px solid #e2e8f0' }}>
-          <p style={{ fontSize: 9, color: '#94a3b8', textAlign: 'center' }}>
-            This is a system-generated document from AcctFin ERP v1.0.0 • Generated on {new Date().toLocaleDateString('en-PK')}
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, marginTop: 30 }}>
-            <div style={{ borderTop: '1px solid #1e293b', paddingTop: 6, fontSize: 10, textAlign: 'center' }}>Employee Signature</div>
-            <div style={{ borderTop: '1px solid #1e293b', paddingTop: 6, fontSize: 10, textAlign: 'center' }}>Authorized Signatory</div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // ── Render: Bank Disbursement Letter ───────────────────────────────────
-  const renderBankLetter = () => {
-    if (!selectedBatch || filteredLines.length === 0) return null
-    const totalNet = filteredLines.reduce((s, l) => s + l.netPay, 0)
-
-    return (
-      <div className="slip-container" style={{
-        maxWidth: 800, margin: '0 auto', border: '2px solid #1e293b', padding: 24,
-        fontFamily: "'Segoe UI', Arial, sans-serif", fontSize: 11, color: '#1e293b'
-      }}>
-        {/* Letterhead */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div>
-            <h1 style={{ fontSize: 18, fontWeight: 700 }}>AcctFin ERP</h1>
-            <p style={{ fontSize: 10, color: '#64748b' }}>Accounts & Finance Department</p>
-          </div>
-          <div style={{ textAlign: 'right', fontSize: 11 }}>
-            <div>Date: {new Date().toLocaleDateString('en-PK', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
-            <div style={{ marginTop: 4 }}>Ref: PAY-{selectedBatch.period}</div>
-          </div>
-        </div>
-
-        <Separator style={{ marginBottom: 16 }} />
-
-        {/* Bank Info */}
-        {filteredLines[0] && (() => {
-          const firstEmp = employees.find(e => e.id === filteredLines[0].employeeId)
-          return (
-            <div style={{ marginBottom: 12 }}>
-              <div>To: <strong>{firstEmp?.bankName || 'The Bank Manager'}</strong></div>
-            </div>
-          )
-        })()}
-
-        {/* Subject */}
-        <div style={{ fontWeight: 700, fontSize: 12, margin: '16px 0 12px' }}>
-          Subject: Salary Disbursement for {selectedBatch ? fmtMonth(selectedBatch.period) : ''}
-        </div>
-
-        {/* Body */}
-        <div style={{ fontSize: 11, lineHeight: 1.6, marginBottom: 16 }}>
-          <p>Dear Sir/Madam,</p>
-          <p style={{ marginTop: 8 }}>
-            Please credit the following employees' salary for the month of{' '}
-            {selectedBatch ? fmtMonth(selectedBatch.period) : ''} to their respective bank accounts as per the details below:
-          </p>
-        </div>
-
-        {/* Employee Table */}
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'left', fontSize: 9 }}>#</th>
-              <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'left', fontSize: 9 }}>Employee Name</th>
-              <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'left', fontSize: 9 }}>Designation</th>
-              <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'left', fontSize: 9 }}>Bank Account</th>
-              <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'right', fontSize: 9 }}>Net Salary (PKR)</th>
-              <th style={{ background: '#1e293b', color: 'white', padding: '6px 8px', textAlign: 'left', fontSize: 9 }}>Payment Ref</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredLines.map((line, i) => {
-              const emp = employees.find(e => e.id === line.employeeId)
-              return (
-                <tr key={line.id} style={{ background: i % 2 === 0 ? 'transparent' : '#f8fafc' }}>
-                  <td style={{ padding: '5px 8px', borderBottom: '1px solid #e2e8f0', fontSize: 9 }}>{i + 1}</td>
-                  <td style={{ padding: '5px 8px', borderBottom: '1px solid #e2e8f0', fontSize: 9 }}>{line.employeeName}</td>
-                  <td style={{ padding: '5px 8px', borderBottom: '1px solid #e2e8f0', fontSize: 9 }}>{emp?.designation || '—'}</td>
-                  <td style={{ padding: '5px 8px', borderBottom: '1px solid #e2e8f0', fontSize: 9, fontFamily: "'Courier New', monospace" }}>{maskAccount(emp?.bankAccountNumber || null)}</td>
-                  <td style={{ padding: '5px 8px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 9 }}>{fmtPKRNum(line.netPay)}</td>
-                  <td style={{ padding: '5px 8px', borderBottom: '1px solid #e2e8f0', fontSize: 9 }}>{selectedBatch?.batchNumber}-{line.employeeCode || line.id.slice(-4)}</td>
-                </tr>
-              )
-            })}
-            <tr style={{ background: '#f1f5f9', fontWeight: 700 }}>
-              <td colSpan={4} style={{ padding: '6px 8px', borderTop: '2px solid #1e293b', fontSize: 9, textAlign: 'right' }}>Total</td>
-              <td style={{ padding: '6px 8px', borderTop: '2px solid #1e293b', textAlign: 'right', fontFamily: "'Courier New', monospace", fontSize: 9 }}>{fmtPKRNum(totalNet)}</td>
-              <td style={{ padding: '6px 8px', borderTop: '2px solid #1e293b' }}></td>
-            </tr>
-          </tbody>
-        </table>
-
-        {/* Amount in Words */}
-        <div style={{ fontSize: 10, color: '#475569', fontStyle: 'italic', marginTop: 8 }}>
-          Amount in Words: {numberToWordsPKR(totalNet)}
-        </div>
-
-        {/* Closing */}
-        <div style={{ marginTop: 24, fontSize: 11, lineHeight: 1.6 }}>
-          <p>Please process the above payments at your earliest convenience.</p>
-          <p style={{ marginTop: 8 }}>Thank you for your continued support.</p>
-        </div>
-
-        {/* Signatures */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, marginTop: 40 }}>
-          <div style={{ borderTop: '1px solid #1e293b', paddingTop: 6, fontSize: 10, textAlign: 'center' }}>Prepared By</div>
-          <div style={{ borderTop: '1px solid #1e293b', paddingTop: 6, fontSize: 10, textAlign: 'center' }}>Authorized Signatory</div>
-        </div>
-      </div>
-    )
-  }
-
-  // ── Main Render ────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      {renderControls()}
-
-      {showPreview && selectedBatch && filteredLines.length > 0 && (
-        <div ref={printRef}>
-          {docType === 'slip' ? (
-            filteredLines.map(line => renderSalarySlip(line))
-          ) : (
-            renderBankLetter()
+      {/* Filters */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[140px]">
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Period</label>
+            <input type="month" value={period} onChange={e => setPeriod(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+          </div>
+          <div className="flex-1 min-w-[180px]">
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Search</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+              <input type="text" placeholder="Name or code..." value={search} onChange={e => setSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+            </div>
+          </div>
+          <Button onClick={handleLoad} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white h-9 px-5">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+            {loading ? 'Loading...' : 'Load'}
+          </Button>
+          {employees.length > 0 && (
+            <Button variant="outline" onClick={handleBulkPrint} className="h-9 px-4">
+              <Printer className="w-4 h-4 mr-1" /> Print All
+            </Button>
           )}
+        </div>
+      </div>
+
+      {/* KPIs */}
+      {employees.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <KpiCard label="Total Gross" value={fmtPKR(totals.gross)} icon={<DollarSign className="w-4 h-4" />} color="#2563EB" />
+          <KpiCard label="Total Tax" value={fmtPKR(totals.tax)} icon={<TrendingDown className="w-4 h-4" />} color="#DC2626" />
+          <KpiCard label="Total Net" value={fmtPKR(totals.net)} icon={<TrendingUp className="w-4 h-4" />} color="#16A34A" />
+          <KpiCard label="Total SC" value={fmtPKR(totals.sc)} icon={<Shield className="w-4 h-4" />} color="#D97706" />
         </div>
       )}
 
-      {showPreview && filteredLines.length === 0 && (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <FileText className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-            <p className="text-sm text-muted-foreground">
-              No payroll lines found for the selected employee/batch combination.
-            </p>
-          </CardContent>
-        </Card>
+      {/* Select bar */}
+      {employees.length > 0 && (
+        <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm">
+          <button onClick={() => setSelected(selected.size === filtered.length ? new Set() : new Set(filtered.map((e: any) => e.employeeId)))}
+            className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-green-600 transition-colors">
+            {selected.size === filtered.length
+              ? <CheckSquare className="w-4 h-4 text-green-600" />
+              : <Square className="w-4 h-4" />}
+            {selected.size === filtered.length ? 'Deselect All' : 'Select All'}
+          </button>
+          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+            <Users className="w-3.5 h-3.5" />
+            {filtered.length} employee{filtered.length !== 1 ? 's' : ''}
+            {selected.size > 0 && ` · ${selected.size} selected`}
+          </div>
+        </div>
       )}
+
+      {/* Employee cards */}
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 animate-pulse">
+              <div className="flex gap-3">
+                <div className="w-10 h-10 bg-gray-200 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-48" />
+                  <div className="h-3 bg-gray-100 rounded w-32" />
+                  <div className="flex gap-2 mt-2">
+                    {[1, 2, 3, 4].map(j => <div key={j} className="h-10 w-24 bg-gray-100 rounded-lg" />)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filtered.length > 0 ? (
+        <div className="space-y-3">
+          {filtered.map((emp: any) => (
+            <div key={emp.employeeId}
+              className={`bg-white border rounded-xl p-4 transition-all ${selected.has(emp.employeeId) ? 'border-green-500 ring-1 ring-green-500' : 'border-gray-200 hover:border-gray-300'}`}>
+              <div className="flex items-start gap-3">
+                <button onClick={() => setSelected(prev => {
+                  const next = new Set(prev)
+                  next.has(emp.employeeId) ? next.delete(emp.employeeId) : next.add(emp.employeeId)
+                  return next
+                })} className="mt-0.5 flex-shrink-0">
+                  {selected.has(emp.employeeId)
+                    ? <CheckSquare className="w-5 h-5 text-green-600" />
+                    : <Square className="w-5 h-5 text-gray-400" />}
+                </button>
+                <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                  {emp.employeeName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-gray-900 text-sm">{emp.employeeName}</span>
+                    <span className="text-xs text-gray-400 font-mono">{emp.employeeCode}</span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                      {emp.batchStatus}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">{emp.designation} · {emp.department}</div>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {[
+                      { label: 'Gross', value: emp.grossSalary, color: 'bg-blue-50 text-blue-700' },
+                      { label: 'Tax', value: emp.incomeTax, color: 'bg-red-50 text-red-700' },
+                      { label: 'Net Pay', value: emp.netSalary, color: 'bg-green-50 text-green-700' },
+                      { label: 'SC', value: emp.totalSC, color: 'bg-amber-50 text-amber-700' },
+                    ].map(chip => (
+                      <div key={chip.label} className={`px-3 py-1.5 rounded-lg ${chip.color}`}>
+                        <div className="text-xs font-medium opacity-70">{chip.label}</div>
+                        <div className="text-sm font-bold font-mono">Rs {fmt(chip.value)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <button onClick={() => handlePreview(emp)} title="Preview"
+                    className="p-2 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-all">
+                    <Eye className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleDownload(emp)} disabled={!!downloading[emp.employeeId]} title="Open Slip"
+                    className="p-2 rounded-lg text-gray-500 hover:text-green-600 hover:bg-green-50 transition-all disabled:opacity-40">
+                    {downloading[emp.employeeId] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : employees.length === 0 && !loading ? (
+        <EmptyState icon={<FileText className="w-12 h-12" />} title="No salary slips loaded" desc="Select a period and click Load to get started" />
+      ) : null}
+
+      {preview && <PreviewModal url={preview.url} title={preview.title} onClose={() => setPreview(null)} />}
+    </div>
+  )
+}
+
+// ── BANK LETTER TAB ───────────────────────────────────────────
+
+function BankLetterTab() {
+  const { toast } = useToast()
+  const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7))
+  const [summary, setSummary] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [preview, setPreview] = useState<string | null>(null)
+
+  const handleLoad = async () => {
+    if (!period) { toast({ title: 'Select a period', variant: 'destructive' }); return }
+    setLoading(true)
+    setSummary(null)
+    try {
+      const res = await fetch(`/api/payroll/bank-letter?period=${period}&format=json`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to load')
+      setSummary(data.data)
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handlePreview = () => {
+    setPreview(`/api/payroll/bank-letter?period=${period}&format=html`)
+  }
+
+  const handlePrint = () => {
+    window.open(`/api/payroll/bank-letter?period=${period}&format=html`, '_blank')
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[140px]">
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Period</label>
+            <input type="month" value={period} onChange={e => setPeriod(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+          </div>
+          <Button onClick={handleLoad} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white h-9 px-5">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+            {loading ? 'Loading...' : 'Generate Preview'}
+          </Button>
+          {summary && (
+            <>
+              <Button variant="outline" onClick={handlePreview} className="h-9 px-4">
+                <Eye className="w-4 h-4 mr-1" /> Preview
+              </Button>
+              <Button variant="outline" onClick={handlePrint} className="h-9 px-4">
+                <Printer className="w-4 h-4 mr-1" /> Print / Save PDF
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {summary && (
+        <>
+          {/* KPIs */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <KpiCard label="Employees" value={String(summary.totalEmployees)} icon={<Users className="w-4 h-4" />} color="#2563EB" />
+            <KpiCard label="Total Gross" value={fmtPKR(summary.totalGross)} icon={<DollarSign className="w-4 h-4" />} color="#6B7280" />
+            <KpiCard label="Total Deductions" value={fmtPKR(summary.totalDeductions)} icon={<TrendingDown className="w-4 h-4" />} color="#DC2626" />
+            <KpiCard label="Net Disbursement" value={fmtPKR(summary.totalNet)} icon={<CheckCircle2 className="w-4 h-4" />} color="#16A34A" />
+          </div>
+
+          {/* Table */}
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+              <span className="font-semibold text-gray-900 text-sm">Disbursement Schedule — {summary.periodLabel}</span>
+              <span className="text-xs text-gray-500">{summary.totalEmployees} employees</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    {['#', 'Employee', 'Bank', 'Account No.', 'Gross (Rs)', 'Deductions (Rs)', 'Net Payable (Rs)'].map(h => (
+                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {summary.rows.map((row: any) => (
+                    <tr key={row.srNo} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-gray-500 text-xs">{row.srNo}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-900">{row.employeeName}</div>
+                        <div className="text-xs text-gray-400">{row.employeeCode} · {row.designation}</div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 text-xs">{row.bankName}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-700">{row.accountNumber}</td>
+                      <td className="px-4 py-3 text-right font-mono text-gray-700">{fmt(row.grossSalary)}</td>
+                      <td className="px-4 py-3 text-right font-mono text-red-600">{fmt(row.deductions)}</td>
+                      <td className="px-4 py-3 text-right font-mono font-bold text-green-700">{fmt(row.netSalary)}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-green-50 border-t-2 border-green-200">
+                    <td colSpan={4} className="px-4 py-3 font-bold text-gray-900 text-sm">TOTAL — {summary.totalEmployees} Employees</td>
+                    <td className="px-4 py-3 text-right font-bold font-mono text-gray-900">{fmt(summary.totalGross)}</td>
+                    <td className="px-4 py-3 text-right font-bold font-mono text-red-700">{fmt(summary.totalDeductions)}</td>
+                    <td className="px-4 py-3 text-right font-bold font-mono text-green-700">{fmt(summary.totalNet)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {!summary && !loading && (
+        <EmptyState icon={<Building2 className="w-12 h-12" />} title="No letter generated yet" desc="Select a period and click Generate Preview" />
+      )}
+
+      {preview && <PreviewModal url={preview} title={`Bank Disbursement Letter — ${periodLabel(period)}`} onClose={() => setPreview(null)} />}
+    </div>
+  )
+}
+
+// ── FBR TAX REPORT TAB ────────────────────────────────────────
+
+function FBRReportTab() {
+  const { toast } = useToast()
+  const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7))
+  const [records, setRecords] = useState<any[]>([])
+  const [totals, setTotals] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [preview, setPreview] = useState<string | null>(null)
+
+  const handleLoad = async () => {
+    if (!period) { toast({ title: 'Select a period', variant: 'destructive' }); return }
+    setLoading(true)
+    setRecords([])
+    setTotals(null)
+    try {
+      const res = await fetch(`/api/payroll/reports?type=tax-psid&month=${period}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to load')
+      setRecords(data.records || [])
+      setTotals(data.totals || null)
+      if ((data.records || []).length === 0) {
+        toast({ title: 'No taxable employees', description: `No income tax deductions found for ${periodLabel(period)}` })
+      }
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleExportCSV = () => {
+    if (records.length === 0) return
+    const headers = Object.keys(records[0]).join(',')
+    const rows = records.map(r => Object.values(r).map(v => JSON.stringify(v ?? '')).join(','))
+    const csv = [headers, ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `fbr-wht-section149-${period}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast({ title: 'CSV exported', description: 'Use this file for FBR IRIS upload' })
+  }
+
+  const handlePrint = () => {
+    window.print()
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header info */}
+      <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+        <div className="flex items-start gap-3">
+          <Landmark className="w-5 h-5 text-green-700 flex-shrink-0 mt-0.5" />
+          <div>
+            <div className="font-semibold text-green-900 text-sm">FBR WHT Statement — Section 149</div>
+            <div className="text-xs text-green-700 mt-1">
+              Monthly Withholding Tax on Salary under Income Tax Ordinance 2001.
+              Export CSV for FBR IRIS portal upload. CNIC format: 13 digits, no dashes.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[140px]">
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Period</label>
+            <input type="month" value={period} onChange={e => setPeriod(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+          </div>
+          <Button onClick={handleLoad} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white h-9 px-5">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+            {loading ? 'Loading...' : 'Generate Report'}
+          </Button>
+          {records.length > 0 && (
+            <>
+              <Button variant="outline" onClick={handleExportCSV} className="h-9 px-4">
+                <Download className="w-4 h-4 mr-1" /> Export CSV (IRIS)
+              </Button>
+              <Button variant="outline" onClick={handlePrint} className="h-9 px-4">
+                <Printer className="w-4 h-4 mr-1" /> Print
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* KPIs */}
+      {totals && (
+        <div className="grid grid-cols-3 gap-3">
+          <KpiCard label="Taxable Employees" value={String(totals.totalRecords)} icon={<Users className="w-4 h-4" />} color="#2563EB" />
+          <KpiCard label="Total Taxable Amount" value={fmtPKR(totals.totalTaxableAmount)} icon={<DollarSign className="w-4 h-4" />} color="#6B7280" />
+          <KpiCard label="Total Tax Deducted" value={fmtPKR(totals.totalTaxAmount)} icon={<Receipt className="w-4 h-4" />} color="#DC2626" />
+        </div>
+      )}
+
+      {/* PSID Payment Box */}
+      {totals && totals.totalTaxAmount > 0 && (
+        <div className="bg-white border-2 border-green-600 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Landmark className="w-4 h-4 text-green-700" />
+            <span className="font-semibold text-green-900 text-sm">CPR / PSID Payment Details</span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            {[
+              ['Payment Head', 'Income Tax — Withholding'],
+              ['Tax Type Code', '149 — Salary'],
+              ['Section', 'Section 149, ITO 2001'],
+              ['Period', periodLabel(period)],
+              ['Amount to Deposit', fmtPKR(totals.totalTaxAmount)],
+              ['Due Date', '15th of following month'],
+            ].map(([label, value]) => (
+              <div key={label as string}>
+                <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">{label}</div>
+                <div className="font-semibold text-gray-900" style={label === 'Amount to Deposit' ? { color: '#DC2626', fontSize: '15px' } : {}}>{value}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+            Generate PSID from FBR IRIS portal (iris.fbr.gov.pk). Tax must be deposited by 15th of following month.
+            Late payment attracts default surcharge @ 12% per annum under Section 205.
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      {records.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden print:shadow-none">
+          <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <span className="font-semibold text-gray-900 text-sm">WHT Statement — Section 149</span>
+              <span className="text-xs text-gray-500 ml-2">{periodLabel(period)}</span>
+            </div>
+            <span className="text-xs text-gray-500">{records.length} taxable employee{records.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-green-800 text-white">
+                  <th className="px-3 py-3 text-left font-semibold uppercase tracking-wider">#</th>
+                  <th className="px-3 py-3 text-left font-semibold uppercase tracking-wider">Employee Name</th>
+                  <th className="px-3 py-3 text-left font-semibold uppercase tracking-wider">CNIC (13 Digits)</th>
+                  <th className="px-3 py-3 text-left font-semibold uppercase tracking-wider">NTN</th>
+                  <th className="px-3 py-3 text-left font-semibold uppercase tracking-wider">City</th>
+                  <th className="px-3 py-3 text-left font-semibold uppercase tracking-wider">Status</th>
+                  <th className="px-3 py-3 text-left font-semibold uppercase tracking-wider">Section</th>
+                  <th className="px-3 py-3 text-right font-semibold uppercase tracking-wider">Taxable Amt (Rs)</th>
+                  <th className="px-3 py-3 text-right font-semibold uppercase tracking-wider">Tax Deducted (Rs)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {records.map((r: any, i: number) => (
+                  <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-green-50/30'}>
+                    <td className="px-3 py-2.5 text-gray-500">{i + 1}</td>
+                    <td className="px-3 py-2.5 font-medium text-gray-900">{r.TaxPayer_Name}</td>
+                    <td className="px-3 py-2.5 font-mono text-gray-700">
+                      {r.TaxPayer_CNIC || <span className="text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Missing</span>}
+                    </td>
+                    <td className="px-3 py-2.5 font-mono text-gray-600">{r.TaxPayer_NTN || '—'}</td>
+                    <td className="px-3 py-2.5 text-gray-600">{r.TaxPayer_City || '—'}</td>
+                    <td className="px-3 py-2.5">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${r.TaxPayer_Status === 'Filer' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {r.TaxPayer_Status || '—'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-red-600 font-semibold">{r.Payment_Section}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-gray-700">{fmt(r.Taxable_Amount)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono font-bold text-red-600">{fmt(r.Tax_Amount)}</td>
+                  </tr>
+                ))}
+                {totals && (
+                  <tr className="bg-green-100 border-t-2 border-green-600 font-bold">
+                    <td colSpan={7} className="px-3 py-3 text-green-900">TOTAL — {totals.totalRecords} Employee(s)</td>
+                    <td className="px-3 py-3 text-right font-mono text-gray-900">{fmt(totals.totalTaxableAmount)}</td>
+                    <td className="px-3 py-3 text-right font-mono text-red-700">{fmt(totals.totalTaxAmount)}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {records.length === 0 && !loading && (
+        <EmptyState icon={<Landmark className="w-12 h-12" />} title="No FBR report generated" desc="Select a period and click Generate Report" />
+      )}
+    </div>
+  )
+}
+
+// ── MAIN EXPORT ───────────────────────────────────────────────
+
+export function PayrollSlips() {
+  return (
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+      <div className="max-w-6xl mx-auto">
+        {/* Page Header */}
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <FileText className="w-5 h-5 text-green-600" />
+            Payroll Documents
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Generate salary slips, bank disbursement letters, and FBR WHT reports
+          </p>
+        </div>
+
+        <Tabs defaultValue="slips">
+          <TabsList className="mb-5 bg-white border border-gray-200 p-1 rounded-xl shadow-sm">
+            <TabsTrigger value="slips" className="flex items-center gap-1.5 text-xs font-medium rounded-lg data-[state=active]:bg-green-600 data-[state=active]:text-white">
+              <FileText className="w-3.5 h-3.5" /> Salary Slips
+            </TabsTrigger>
+            <TabsTrigger value="bank" className="flex items-center gap-1.5 text-xs font-medium rounded-lg data-[state=active]:bg-green-600 data-[state=active]:text-white">
+              <Building2 className="w-3.5 h-3.5" /> Bank Letter
+            </TabsTrigger>
+            <TabsTrigger value="fbr" className="flex items-center gap-1.5 text-xs font-medium rounded-lg data-[state=active]:bg-green-600 data-[state=active]:text-white">
+              <Landmark className="w-3.5 h-3.5" /> FBR WHT Report
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="slips"><SalarySlipsTab /></TabsContent>
+          <TabsContent value="bank"><BankLetterTab /></TabsContent>
+          <TabsContent value="fbr"><FBRReportTab /></TabsContent>
+        </Tabs>
+      </div>
     </div>
   )
 }
