@@ -26,6 +26,8 @@ import {
   CircleDot, FileSpreadsheet, RefreshCw, X, Check, RotateCcw
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useAppStore } from '@/lib/store'
+
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer, Legend
@@ -419,6 +421,7 @@ function FormField({ label, required, children, colSpan }: { label: string; requ
 
 export function FixedAssetsModule() {
   const { toast } = useToast()
+  const { authUser } = useAppStore()
   const [activeTab, setActiveTab] = useState('dashboard')
   const [loading, setLoading] = useState(true)
   const [assets, setAssets] = useState<AssetRecord[]>([])
@@ -1095,6 +1098,7 @@ export function FixedAssetsModule() {
               autoPost: false,
               isAssetPosted: true,
               financialYearId,
+              userId: authUser?.id,
               entries: [
                 { accountId: assetAccountId, debit: Number(wizardForm.purchasePrice), credit: 0, description: `Dr. ${wizardForm.category} Asset — ${wizardForm.name}`, assetRef: assetData.assetId as string || '' },
                 { accountId: bankAccountId, debit: 0, credit: Number(wizardForm.purchasePrice), description: `Cr. Bank — ${wizardForm.supplierName || 'Payment for asset'}`, assetRef: assetData.assetId as string || '' },

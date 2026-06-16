@@ -2089,7 +2089,7 @@ async function generateValidation(
   const liabilityAccounts = allAccounts.filter(a => a.accountType === 'LIABILITY')
   const equityAccounts = allAccounts.filter(a => a.accountType === 'EQUITY')
 
-  const acctEqResults = []
+  const acctEqResults: any[] = []
   for (const k of allColKeys) {
     const grossAssets = netBalanceForProject(balances, assetAccounts.map(a => a.id), k, false)
     const accDep = netBalanceForProject(balances, accDepAccounts.map(a => a.id), k, true)

@@ -157,9 +157,7 @@ export async function POST(request: NextRequest) {
     const sanitizedFileName = `EMP-${employee.employeeCode}-${documentType.code}-${timestamp}.${fileExtension}`
 
     // Ensure upload directory exists
-    const uploadDir = path.join(
-      '/home/z/my-project/uploads/employee-docs'
-    )
+    const uploadDir = path.join(process.cwd(), 'uploads/employee-docs')
     await mkdir(uploadDir, { recursive: true })
 
     // Write file to disk

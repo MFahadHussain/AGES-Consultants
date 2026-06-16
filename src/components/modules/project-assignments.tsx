@@ -27,6 +27,7 @@ import {
   X,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { EmployeeCombobox } from '@/components/ui/employee-combobox'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -776,23 +777,12 @@ export function ProjectAssignments() {
                 <Label className="text-xs font-medium">
                   Employee <span className="text-red-500">*</span>
                 </Label>
-                <Select
+                <EmployeeCombobox
+                  employees={employees.filter((e) => e.status === 'active')}
                   value={form.employeeId}
-                  onValueChange={(v) => setForm((p) => ({ ...p, employeeId: v }))}
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="Select employee" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {employees
-                      .filter((e) => e.status === 'active')
-                      .map((e) => (
-                        <SelectItem key={e.id} value={e.id}>
-                          {e.employeeCode} — {e.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setForm((p) => ({ ...p, employeeId: v }))}
+                  placeholder="Search employee..."
+                />
               </div>
 
               <div className="space-y-1.5">

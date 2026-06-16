@@ -1274,6 +1274,8 @@ model Allowance {
   baseOnSalary    Boolean  @default(false) // If percentage, is it on base salary?
   isTaxable       Boolean  @default(true) // Whether subject to income tax
   isProjectSpecific Boolean @default(false) // Can vary by project
+  isInclusive     Boolean  @default(false) // Crucial: Flags if carved out of Gross Salary
+  isSocialCharges Boolean  @default(false) // Whether allowance is subject to social charges
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

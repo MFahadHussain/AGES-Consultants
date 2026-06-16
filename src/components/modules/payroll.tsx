@@ -384,6 +384,7 @@ export function PayrollIntegration() {
           financialYearId: openFY.id,
           projectId: v.projectId,
           isPayrollPosted: true,
+          userId: authUser?.id,
           entries,
         }),
       })

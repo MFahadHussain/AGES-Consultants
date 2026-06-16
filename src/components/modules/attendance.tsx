@@ -13,36 +13,44 @@ import { CalendarCheck, Users, AlertTriangle, Clock, Save, RotateCcw, Check, Lay
 import { useToast } from '@/hooks/use-toast'
 
 // ── Constants ──────────────────────────────────────────────
-const VALID_STATUSES = ['P', 'W', 'WW', 'H', 'CL', 'SL', 'EL', 'CO', 'T', 'WH', 'CD', 'A'] as const
+const VALID_STATUSES = ['P', 'W', 'H', 'CL', 'SL', 'EL', 'CO', 'T', 'WH', 'A', 'PW', 'TW', 'WHW', 'PH', 'TH', 'WHH', 'WW', 'CD'] as const
 type AttendanceStatus = (typeof VALID_STATUSES)[number]
 
 /** Billable statuses — require a projectId */
-const BILLABLE_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO'])
+const BILLABLE_STATUSES = new Set<string>(['P', 'W', 'H', 'WH', 'T', 'CO', 'PW', 'TW', 'WHW', 'PH', 'TH', 'WHH', 'WW'])
 
 /** Statuses that require/allow a project assignment — billable + paid leave */
-const PROJECT_REQUIRED_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO', 'CL', 'SL', 'EL'])
+const PROJECT_REQUIRED_STATUSES = new Set<string>([
+  'P', 'W', 'H', 'WH', 'T', 'CO', 'PW', 'TW', 'WHW', 'PH', 'TH', 'WHH', 'WW', 'CL', 'SL', 'EL', 'A'
+])
 
 /** Alias kept for backward compat in grid rendering */
 const WORKING_STATUSES = BILLABLE_STATUSES
 
 const STATUS_LABELS: Record<string, string> = {
   P: 'Present',
-  W: 'Weekend Working',
-  WW: 'Work on Weekend',
+  W: 'Weekend',
   H: 'Holiday Working',
   CL: 'Casual Leave',
   SL: 'Sick Leave',
   EL: 'Earned Leave',
   CO: 'Comp Off',
-  T: 'Training',
+  T: 'Tour',
   WH: 'Work from Home',
-  CD: 'Credit Day',
   A: 'Absent',
+  PW: 'Present on Weekend',
+  TW: 'Tour on Weekend',
+  WHW: 'Work from Home on Weekend',
+  PH: 'Present on Holiday',
+  TH: 'Tour on Holiday',
+  WHH: 'Work from Home on Holiday',
+  WW: 'Work on Weekend',
+  CD: 'Compensatory Deduction',
 }
 
-const SC_EARN_STATUSES = new Set(['P', 'W', 'WW', 'H', 'T', 'WH'])
-const SC_DEDUCT_STATUSES = new Set(['CL', 'SL', 'EL', 'CO'])
-const SC_NO_IMPACT_STATUSES = new Set(['A', 'CD'])
+const SC_EARN_STATUSES = new Set<string>(['P', 'W', 'H', 'T', 'WH', 'PW', 'TW', 'WHW', 'PH', 'TH', 'WHH', 'WW'])
+const SC_DEDUCT_STATUSES = new Set<string>(['CL', 'SL', 'EL', 'CO'])
+const SC_NO_IMPACT_STATUSES = new Set<string>(['A', 'CD'])
 
 function getScCategory(status: string): 'earn' | 'deduct' | 'none' {
   if (SC_EARN_STATUSES.has(status)) return 'earn'
@@ -50,24 +58,34 @@ function getScCategory(status: string): 'earn' | 'deduct' | 'none' {
   return 'none'
 }
 
-// Color mapping for status badges in the grid
+// Color mapping for status badges in the grid (premium styling matching the prototype)
 const STATUS_COLORS: Record<string, string> = {
-  P: 'bg-green-100 text-green-800 border-green-200',
-  W: 'bg-blue-100 text-blue-800 border-blue-200',
-  WW: 'bg-sky-200 text-sky-900 border-sky-300',
-  H: 'bg-cyan-100 text-cyan-800 border-cyan-200',
-  CL: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  SL: 'bg-orange-100 text-orange-800 border-orange-200',
-  EL: 'bg-amber-100 text-amber-800 border-amber-200',
-  CO: 'bg-purple-100 text-purple-800 border-purple-200',
-  T: 'bg-teal-100 text-teal-800 border-teal-200',
-  WH: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  CD: 'bg-gray-100 text-gray-800 border-gray-200',
-  A: 'bg-red-100 text-red-800 border-red-200',
+  P: 'bg-[#EAF3DE] text-[#27500A] border-[#D6ECBD]',
+  W: 'bg-[#E6F1FB] text-[#0C447C] border-[#CBE0FA]',
+  H: 'bg-[#B5D4F4] text-[#042C53] border-[#91C1F2]',
+  CL: 'bg-[#FAEEDA] text-[#633806] border-[#F7DFB6]',
+  SL: 'bg-[#FAC775] text-[#412402] border-[#F9B74F]',
+  EL: 'bg-[#F5C4B3] text-[#4A1B0C] border-[#F0AA92]',
+  CO: 'bg-[#D3D1C7] text-[#2C2C2A] border-[#BCB9AD]',
+  T: 'bg-[#9FE1CB] text-[#04342C] border-[#7FD6B7]',
+  WH: 'bg-[#CECBF6] text-[#26215C] border-[#B2ADF2]',
+  A: 'bg-[#FCEBEB] text-[#791F1F] border-[#FAC8C8]',
+  PW: 'bg-[#C0DD97] text-[#173404] border-[#A8CE74]',
+  TW: 'bg-[#5DCAA5] text-[#04342C] border-[#3FBC91]',
+  WHW: 'bg-[#AFA9EC] text-[#26215C] border-[#8D84E5]',
+  PH: 'bg-[#97C459] text-[#173404] border-[#7FAD3D]',
+  TH: 'bg-[#1D9E75] text-[#04342C] border-[#167D5D]',
+  WHH: 'bg-[#7F77DD] text-[#EEEDFE] border-[#5E55CE]',
+  WW: 'bg-[#E6F1FB] text-[#0C447C] border-[#CBE0FA]',
+  CD: 'bg-[#f1f5f9] text-[#475569] border-[#cbd5e1]',
 }
 
-// Status cycle order for click-to-cycle
-const STATUS_CYCLE: AttendanceStatus[] = ['P', 'WH', 'W', 'WW', 'H', 'CL', 'SL', 'EL', 'CO', 'T', 'CD', 'A']
+// Dynamic cycle categories
+const CYCLE: Record<'regular' | 'weekend' | 'holiday', (AttendanceStatus | '')[]> = {
+  regular: ['P', 'WH', 'T', 'CO', 'CL', 'SL', 'EL', 'A', ''],
+  weekend: ['W', 'PW', 'TW', 'WHW', ''],
+  holiday: ['H', 'PH', 'TH', 'WHH', ''],
+}
 
 // Default project list (fallback if API fails)
 const DEFAULT_PROJECTS = ['Unallocated', 'Proj Alpha', 'Proj Beta', 'Proj Gamma', 'Proj Delta']
@@ -197,6 +215,34 @@ export function AttendanceModule() {
   const [bulkFillPreview, setBulkFillPreview] = useState<{ unassignedDays: number; totalBillableDays: number; alreadyAssignedDays: number } | null>(null)
   const [bulkFillLoading, setBulkFillLoading] = useState(false)
   const [bulkFillApplying, setBulkFillApplying] = useState(false)
+
+  // Holiday state (persisted by month in localStorage)
+  const [holidays, setHolidays] = useState<number[]>([])
+  const [holidayDialogOpen, setHolidayDialogOpen] = useState(false)
+
+  // Load holidays whenever selectedMonth changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(`holidays_${selectedMonth}`)
+      if (stored) {
+        try {
+          setHolidays(JSON.parse(stored))
+        } catch (e) {
+          setHolidays([])
+        }
+      } else {
+        setHolidays([])
+      }
+    }
+  }, [selectedMonth])
+
+  // Save holidays helper
+  const saveHolidays = (days: number[]) => {
+    setHolidays(days)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`holidays_${selectedMonth}`, JSON.stringify(days))
+    }
+  }
 
   // Stats from API (single employee view)
   const [summaryStats, setSummaryStats] = useState<{
@@ -402,51 +448,39 @@ export function AttendanceModule() {
   }, [employees.length, selectedMonth, fetchAttendanceData])
 
   // ── Grid interaction ───────────────────────────────────
-  /** Handle cell click - cycles status, auto-assigns project or opens popover */
+  /** Handle cell click - cycles status based on day category and always opens project selector if project required */
   const handleCellClick = (employeeId: string, day: number) => {
     const empGrid = gridData[employeeId] || {}
-    const currentStatus = empGrid[day]?.status || ''
-    const currentIndex = STATUS_CYCLE.indexOf(currentStatus as AttendanceStatus)
-    const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length]
-    const isNextBillable = BILLABLE_STATUSES.has(nextStatus)
+    const dow = getDayOfWeek(selectedMonth, day)
+    const isWeekend = dow === 0 || dow === 6
+    const isHoliday = holidays.includes(day)
+    const cellType: 'regular' | 'weekend' | 'holiday' = isHoliday ? 'holiday' : isWeekend ? 'weekend' : 'regular'
 
-    // Determine project for billable statuses
+    const cyc = CYCLE[cellType]
+    const currentStatus = (empGrid[day]?.status || '') as AttendanceStatus | ''
+    const idx = cyc.indexOf(currentStatus)
+    const nextStatus = cyc[(idx + 1) % cyc.length]
+
+    const needsProject = PROJECT_REQUIRED_STATUSES.has(nextStatus)
+
+    // Determine project for the selected status
     let projectValue: string | null = null
     let projectIdValue: string | null = null
-    let autoAssigned = false
-    let manuallyOverridden = false
     const existingDayData = empGrid[day]
+    const employeeProjects = getEmployeeProjects(employeeId)
 
-    if (isNextBillable || PROJECT_REQUIRED_STATUSES.has(nextStatus)) {
-      const employeeProjects = getEmployeeProjects(employeeId)
+    if (needsProject) {
       const existingProject = existingDayData?.project
-
-      if (employeeProjects.length === 1) {
-        // AUTO-ASSIGN — no popover shown
+      if (existingProject && existingProject !== 'Unallocated') {
+        projectValue = existingProject
+        projectIdValue = existingDayData?.projectId || null
+      } else if (employeeProjects.length > 0) {
         projectValue = employeeProjects[0].project.name
         projectIdValue = employeeProjects[0].projectId
-        autoAssigned = true
-        if (isNextBillable) {
-          toast({ title: 'Auto-assigned', description: `Auto-assigned to ${employeeProjects[0].project.name}` })
-        }
-      } else if (employeeProjects.length > 1) {
-        // Will show popover — pre-filtered to only this employee's projects
-        projectValue = existingProject && existingProject !== 'Unallocated'
-          ? existingProject
-          : employeeProjects[0].project.name
-        projectIdValue = existingDayData?.projectId || employeeProjects[0].projectId
       } else {
-        // NO PROJECT ASSIGNED — default to "Unallocated"
         projectValue = 'Unallocated'
         projectIdValue = null
-        if (isNextBillable) {
-          toast({ title: 'Warning', description: 'No active project assignment found', variant: 'destructive' })
-        }
       }
-    } else {
-      // Truly non-project statuses (A, CD): project should be null
-      projectValue = null
-      projectIdValue = null
     }
 
     // Cycle the status
@@ -458,35 +492,26 @@ export function AttendanceModule() {
         projectId: projectIdValue,
         recordId: empGrid[day]?.recordId || null,
         changed: true,
-        autoAssigned,
-        manuallyOverridden,
       }
       return { ...prev, [employeeId]: empGrid }
     })
     setHasChanges(true)
 
-    // Open popover only for multi-project employees with project-required status
-    if (isNextBillable || PROJECT_REQUIRED_STATUSES.has(nextStatus)) {
-      const employeeProjects = getEmployeeProjects(employeeId)
-      if (employeeProjects.length > 1) {
-        setPopoverProject(projectValue || employeeProjects[0].project.name)
-        setPopoverCell({ empId: employeeId, day })
-      } else {
-        setPopoverCell(null)
-      }
+    // ALWAYS open the project popover picker if nextStatus requires a project
+    if (nextStatus && needsProject) {
+      setPopoverProject(projectValue || 'Unallocated')
+      setPopoverCell({ empId: employeeId, day })
     } else {
       setPopoverCell(null)
     }
   }
 
-  /** Handle click on project chip for auto-assigned cell — allows manual override */
+  /** Handle click on project chip — always opens popover to select/change project */
   const handleProjectChipClick = (e: React.MouseEvent, employeeId: string, day: number) => {
     e.stopPropagation()
     const dayData = gridData[employeeId]?.[day]
     if (!dayData || !PROJECT_REQUIRED_STATUSES.has(dayData.status)) return
 
-    const employeeProjects = getEmployeeProjects(employeeId)
-    // Always allow override by showing popover with assigned projects
     setPopoverProject(dayData.project || 'Unallocated')
     setPopoverCell({ empId: employeeId, day })
   }
@@ -498,18 +523,12 @@ export function AttendanceModule() {
     const resolvedProjectId = projectNameToId(popoverProject)
     setGridData(prev => {
       const empGrid = { ...(prev[empId] || {}) }
-      const existingDay = empGrid[day]
-      const wasAutoAssigned = existingDay?.autoAssigned === true
-      const projectChanged = existingDay?.project !== popoverProject
-
       empGrid[day] = {
         ...empGrid[day],
-        status: empGrid[day]?.status || 'P',
         project: popoverProject,
         projectId: resolvedProjectId,
         changed: true,
-        autoAssigned: wasAutoAssigned && !projectChanged ? true : false,
-        manuallyOverridden: wasAutoAssigned && projectChanged ? true : (existingDay?.manuallyOverridden || false),
+        manuallyOverridden: true,
       }
       return { ...prev, [empId]: empGrid }
     })
@@ -801,6 +820,16 @@ export function AttendanceModule() {
           </SelectContent>
         </Select>
         <div className="flex items-center gap-2 ml-auto">
+          {/* Holidays Configurator Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs border-blue-200 text-blue-700 bg-blue-50/10 hover:bg-blue-100/50"
+            onClick={() => setHolidayDialogOpen(true)}
+          >
+            <Clock className="h-3.5 w-3.5 mr-1" />Select Holidays
+          </Button>
+
           {/* Bulk Fill Button */}
           <Button
             variant="outline"
@@ -829,34 +858,67 @@ export function AttendanceModule() {
           <span className="ml-2 text-xs text-muted-foreground">Loading attendance data...</span>
         </div>
       ) : (
-        <Card>
-          <ScrollArea className="w-full">
-            <div className="min-w-[1200px]">
-              <Table>
-                <TableHeader>
+        <Card className="overflow-hidden">
+          <div className="max-h-[600px] overflow-auto border rounded-md relative scrollbar-thin">
+            <div className="min-w-[1300px]">
+              <Table className="relative border-collapse">
+                <TableHeader className="sticky top-0 bg-card z-30 shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">
                   <TableRow>
-                    <TableHead className="text-[10px] sticky left-0 bg-card z-10 min-w-[140px]">Employee</TableHead>
+                    <TableHead className="text-[10px] sticky left-0 top-0 bg-card z-40 min-w-[140px] border-r shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">Employee</TableHead>
                     {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
                       const dow = getDayOfWeek(selectedMonth, day)
                       const isWeekend = dow === 0 || dow === 6
+                      const isHoliday = holidays.includes(day)
                       return (
                         <TableHead
                           key={day}
-                          className={`text-[9px] text-center p-0 w-8 min-w-8 ${isWeekend ? 'bg-muted/50 text-orange-600' : ''}`}
+                          className={`text-[9px] text-center p-0 w-8 min-w-8 cursor-pointer select-none transition-colors hover:bg-blue-100/30 sticky top-0 bg-card z-20 ${
+                            isHoliday
+                              ? 'bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 font-bold border-x border-blue-200/50'
+                              : isWeekend
+                                ? 'bg-muted/50 text-orange-600'
+                                : ''
+                          }`}
+                          onClick={() => {
+                            const updated = isHoliday
+                              ? holidays.filter(d => d !== day)
+                              : [...holidays, day]
+                            saveHolidays(updated)
+                            
+                            // Automatically default to H for empty/default statuses
+                            setGridData(prev => {
+                              const next = { ...prev }
+                              for (const empId of Object.keys(next)) {
+                                const empGrid = { ...next[empId] }
+                                const currentDay = empGrid[day] || {}
+                                if (!currentDay.status || currentDay.status === 'P' || currentDay.status === 'A' || currentDay.status === '') {
+                                  empGrid[day] = {
+                                    ...currentDay,
+                                    status: isHoliday ? '' : 'H',
+                                    changed: true
+                                  }
+                                }
+                                next[empId] = empGrid
+                              }
+                              setHasChanges(true)
+                              return next
+                            })
+                          }}
+                          title="Click to toggle Holiday"
                         >
                           <div>{day}</div>
                           <div className="text-[7px] font-normal">
-                            {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'][dow]}
+                            {isHoliday ? 'Holi' : ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'][dow]}
                           </div>
                         </TableHead>
                       )
                     })}
-                    <TableHead className="text-[9px] text-center sticky right-0 bg-card z-10 min-w-[56px]">Present</TableHead>
-                    <TableHead className="text-[9px] text-center sticky right-0 bg-card z-10 min-w-[56px]">Absent</TableHead>
-                    <TableHead className="text-[9px] text-center sticky right-0 bg-card z-10 min-w-[56px]">Leave</TableHead>
-                    <TableHead className="text-[9px] text-center sticky right-0 bg-card z-10 min-w-[56px]">SC-Earn</TableHead>
-                    <TableHead className="text-[9px] text-center sticky right-0 bg-card z-10 min-w-[56px]">SC-De</TableHead>
-                    <TableHead className="text-[9px] text-center sticky right-0 bg-card z-10 min-w-[100px]">Projects</TableHead>
+                    <TableHead className="text-[9px] text-center sticky top-0 bg-card z-20 min-w-[56px]">Present</TableHead>
+                    <TableHead className="text-[9px] text-center sticky top-0 bg-card z-20 min-w-[56px]">Absent</TableHead>
+                    <TableHead className="text-[9px] text-center sticky top-0 bg-card z-20 min-w-[56px]">Leave</TableHead>
+                    <TableHead className="text-[9px] text-center sticky top-0 bg-card z-20 min-w-[56px]">SC-Earn</TableHead>
+                    <TableHead className="text-[9px] text-center sticky top-0 bg-card z-20 min-w-[56px]">SC-De</TableHead>
+                    <TableHead className="text-[9px] text-center sticky top-0 bg-card z-20 min-w-[100px]">Projects</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -902,12 +964,27 @@ export function AttendanceModule() {
                     const hasOnlyUnallocated = projectLines.length === 1 && projectLines[0].short === 'Unalloc'
                     const showDash = projectLines.length === 0 || hasOnlyUnallocated
 
+                    let coCount = 0
+                    for (let day = 1; day <= daysInMonth; day++) {
+                      const s = empGrid[day]?.status
+                      if (s && ['PW', 'TW', 'WHW', 'PH', 'TH', 'WHH'].includes(s)) {
+                        coCount++
+                      }
+                    }
+
                     return (
-                      <TableRow key={emp.id}>
-                        <TableCell className="text-xs sticky left-0 bg-card z-10 min-w-[140px]">
+                      <TableRow key={emp.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
+                        <TableCell className="text-xs sticky left-0 bg-card z-10 min-w-[140px] border-r shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
                           <div>
-                            <p className="font-medium text-[11px] truncate">{emp.name}</p>
-                            <p className="text-[9px] text-muted-foreground">{emp.employeeCode}</p>
+                            <p className="font-semibold text-[11px] truncate text-foreground">{emp.name}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[9px] text-muted-foreground">{emp.employeeCode}</span>
+                              {coCount > 0 && (
+                                <Badge className="text-[8px] h-3.5 px-1 bg-amber-100 text-amber-800 border-amber-200">
+                                  CO: {coCount}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </TableCell>
                         {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
@@ -925,7 +1002,13 @@ export function AttendanceModule() {
                           return (
                             <TableCell
                               key={day}
-                              className={`p-0 text-center cursor-pointer select-none relative ${isWeekend ? 'bg-orange-50/30' : ''}`}
+                              className={`p-0 text-center cursor-pointer select-none relative ${
+                                holidays.includes(day)
+                                  ? 'bg-blue-50/20 dark:bg-blue-950/10 border-x border-blue-100/30'
+                                  : isWeekend
+                                    ? 'bg-orange-50/30'
+                                    : ''
+                              }`}
                               onClick={() => handleCellClick(emp.id, day)}
                               title={status ? `${STATUS_LABELS[status]} (${status})${project && showsProject ? ` - ${project}` : ''}${changed ? ' - Modified' : ''}` : 'Click to set status'}
                             >
@@ -1011,12 +1094,12 @@ export function AttendanceModule() {
                             </TableCell>
                           )
                         })}
-                        <TableCell className="text-[10px] text-center font-bold text-green-700 sticky right-0 bg-card z-10">{present}</TableCell>
-                        <TableCell className="text-[10px] text-center font-bold text-red-700 sticky right-0 bg-card z-10">{absent}</TableCell>
-                        <TableCell className="text-[10px] text-center font-bold text-amber-700 sticky right-0 bg-card z-10">{leave}</TableCell>
-                        <TableCell className="text-[10px] text-center font-bold text-emerald-700 sticky right-0 bg-card z-10">{scEarn}</TableCell>
-                        <TableCell className="text-[10px] text-center font-bold text-orange-700 sticky right-0 bg-card z-10">{scDeduct}</TableCell>
-                        <TableCell className="text-[10px] text-left sticky right-0 bg-card z-10 min-w-[100px]">
+                        <TableCell className="text-[10px] text-center font-bold text-green-700">{present}</TableCell>
+                        <TableCell className="text-[10px] text-center font-bold text-red-700">{absent}</TableCell>
+                        <TableCell className="text-[10px] text-center font-bold text-amber-700">{leave}</TableCell>
+                        <TableCell className="text-[10px] text-center font-bold text-emerald-700">{scEarn}</TableCell>
+                        <TableCell className="text-[10px] text-center font-bold text-orange-700">{scDeduct}</TableCell>
+                        <TableCell className="text-[10px] text-left min-w-[100px]">
                           {showDash ? (
                             <span className="text-slate-400">—</span>
                           ) : (
@@ -1042,7 +1125,7 @@ export function AttendanceModule() {
                 </TableBody>
               </Table>
             </div>
-          </ScrollArea>
+          </div>
         </Card>
       )}
 
@@ -1078,10 +1161,10 @@ export function AttendanceModule() {
                 disabled={!selectedEmployeeId}
                 onClick={() => {
                   if (!selectedEmployeeId) return
-                  const isBillable = BILLABLE_STATUSES.has(s)
+                  const needsProject = PROJECT_REQUIRED_STATUSES.has(s)
                   const employeeProjects = getEmployeeProjects(selectedEmployeeId)
 
-                  if (isBillable && employeeProjects.length > 1) {
+                  if (needsProject && employeeProjects.length > 1) {
                     // Multi-project: show picker instead of immediately filling
                     setQuickFillProjectPicker({
                       employeeId: selectedEmployeeId,
@@ -1099,7 +1182,7 @@ export function AttendanceModule() {
                       let projectValue: string | null = null
                       let projectIdValue: string | null = null
                       let autoAssigned = false
-                      if (isBillable) {
+                      if (needsProject) {
                         if (employeeProjects.length === 1) {
                           projectValue = employeeProjects[0].project.name
                           projectIdValue = employeeProjects[0].projectId
@@ -1123,9 +1206,9 @@ export function AttendanceModule() {
                     return newGrid
                   })
                   setHasChanges(true)
-                  if (isBillable && employeeProjects.length === 1) {
+                  if (needsProject && employeeProjects.length === 1) {
                     toast({ title: 'Auto-assigned', description: `Auto-assigned to ${employeeProjects[0].project.name}` })
-                  } else if (isBillable && employeeProjects.length === 0) {
+                  } else if (needsProject && employeeProjects.length === 0) {
                     toast({ title: 'Warning', description: 'No active project assignment found', variant: 'destructive' })
                   }
                 }}
@@ -1310,6 +1393,74 @@ export function AttendanceModule() {
               {bulkFillApplying ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Play className="h-3.5 w-3.5 mr-1" />}
               Apply
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Holiday configuration Dialog ── */}
+      <Dialog open={holidayDialogOpen} onOpenChange={setHolidayDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-sm flex items-center gap-2">
+              <Clock className="h-4 w-4 text-blue-600" />
+              Configure Holidays for {formatMonthLabel(selectedMonth)}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              Select the days of the month that are public holidays. Tip: You can also toggle holidays by directly clicking the day numbers in the table header!
+            </p>
+            <div className="grid grid-cols-7 gap-2">
+              {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
+                const dow = getDayOfWeek(selectedMonth, day)
+                const isWeekend = dow === 0 || dow === 6
+                const isSelected = holidays.includes(day)
+                return (
+                  <Button
+                    key={day}
+                    variant={isSelected ? 'default' : 'outline'}
+                    size="sm"
+                    className={`h-9 w-full text-xs font-semibold ${
+                      isSelected
+                        ? 'bg-blue-100 hover:bg-blue-200 text-blue-800 border-blue-300'
+                        : isWeekend
+                          ? 'border-orange-200 text-orange-600 bg-orange-50/10'
+                          : ''
+                    }`}
+                    onClick={() => {
+                      const updated = isSelected
+                        ? holidays.filter(d => d !== day)
+                        : [...holidays, day]
+                      saveHolidays(updated)
+
+                      // Toggle default status to H for empty or default statuses
+                      setGridData(prev => {
+                        const next = { ...prev }
+                        for (const empId of Object.keys(next)) {
+                          const empGrid = { ...next[empId] }
+                          const currentDay = empGrid[day] || {}
+                          if (!currentDay.status || currentDay.status === 'P' || currentDay.status === 'A' || currentDay.status === '') {
+                            empGrid[day] = {
+                              ...currentDay,
+                              status: isSelected ? '' : 'H',
+                              changed: true
+                            }
+                          }
+                          next[empId] = empGrid
+                        }
+                        setHasChanges(true)
+                        return next
+                      })
+                    }}
+                  >
+                    {day}
+                  </Button>
+                )
+              })}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button size="sm" onClick={() => setHolidayDialogOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -52,6 +52,7 @@ export async function GET(
   }
 }
 
+
 // DELETE: Remove an attachment
 export async function DELETE(
   request: Request,
@@ -59,7 +60,9 @@ export async function DELETE(
 ) {
   try {
     const { id, attachmentId } = await params
+    const { searchParams } = new URL(request.url)
     const systemUserId = await getSystemUserId()
+    const userId = searchParams.get('userId') || systemUserId
 
     const attachment = await db.voucherAttachment.findUnique({
       where: { id: attachmentId },
@@ -94,7 +97,7 @@ export async function DELETE(
     try {
       await db.auditLog.create({
         data: {
-          userId: systemUserId,
+          userId: userId,
           action: 'DELETE',
           entity: 'VoucherAttachment',
           entityId: attachmentId,

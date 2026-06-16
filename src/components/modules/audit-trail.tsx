@@ -25,6 +25,8 @@ interface AuditLog {
   entityId?: string | null
   entityName?: string | null
   details?: unknown
+  oldValues?: unknown
+  newValues?: unknown
   ipAddress?: string | null
   userAgent?: string | null
   sessionId?: string | null
@@ -125,6 +127,72 @@ function AuditDetailDrawer({ log, onClose }: { log: AuditLog; onClose: () => voi
 
   const displayName = log.user?.name || log.username || 'System'
 
+  const renderValueDiff = () => {
+    if (!log.oldValues && !log.newValues) return null
+
+    const formatVal = (val: any): string => {
+      if (val === null || val === undefined) return '—'
+      if (typeof val === 'boolean') return val ? 'Yes' : 'No'
+      if (typeof val === 'object') return JSON.stringify(val)
+      return String(val)
+    }
+
+    let oldObj: Record<string, any> = {}
+    let newObj: Record<string, any> = {}
+    try {
+      oldObj = typeof log.oldValues === 'string' ? JSON.parse(log.oldValues) : log.oldValues || {}
+    } catch {
+      oldObj = (log.oldValues as Record<string, any>) || {}
+    }
+    try {
+      newObj = typeof log.newValues === 'string' ? JSON.parse(log.newValues) : log.newValues || {}
+    } catch {
+      newObj = (log.newValues as Record<string, any>) || {}
+    }
+
+    const allKeys = Array.from(new Set([...Object.keys(oldObj), ...Object.keys(newObj)]))
+      .filter(k => k !== 'updatedAt' && k !== 'createdAt' && k !== 'id')
+
+    const changes = allKeys.map(key => {
+      const oldVal = oldObj[key]
+      const newVal = newObj[key]
+      const isChanged = JSON.stringify(oldVal) !== JSON.stringify(newVal)
+      return { key, oldVal, newVal, isChanged }
+    }).filter(c => c.isChanged)
+
+    if (changes.length === 0) return null
+
+    return (
+      <div className="space-y-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Value Changes (Diff)</p>
+        <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-semibold text-slate-500 uppercase">
+                <th className="px-3 py-1.5">Field</th>
+                <th className="px-3 py-1.5">Before</th>
+                <th className="px-3 py-1.5">After</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {changes.map(c => (
+                <tr key={c.key} className="hover:bg-slate-50/50">
+                  <td className="px-3 py-2 font-medium text-slate-700 capitalize">{c.key.replace(/([A-Z])/g, ' $1')}</td>
+                  <td className="px-3 py-2 font-mono text-[11px] text-red-600 bg-red-50/30 line-through decoration-red-400/50">
+                    {formatVal(c.oldVal)}
+                  </td>
+                  <td className="px-3 py-2 font-mono text-[11px] text-emerald-700 bg-emerald-50/30 font-semibold">
+                    {formatVal(c.newVal)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
@@ -190,6 +258,9 @@ function AuditDetailDrawer({ log, onClose }: { log: AuditLog; onClose: () => voi
               </div>
             </div>
 
+            {/* Value Changes Diff */}
+            {renderValueDiff()}
+
             {/* Payload */}
             {log.details && (
               <div>
@@ -235,6 +306,7 @@ export function AuditTrail() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [showFilters, setShowFilters] = useState(false)
+  const [severityCounts, setSeverityCounts] = useState<{ critical?: number; warning?: number; info?: number }>({})
 
   const fetchLogs = useCallback(async (p = 1) => {
     setLoading(true)
@@ -247,10 +319,11 @@ export function AuditTrail() {
       if (dateTo) params.set('dateTo', dateTo)
       const res = await fetch(`/api/audit?${params}`)
       if (!res.ok) throw new Error('Failed')
-      const data: AuditResponse = await res.json()
+      const data: AuditResponse & { meta?: { severitySummary?: Record<string, number> } } = await res.json()
       setLogs(data.data || [])
       setTotalPages(data.pagination?.totalPages || 1)
       setTotal(data.pagination?.total || 0)
+      setSeverityCounts(data.meta?.severitySummary || {})
     } catch {
       toast({ title: 'Error', description: 'Failed to load audit trail', variant: 'destructive' })
     } finally {
@@ -317,9 +390,9 @@ export function AuditTrail() {
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KpiCard label="Total Events" value={total} icon={<FileText className="w-4 h-4" />} color="#1A7A4A" bg="#F0FDF4" />
-          <KpiCard label="Critical" value={criticalCount} icon={<AlertCircle className="w-4 h-4" />} color="#DC2626" bg="#FEF2F2" />
-          <KpiCard label="Warnings" value={warningCount} icon={<AlertTriangle className="w-4 h-4" />} color="#D97706" bg="#FFFBEB" />
-          <KpiCard label="Info" value={infoCount} icon={<Info className="w-4 h-4" />} color="#2563EB" bg="#EFF6FF" />
+          <KpiCard label="Critical" value={severityCounts.critical || 0} icon={<AlertCircle className="w-4 h-4" />} color="#DC2626" bg="#FEF2F2" />
+          <KpiCard label="Warnings" value={severityCounts.warning || 0} icon={<AlertTriangle className="w-4 h-4" />} color="#D97706" bg="#FFFBEB" />
+          <KpiCard label="Info" value={severityCounts.info || 0} icon={<Info className="w-4 h-4" />} color="#2563EB" bg="#EFF6FF" />
         </div>
 
         {/* Search & Filters */}

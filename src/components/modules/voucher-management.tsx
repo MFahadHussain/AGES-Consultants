@@ -20,6 +20,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { numberToWords } from '@/lib/number-to-words'
 import { AccountCombobox, type AccountOption } from '@/components/ui/account-combobox'
+import { useAppStore } from '@/lib/store'
 
 const voucherTypes = [
   { value: 'BP', label: 'Bank Payment', color: 'bg-red-100 text-red-800' },
@@ -208,6 +209,7 @@ const defaultForm = {
 }
 
 export function VoucherManagement() {
+  const { authUser } = useAppStore()
   const [vouchers, setVouchers] = useState<Voucher[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [projects, setProjects] = useState<any[]>([])
@@ -342,7 +344,7 @@ export function VoucherManagement() {
       const res = await fetch(`/api/vouchers/${voucherId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, comments, userRole: currentRole }),
+        body: JSON.stringify({ action, comments, userRole: currentRole, userId: authUser?.id }),
       })
       const result = await res.json()
       if (!res.ok) {
@@ -411,7 +413,7 @@ export function VoucherManagement() {
           autoPost: form.autoPost && hasPermission('quick_post', currentRole), entries: validEntries, financialYearId: activeFy.id,
           voucherTypeName: voucherTypes.find(v => v.value === form.voucherType)?.label,
           projectId: form.projectId || undefined, donorId: form.donorId || undefined,
-          locationId: form.locationId || undefined, clientId: form.clientId || undefined, userRole: currentRole,
+          locationId: form.locationId || undefined, clientId: form.clientId || undefined, userRole: currentRole, userId: authUser?.id,
         }),
       })
       const result = await res.json()
@@ -471,7 +473,7 @@ export function VoucherManagement() {
           chequeDate: form.chequeDate || null, voucherNo: form.voucherNo || null,
           amountInWords: form.amountInWords || autoAmountInWords || null,
           projectId: form.projectId || null, donorId: form.donorId || null,
-          locationId: form.locationId || null, clientId: form.clientId || null, entries: validEntries, userRole: currentRole,
+          locationId: form.locationId || null, clientId: form.clientId || null, entries: validEntries, userRole: currentRole, userId: authUser?.id,
         }),
       })
       const result = await res.json()
@@ -495,7 +497,7 @@ export function VoucherManagement() {
     if (!deleteVoucherId) return
     setDeleting(true)
     try {
-      const res = await fetch(`/api/vouchers/${deleteVoucherId}`, { method: 'DELETE' })
+      const res = await fetch(`/api/vouchers/${deleteVoucherId}?userId=${authUser?.id || ''}`, { method: 'DELETE' })
       const result = await res.json()
       if (!res.ok) { toast({ title: 'Error', description: result.error, variant: 'destructive' }); setDeleting(false); return }
       toast({ title: 'Voucher Deleted', description: `Voucher ${deleteVoucherNumber} has been deleted` })
@@ -538,6 +540,7 @@ export function VoucherManagement() {
       const formData = new FormData()
       for (let i = 0; i < files.length; i++) formData.append('files', files[i])
       formData.append('category', attachmentCategory)
+      formData.append('uploadedBy', authUser?.id || '')
       const res = await fetch(`/api/vouchers/${voucherId}/attachments`, { method: 'POST', body: formData })
       const result = await res.json()
       if (!res.ok) { toast({ title: 'Upload Error', description: result.error, variant: 'destructive' }); setUploadingFiles(false); return }
@@ -552,7 +555,7 @@ export function VoucherManagement() {
 
   const handleAttachmentDelete = async (voucherId: string, attachmentId: string) => {
     try {
-      const res = await fetch(`/api/vouchers/${voucherId}/attachments/${attachmentId}`, { method: 'DELETE' })
+      const res = await fetch(`/api/vouchers/${voucherId}/attachments/${attachmentId}?userId=${authUser?.id || ''}`, { method: 'DELETE' })
       if (!res.ok) { const err = await res.json(); toast({ title: 'Error', description: err.error, variant: 'destructive' }); return }
       toast({ title: 'Attachment Deleted', description: 'File has been removed' })
       if (detailOpen) {

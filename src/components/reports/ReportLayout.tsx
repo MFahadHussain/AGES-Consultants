@@ -48,15 +48,29 @@ export default function ReportLayout({
   return (
     <div className="w-full">
       {/* Header */}
-      <div className="text-center mb-6">
-        <h1 className="text-xl font-bold tracking-tight">{companyName}</h1>
-        <h2 className="text-lg font-semibold mt-1">{reportTitle}</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          For the period {periodString}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          {displayProjectName}
-        </p>
+      <div className="mb-8 relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/20 p-8 text-center shadow-sm print:shadow-none print:border-b-4 print:border-t-0 print:border-x-0 print:border-primary/80 print:rounded-none print:bg-transparent print:p-6 print:mb-8">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background/0 to-background/0 print:hidden" />
+        <div className="relative z-10">
+          <Badge variant="outline" className="mb-4 text-primary border-primary/30 bg-primary/10 uppercase tracking-widest text-[10px] print:hidden px-3 py-1">
+            Official Financial Statement
+          </Badge>
+          <h1 className="text-3xl font-extrabold tracking-tight text-primary print:text-4xl">
+            {companyName}
+          </h1>
+          <h2 className="text-xl font-bold mt-2 text-foreground/90 uppercase tracking-wider print:text-foreground">
+            {reportTitle}
+          </h2>
+          <div className="mt-5 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-sm">
+            <div className="flex items-center gap-2 text-muted-foreground bg-background/60 backdrop-blur-md px-4 py-1.5 rounded-full border border-border/50 shadow-sm print:border print:border-border print:bg-transparent print:rounded-md print:px-4 print:py-1 print:shadow-none">
+              <span className="w-2 h-2 rounded-full bg-primary/60 animate-pulse print:hidden" />
+              <span>Period: <strong className="text-foreground">{periodString}</strong></span>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground bg-background/60 backdrop-blur-md px-4 py-1.5 rounded-full border border-border/50 shadow-sm print:border print:border-border print:bg-transparent print:rounded-md print:px-4 print:py-1 print:shadow-none">
+              <span className="w-2 h-2 rounded-full bg-primary/60 print:hidden" />
+              <span>Project: <strong className="text-foreground">{displayProjectName}</strong></span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Validation Banner */}

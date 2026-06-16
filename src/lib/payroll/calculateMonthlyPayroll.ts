@@ -27,14 +27,14 @@ import { db } from '@/lib/db'
 
 // ── Status Classification ──────────────────────────────────────────────────
 
-/** Statuses that earn salary (paid days) — includes leave days */
-const PAID_STATUSES = new Set(['P', 'W', 'H', 'WH', 'T', 'CO', 'SL', 'EL', 'CL'])
+/** Statuses that earn salary (paid days) — includes leave days and now absents */
+const PAID_STATUSES = new Set(['P', 'W', 'H', 'WH', 'T', 'CO', 'SL', 'EL', 'CL', 'PW', 'TW', 'WHW', 'PH', 'TH', 'WHH', 'A', 'CD'])
 
 /** Statuses eligible for salary + SC earning (legacy compat) */
-const ELIGIBLE_STATUSES = new Set(['P', 'W', 'H', 'T', 'WH', 'WW', 'CL', 'SL', 'EL', 'HP'])
+const ELIGIBLE_STATUSES = new Set(['P', 'W', 'H', 'T', 'WH', 'WW', 'CL', 'SL', 'EL', 'HP', 'PW', 'TW', 'WHW', 'PH', 'TH', 'WHH', 'A', 'CD'])
 
 /** SC EARN statuses — leave days (SL, CL, EL) are PAID but do NOT earn SC */
-const SC_EARN_STATUSES = new Set(['P', 'W', 'H', 'WH', 'T', 'CO'])
+const SC_EARN_STATUSES = new Set(['P', 'W', 'H', 'WH', 'T', 'CO', 'PW', 'TW', 'WHW', 'PH', 'TH', 'WHH'])
 
 /** Leave statuses that are paid but NOT SC eligible */
 const LEAVE_STATUSES_PAID = new Set(['CL', 'SL', 'EL'])
@@ -43,10 +43,10 @@ const LEAVE_STATUSES_PAID = new Set(['CL', 'SL', 'EL'])
 const LEAVE_STATUSES = new Set(['CL', 'SL', 'EL'])
 
 /** Paid non-billable statuses (salary continues, no project required) */
-const PAID_NON_BILLABLE = new Set(['W', 'HP', 'CL', 'SL', 'EL', 'T'])
+const PAID_NON_BILLABLE = new Set(['HP', 'CL', 'SL', 'EL', 'A', 'CD'])
 
 /** Statuses that are billable and require a project assignment */
-const BILLABLE_STATUSES = new Set(['P', 'WH', 'WW', 'CO'])
+const BILLABLE_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO', 'PW', 'TW', 'WHW', 'PH', 'TH', 'WHH'])
 
 // ── SC Rate Constants ──────────────────────────────────────────────────────
 
@@ -324,6 +324,98 @@ export async function calculateMonthlyPayroll(
   const monthStart = new Date(Date.UTC(year, mon - 1, 1))
   const monthEnd = new Date(Date.UTC(year, mon - 1, calendarDays, 23, 59, 59, 999))
 
+  // Fetch active project assignments (contracts) early
+  const projectAssignments = await db.employeeProjectAssignment.findMany({
+    where: {
+      employeeId,
+      isActive: true,
+      startDate: { lte: monthEnd },
+      OR: [
+        { endDate: null },
+        { endDate: { gte: monthStart } },
+      ],
+    },
+    select: {
+      id: true,
+      projectId: true,
+      salaryAmount: true,
+      role: true,
+      project: { select: { id: true, code: true, name: true } },
+    },
+  })
+
+  // Calculate the effective contracted base salary (sum of project assignment salaries or fallback to employee.baseSalary)
+  const effectiveBaseSalary = projectAssignments.length > 0
+    ? projectAssignments.reduce((sum, pa) => sum + (pa.salaryAmount || employee.baseSalary), 0)
+    : employee.baseSalary
+
+  // Fetch active allowances for inclusive base salary reverse-calculation
+  const activeEmpAllowances = await db.employeeAllowance.findMany({
+    where: {
+      employeeId,
+      isActive: true,
+      effectiveDate: { lte: monthEnd },
+    },
+    include: { allowance: true },
+  })
+
+  // Sum up all inclusive percentage-based allowances
+  const totalInclusivePercentage = activeEmpAllowances
+    .filter(ea => ea.allowance.isActive && ea.allowance.allowanceType === 'percentage' && ea.allowance.isInclusive)
+    .reduce((sum, ea) => {
+      const val = ea.customValue !== null && ea.customValue !== undefined
+        ? Number(ea.customValue)
+        : Number(ea.allowance.value)
+      return sum + val
+    }, 0)
+
+  // Reverse-calculate true Basic Salary if there are inclusive allowances
+  const baseSalaryForCalculations = totalInclusivePercentage > 0
+    ? effectiveBaseSalary / (1 + (totalInclusivePercentage / 100))
+    : effectiveBaseSalary
+
+  // Sum up all allowance amounts that are enabled for Social Charges
+  let scAllowanceSum = 0
+
+  // Pre-calculate Medical Allowance (code: 'MED') for SC base if present
+  let scMedAmount = 0
+  const scMed = activeEmpAllowances.find(ea => ea.allowance.code === 'MED' && ea.allowance.isActive)
+  if (scMed) {
+    const medVal = scMed.customValue !== null && scMed.customValue !== undefined
+      ? Number(scMed.customValue)
+      : Number(scMed.allowance.value)
+    
+    if (scMed.allowance.allowanceType === 'percentage') {
+      scMedAmount = Math.round((baseSalaryForCalculations * medVal) / 100)
+    } else {
+      scMedAmount = Math.round(medVal)
+    }
+  }
+
+  for (const ea of activeEmpAllowances) {
+    if (ea.allowance.isActive) {
+      const val = ea.customValue !== null && ea.customValue !== undefined
+        ? Number(ea.customValue)
+        : Number(ea.allowance.value)
+      
+      let allowanceAmount = val
+      if (ea.allowance.allowanceType === 'percentage') {
+        if (ea.allowance.code === 'Field') {
+          const baseForField = baseSalaryForCalculations + scMedAmount
+          allowanceAmount = Math.round((baseForField * val) / 100)
+        } else {
+          allowanceAmount = Math.round((baseSalaryForCalculations * val) / 100)
+        }
+      } else {
+        allowanceAmount = Math.round(allowanceAmount)
+      }
+      
+      if (ea.allowance.isSocialCharges) {
+        scAllowanceSum += allowanceAmount
+      }
+    }
+  }
+
   // ── 2. Fetch all attendance records for this month ──
   const attendance = await db.attendance.findMany({
     where: {
@@ -346,7 +438,7 @@ export async function calculateMonthlyPayroll(
   const eligibleDays = attendance.filter(a => ELIGIBLE_STATUSES.has(a.status)).length
   const leaveDays = attendance.filter(a => LEAVE_STATUSES.has(a.status)).length
   const absentDays = attendance.filter(a => a.status === 'A' || a.status === 'CD').length
-  const payableDays = calendarDays - absentDays
+  const payableDays = calendarDays // no deduction on absent
 
   // FIX 1: Separate paid days and SC-eligible days
   // SL, CL, EL are PAID (employee gets salary) but NOT SC eligible
@@ -355,24 +447,7 @@ export async function calculateMonthlyPayroll(
   const leaveDaysPaid = attendance.filter(a => LEAVE_STATUSES_PAID.has(a.status)).length
 
   // ── 5. Fetch active project assignments (contracts) ──
-  const projectAssignments = await db.employeeProjectAssignment.findMany({
-    where: {
-      employeeId,
-      isActive: true,
-      startDate: { lte: monthEnd },
-      OR: [
-        { endDate: null },
-        { endDate: { gte: monthStart } },
-      ],
-    },
-    select: {
-      id: true,
-      projectId: true,
-      salaryAmount: true,
-      role: true,
-      project: { select: { id: true, code: true, name: true } },
-    },
-  })
+  // (Reused from Step 1 early fetch)
 
   // ── 6. MULTI-CONTRACT EARNINGS CALCULATION ──
 
@@ -397,7 +472,10 @@ export async function calculateMonthlyPayroll(
     // Each assignment is a contract with its own salary
 
     for (const assignment of projectAssignments) {
-      const contractSalary = assignment.salaryAmount || employee.baseSalary
+      const contractSalaryOriginal = assignment.salaryAmount || employee.baseSalary
+      const contractSalary = totalInclusivePercentage > 0
+        ? contractSalaryOriginal / (1 + (totalInclusivePercentage / 100))
+        : contractSalaryOriginal
       const dailyRate = roundPKR(contractSalary / calendarDays)
       const daysWorked = projectDaysMap[assignment.projectId] || 0
       const earnedSalary = roundPKR(dailyRate * daysWorked)
@@ -450,7 +528,7 @@ export async function calculateMonthlyPayroll(
     for (const [pId, days] of Object.entries(projectDaysMap)) {
       if (!assignedProjectIds.has(pId)) {
         // Project has attendance but no contract — use base salary
-        const fallbackDailyRate = roundPKR(employee.baseSalary / calendarDays)
+        const fallbackDailyRate = roundPKR(baseSalaryForCalculations / calendarDays)
         const earnedSalary = roundPKR(fallbackDailyRate * days)
 
         // Fetch project details
@@ -464,7 +542,7 @@ export async function calculateMonthlyPayroll(
           projectId: pId,
           projectName: proj?.name || 'Unknown',
           projectCode: proj?.code || 'UNK',
-          contractSalary: employee.baseSalary,
+          contractSalary: baseSalaryForCalculations,
           dailyRate: fallbackDailyRate,
           daysWorked: days,
           earnedSalary,
@@ -489,7 +567,7 @@ export async function calculateMonthlyPayroll(
     if (paidNonBillableDays > 0 && totalContractEarnings > 0) {
       const avgDailyRate = totalBillableDaysInContracts > 0
         ? roundPKR(totalContractEarnings / totalBillableDaysInContracts)
-        : roundPKR(employee.baseSalary / calendarDays)
+        : roundPKR(baseSalaryForCalculations / calendarDays)
 
       // Add non-billable pay to each contract proportionally
       const nonBillablePay = roundPKR(avgDailyRate * paidNonBillableDays)
@@ -515,8 +593,8 @@ export async function calculateMonthlyPayroll(
   } else {
     // ── Single-Salary Mode (no project assignments) ──
     // Fall back to the original formula: (base / calendar) × payable
-    const dailyRate = roundPKR(employee.baseSalary / calendarDays)
-    const earnedSalary = roundPKR((employee.baseSalary / calendarDays) * payableDays)
+    const dailyRate = roundPKR(baseSalaryForCalculations / calendarDays)
+    const earnedSalary = roundPKR((baseSalaryForCalculations / calendarDays) * payableDays)
 
     // If there ARE daily project records, create contract earnings per project
     if (Object.keys(projectDaysMap).length > 0) {
@@ -541,7 +619,7 @@ export async function calculateMonthlyPayroll(
           projectId: pId,
           projectName: projectMap.get(pId)?.name || 'Unknown',
           projectCode: projectMap.get(pId)?.code || 'UNK',
-          contractSalary: employee.baseSalary,
+          contractSalary: baseSalaryForCalculations,
           dailyRate,
           daysWorked: days,
           earnedSalary: salaryShare,
@@ -571,7 +649,7 @@ export async function calculateMonthlyPayroll(
         projectId: employee.defaultProjectId || 'NO-PROJECT',
         projectName: 'Default',
         projectCode: 'DEF',
-        contractSalary: employee.baseSalary,
+        contractSalary: baseSalaryForCalculations,
         dailyRate,
         daysWorked: payableDays,
         earnedSalary,
@@ -594,7 +672,7 @@ export async function calculateMonthlyPayroll(
   // Weighted average daily rate (for backward compat)
   const dailyRate = totalBillableDays > 0
     ? roundPKR(totalContractEarnings / totalBillableDays)
-    : roundPKR(employee.baseSalary / calendarDays)
+    : roundPKR(baseSalaryForCalculations / calendarDays)
 
   // ── 7. SC Calculation (FIX 1 + FIX 2) ──
   // FIX 1: SL, CL, EL are PAID but NOT SC eligible
@@ -631,7 +709,10 @@ export async function calculateMonthlyPayroll(
     const nonBillableScDays = Math.max(0, scEligDays - totalBillableScDays)
 
     for (const assignment of projectAssignments) {
-      const contractSalary = assignment.salaryAmount || employee.baseSalary
+      const contractSalaryOriginal = assignment.salaryAmount || employee.baseSalary
+      const contractSalary = totalInclusivePercentage > 0
+        ? contractSalaryOriginal / (1 + (totalInclusivePercentage / 100))
+        : contractSalaryOriginal
       const projectBillableScDays = projectScEligMap[assignment.projectId] || 0
 
       // Distribute non-billable SC days proportionally across projects
@@ -641,7 +722,13 @@ export async function calculateMonthlyPayroll(
 
       const projectScEligDaysVal = projectBillableScDays + projectNonBillableScShare
       const projectRatio = calendarDays > 0 ? projectScEligDaysVal / calendarDays : 0
-      const projectScBaseVal = roundPKR(contractSalary * projectRatio)
+
+      // Distribute social charge enabled allowances proportionally based on project contract salary
+      const projectScAllowanceShare = baseSalaryForCalculations > 0
+        ? (scAllowanceSum * contractSalary) / baseSalaryForCalculations
+        : 0
+
+      const projectScBaseVal = roundPKR((contractSalary + projectScAllowanceShare) * projectRatio)
       const projectSCVal = roundPKR(projectScBaseVal * SC_RATE)
 
       projectScDetails.push({
@@ -660,9 +747,9 @@ export async function calculateMonthlyPayroll(
     const assignedProjectIds = new Set(projectAssignments.map(a => a.projectId))
     for (const [pId, billableScDays] of Object.entries(projectScEligMap)) {
       if (!assignedProjectIds.has(pId)) {
-        const fallbackSalary = employee.baseSalary
+        const fallbackSalary = baseSalaryForCalculations
         const projectRatio = calendarDays > 0 ? billableScDays / calendarDays : 0
-        const projectScBaseVal = roundPKR(fallbackSalary * projectRatio)
+        const projectScBaseVal = roundPKR((fallbackSalary + scAllowanceSum) * projectRatio)
         const projectSCVal = roundPKR(projectScBaseVal * SC_RATE)
 
         const proj = await db.project.findUnique({ where: { id: pId }, select: { name: true } })
@@ -684,7 +771,7 @@ export async function calculateMonthlyPayroll(
 
   } else {
     // ── Single-Salary SC: global attendance ratio ──
-    scBase = roundPKR(monthlySalary * attendanceRatio)
+    scBase = roundPKR((monthlySalary + scAllowanceSum) * attendanceRatio)
     finalSC = roundPKR(scBase * SC_RATE)
   }
 
@@ -814,33 +901,48 @@ export async function calculateMonthlyPayroll(
   }
 
   // ── 11. Allowances ──
-  const empAllowances = await db.employeeAllowance.findMany({
-    where: {
-      employeeId,
-      isActive: true,
-      effectiveDate: { lte: monthEnd },
-    },
-    include: { allowance: true },
-  })
+  const empAllowances = activeEmpAllowances
 
   const allowanceDetails: { allowanceId: string; name: string; amount: number; isTaxable: boolean }[] = []
   let totalAllowances = 0
   let taxFreeAllowances = 0
 
+  // Pre-calculate Medical Allowance (code: 'MED') for correct combined base calculations if present
+  let precalculatedMedicalAmount = 0
+  const medAllowance = empAllowances.find(ea => ea.allowance.code === 'MED')
+  if (medAllowance) {
+    const medVal = medAllowance.customValue !== null && medAllowance.customValue !== undefined
+      ? Number(medAllowance.customValue)
+      : Number(medAllowance.allowance.value)
+    
+    if (medAllowance.allowance.allowanceType === 'percentage') {
+      precalculatedMedicalAmount = Math.round((monthlySalary * medVal) / 100)
+    } else {
+      precalculatedMedicalAmount = Math.round(medVal)
+    }
+  }
+
   for (const ea of empAllowances) {
     const amount = ea.customValue !== null && ea.customValue !== undefined
-      ? ea.customValue
-      : ea.allowance.value
+      ? Number(ea.customValue)
+      : Number(ea.allowance.value)
 
     let finalAmount = amount
     if (ea.allowance.allowanceType === 'percentage') {
-      finalAmount = (monthlySalary * amount) / 100
+      if (ea.allowance.code === 'Field') {
+        const baseForField = monthlySalary + precalculatedMedicalAmount
+        finalAmount = Math.round((baseForField * amount) / 100)
+      } else {
+        finalAmount = Math.round((monthlySalary * amount) / 100)
+      }
+    } else {
+      finalAmount = Math.round(finalAmount)
     }
 
     allowanceDetails.push({
       allowanceId: ea.allowanceId,
       name: ea.allowance.name,
-      amount: roundPKR(finalAmount),
+      amount: finalAmount,
       isTaxable: ea.allowance.isTaxable,
     })
 
@@ -897,7 +999,7 @@ export async function calculateMonthlyPayroll(
   if (employee.incomeTaxEnabled !== false && grossSalary > 0) {
     const fy = getFiscalYear(monthStart)
 
-    // Get YTD gross salary from previous payroll lines in this FY
+    // Get YTD payroll lines in this FY
     const ytdLines = await db.payrollBatchLine.findMany({
       where: {
         employeeId,
@@ -906,7 +1008,10 @@ export async function calculateMonthlyPayroll(
       include: { batch: { select: { period: true } } },
     })
 
+    const taxableIncome = roundPKR(grossSalary - taxFreeAllowances)
+
     let ytdIncome = 0
+    let ytdTaxableIncome = 0
     let monthsWorkedYtd = 0
     const processedPeriods = new Set<string>()
 
@@ -918,7 +1023,26 @@ export async function calculateMonthlyPayroll(
 
       if (lineDate >= fy.fyStart && lineDate <= fy.fyEnd) {
         if (linePeriod === `${year}-${String(mon).padStart(2, '0')}`) continue
+        
+        let lineTaxFree = 0
+        if (line.allowanceDetails) {
+          try {
+            const details = JSON.parse(line.allowanceDetails)
+            if (Array.isArray(details)) {
+              for (const item of details) {
+                if (item.isTaxable === false) {
+                  lineTaxFree += Number(item.amount || 0)
+                }
+              }
+            }
+          } catch (e) {
+            // Ignore
+          }
+        }
+        
         ytdIncome += line.grossSalary
+        ytdTaxableIncome += Math.max(0, line.grossSalary - lineTaxFree)
+        
         if (!processedPeriods.has(linePeriod)) {
           processedPeriods.add(linePeriod)
           monthsWorkedYtd++
@@ -926,18 +1050,17 @@ export async function calculateMonthlyPayroll(
       }
     }
 
-    // Add current month's COMBINED gross salary
+    // Add current month's taxable income & gross
     ytdIncome = roundPKR(ytdIncome + grossSalary)
+    ytdTaxableIncome = roundPKR(ytdTaxableIncome + taxableIncome)
     monthsWorkedYtd += 1
 
-    // Projected Annual = (YTD / Months Worked) × 12
+    // Projected Annual Taxable Income = (YTD Taxable / Months Worked) × 12
     const projectedAnnualIncome = monthsWorkedYtd > 0
-      ? roundPKR((ytdIncome / monthsWorkedYtd) * 12)
-      : roundPKR(grossSalary * 12)
+      ? roundPKR((ytdTaxableIncome / monthsWorkedYtd) * 12)
+      : roundPKR(taxableIncome * 12)
 
-    const taxableIncome = roundPKR(grossSalary - taxFreeAllowances)
-
-    // Apply FBR Tax Slabs on Projected Annual
+    // Apply FBR Tax Slabs on Projected Annual Taxable Income
     const { annualTax, slab, variableTax } = calculateFbrTax(projectedAnnualIncome)
 
     // Monthly Tax = Annual Tax / 12
@@ -997,7 +1120,7 @@ export async function calculateMonthlyPayroll(
 
   // ── 20. Gratuity (only if gratuityEnabled) ──
   const gratuity = employee.gratuityEnabled === true
-    ? roundPKR(employee.baseSalary / 12)
+    ? roundPKR(baseSalaryForCalculations / 12)
     : 0
 
   // ── 21. Employer Cost ──

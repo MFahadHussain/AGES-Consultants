@@ -71,8 +71,17 @@ export default function CashFlowStatement({ data }: CashFlowStatementProps) {
   return (
     <div className="w-full space-y-4">
       {/* Three Collapsible Sections */}
-      {data.sections.map((section) => {
+      {data.sections.map((section: any) => {
         const isOpen = openSections.has(section.id);
+        const visibleRows = section.rows.filter((row: any) => {
+          if (row.rowType === 'line_item' || row.rowType === 'sub_line') {
+            return Object.values(row.values || {}).some(
+              (val) => typeof val === 'number' && Math.abs(val) > 0.001
+            );
+          }
+          return true;
+        });
+
         return (
           <Collapsible
             key={section.id}
@@ -105,7 +114,7 @@ export default function CashFlowStatement({ data }: CashFlowStatementProps) {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <CardContent className="pt-0 px-4 pb-4">
-                  <ScrollArea className="w-full">
+                  <ScrollArea className="w-full [&_[data-radix-scroll-area-viewport]]:print:!overflow-visible print:!overflow-visible print:h-auto">
                     <div className="min-w-fit">
                       <table className="w-full border-collapse text-sm">
                         <thead>
@@ -131,7 +140,7 @@ export default function CashFlowStatement({ data }: CashFlowStatementProps) {
                           </tr>
                         </thead>
                         <tbody>
-                          {section.rows.map((row) => {
+                          {visibleRows.map((row: any) => {
                             const indentPx = row.rowType === 'section_header' ? 0 : (row.indentLevel ?? 1) * 16;
                             return (
                               <tr

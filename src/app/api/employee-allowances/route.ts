@@ -58,28 +58,13 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { employeeId, allowanceId, customValue, projectId, isActive, effectiveDate } = body
+    const { employeeId, allowanceId, customValue, projectId, isActive, effectiveDate, assignToAll } = body
 
     // --- Required fields ---
-    if (!employeeId) {
-      return NextResponse.json(
-        { error: 'employeeId is required' },
-        { status: 400 }
-      )
-    }
     if (!allowanceId) {
       return NextResponse.json(
         { error: 'allowanceId is required' },
         { status: 400 }
-      )
-    }
-
-    // --- Validate employee exists ---
-    const employee = await db.employee.findUnique({ where: { id: employeeId } })
-    if (!employee) {
-      return NextResponse.json(
-        { error: `Employee with id "${employeeId}" not found` },
-        { status: 404 }
       )
     }
 
@@ -112,7 +97,7 @@ export async function POST(request: Request) {
     }
 
     // --- Validate customValue if provided ---
-    if (customValue !== undefined && customValue !== null) {
+    if (customValue !== undefined && customValue !== null && customValue !== '') {
       const numValue = Number(customValue)
       if (isNaN(numValue) || numValue < 0) {
         return NextResponse.json(
@@ -120,6 +105,71 @@ export async function POST(request: Request) {
           { status: 400 }
         )
       }
+    }
+
+    // --- Check for bulk assignment toggle ---
+    if (assignToAll === true) {
+      const activeEmployees = await db.employee.findMany({
+        where: { status: 'active' },
+        select: { id: true, name: true },
+      })
+
+      const existingAllowances = await db.employeeAllowance.findMany({
+        where: {
+          allowanceId,
+          projectId: projectId || null,
+          isActive: true,
+        },
+        select: { employeeId: true },
+      })
+      const existingEmployeeIds = new Set(existingAllowances.map(ea => ea.employeeId))
+      const employeesToAssign = activeEmployees.filter(emp => !existingEmployeeIds.has(emp.id))
+
+      if (employeesToAssign.length > 0) {
+        await db.employeeAllowance.createMany({
+          data: employeesToAssign.map(emp => ({
+            employeeId: emp.id,
+            allowanceId,
+            customValue: (customValue !== undefined && customValue !== null && customValue !== '') ? Number(customValue) : null,
+            projectId: projectId || null,
+            isActive: Boolean(isActive ?? true),
+            effectiveDate: effectiveDate ? new Date(effectiveDate) : new Date(),
+          })),
+        })
+      }
+
+      // Audit log
+      await db.auditLog.create({
+        data: {
+          userId: 'system',
+          action: 'BULK_CREATE',
+          entity: 'EmployeeAllowance',
+          entityId: allowanceId,
+          details: `Bulk-assigned allowance "${allowance.code}" to ${employeesToAssign.length} active employees`,
+        },
+      })
+
+      return NextResponse.json({
+        message: `Successfully assigned allowance to ${employeesToAssign.length} active employees`,
+        count: employeesToAssign.length,
+      }, { status: 201 })
+    }
+
+    // --- Standard single assignment validation ---
+    if (!employeeId) {
+      return NextResponse.json(
+        { error: 'employeeId is required for single assignment' },
+        { status: 400 }
+      )
+    }
+
+    // --- Validate employee exists ---
+    const employee = await db.employee.findUnique({ where: { id: employeeId } })
+    if (!employee) {
+      return NextResponse.json(
+        { error: `Employee with id "${employeeId}" not found` },
+        { status: 404 }
+      )
     }
 
     // --- Check for duplicate: same employee + allowance + project combo ---
@@ -143,7 +193,7 @@ export async function POST(request: Request) {
       data: {
         employeeId,
         allowanceId,
-        customValue: customValue !== undefined ? Number(customValue) : null,
+        customValue: (customValue !== undefined && customValue !== null && customValue !== '') ? Number(customValue) : null,
         projectId: projectId || null,
         isActive: Boolean(isActive ?? true),
         effectiveDate: effectiveDate ? new Date(effectiveDate) : new Date(),

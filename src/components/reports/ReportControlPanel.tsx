@@ -184,17 +184,21 @@ export default function ReportControlPanel({
   };
 
   return (
-    <Card className="print:hidden">
-      <CardHeader className="pb-4">
+    <Card className="print:hidden border-primary/10 shadow-md bg-gradient-to-b from-background to-background/50 backdrop-blur-sm relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10" />
+      <div className="absolute bottom-0 left-0 w-64 h-64 bg-accent/30 rounded-full blur-3xl -z-10" />
+      <CardHeader className="pb-4 border-b border-border/50 bg-muted/20">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <FileText className="size-5" />
-            Statutory Report Controls
+          <CardTitle className="flex items-center gap-2 text-lg font-bold text-foreground/90">
+            <div className="p-1.5 bg-primary/10 rounded-md">
+              <FileText className="size-5 text-primary" />
+            </div>
+            Report Configuration
           </CardTitle>
           {validationChip()}
         </div>
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-6 pt-6">
         {/* Row 1: Report Type & View Mode */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -405,18 +409,18 @@ export default function ReportControlPanel({
             {loading ? (
               <>
                 <span className="size-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                Generating...
+                Processing...
               </>
             ) : (
               <>
-                <Play className="size-4 mr-2" />
-                Generate Report
+                <Play className="size-4 mr-2 group-hover:scale-110 transition-transform" />
+                Generate Official Report
               </>
             )}
           </Button>
           {!isValid && (
-            <p className="text-xs text-muted-foreground">
-              Select at least one project and both date fields
+            <p className="text-xs text-amber-600/80 font-medium flex items-center gap-1.5">
+              <AlertTriangle className="size-3" /> Select at least one project and both date fields to generate.
             </p>
           )}
         </div>

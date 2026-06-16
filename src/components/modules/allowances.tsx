@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Gift, Users, CheckCircle, Building2, Plus, Pencil, Trash2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { EmployeeCombobox } from '@/components/ui/employee-combobox'
 
 // ── Types ──────────────────────────────────────────────────
 interface Allowance {
@@ -26,6 +27,8 @@ interface Allowance {
   baseOnSalary: boolean
   isTaxable: boolean
   isProjectSpecific: boolean
+  isInclusive: boolean
+  isSocialCharges: boolean
   isActive: boolean
   _count?: { employeeAllowances: number }
   createdAt: string
@@ -71,6 +74,8 @@ const emptyAllowanceForm = {
   isTaxable: true,
   isProjectSpecific: false,
   isActive: true,
+  isInclusive: false,
+  isSocialCharges: false,
 }
 
 const emptyEmpAllowanceForm = {
@@ -109,8 +114,7 @@ export function AllowancesModule() {
   const [empAllowForm, setEmpAllowForm] = useState({ ...emptyEmpAllowanceForm })
   const [empAllowDeleteId, setEmpAllowDeleteId] = useState<string | null>(null)
   const [empAllowDeleteDialogOpen, setEmpAllowDeleteDialogOpen] = useState(false)
-
-  // Loading
+  const [isBulkAssign, setIsBulkAssign] = useState(false)
   const [loading, setLoading] = useState(false)
 
   // ── Fetches ────────────────────────────────────────────
@@ -179,6 +183,8 @@ export function AllowancesModule() {
       isTaxable: a.isTaxable,
       isProjectSpecific: a.isProjectSpecific,
       isActive: a.isActive,
+      isInclusive: a.isInclusive ?? false,
+      isSocialCharges: a.isSocialCharges ?? false,
     })
     setAllowDialogOpen(true)
   }
@@ -233,12 +239,24 @@ export function AllowancesModule() {
 
   // ── Employee Allowance CRUD ────────────────────────────
   const openCreateEmpAllowance = () => {
+    setIsBulkAssign(false)
     setEmpAllowEditId(null)
     setEmpAllowForm({ ...emptyEmpAllowanceForm })
     setEmpAllowDialogOpen(true)
   }
 
+  const openBulkAssignAllowance = () => {
+    setIsBulkAssign(true)
+    setEmpAllowEditId(null)
+    setEmpAllowForm({
+      ...emptyEmpAllowanceForm,
+      employeeId: 'all',
+    })
+    setEmpAllowDialogOpen(true)
+  }
+
   const openEditEmpAllowance = (ea: EmployeeAllowance) => {
+    setIsBulkAssign(false)
     setEmpAllowEditId(ea.id)
     setEmpAllowForm({
       employeeId: ea.employeeId,
@@ -252,8 +270,12 @@ export function AllowancesModule() {
   }
 
   const saveEmpAllowance = async () => {
-    if (!empAllowForm.employeeId || !empAllowForm.allowanceId) {
+    if (!isBulkAssign && (!empAllowForm.employeeId || !empAllowForm.allowanceId)) {
       toast({ title: 'Validation', description: 'Employee and Allowance are required', variant: 'destructive' })
+      return
+    }
+    if (isBulkAssign && !empAllowForm.allowanceId) {
+      toast({ title: 'Validation', description: 'Allowance is required', variant: 'destructive' })
       return
     }
     setLoading(true)
@@ -263,6 +285,7 @@ export function AllowancesModule() {
         customValue: empAllowForm.customValue === '' ? null : Number(empAllowForm.customValue),
         projectId: empAllowForm.projectId || null,
         effectiveDate: empAllowForm.effectiveDate || new Date().toISOString().slice(0, 10),
+        assignToAll: isBulkAssign,
       }
       const url = empAllowEditId ? `/api/employee-allowances?id=${empAllowEditId}` : '/api/employee-allowances'
       const method = empAllowEditId ? 'PUT' : 'POST'
@@ -275,7 +298,12 @@ export function AllowancesModule() {
         const err = await res.json()
         throw new Error(err.error || 'Failed')
       }
-      toast({ title: empAllowEditId ? 'Updated' : 'Created', description: `Employee allowance ${empAllowEditId ? 'updated' : 'assigned'} successfully` })
+      toast({ 
+        title: empAllowEditId ? 'Updated' : 'Assigned', 
+        description: isBulkAssign 
+          ? `Allowance successfully assigned to all active employees!` 
+          : `Employee allowance ${empAllowEditId ? 'updated' : 'assigned'} successfully` 
+      })
       setEmpAllowDialogOpen(false)
       fetchEmpAllowances()
       fetchAllowances()
@@ -476,9 +504,14 @@ export function AllowancesModule() {
                 </SelectContent>
               </Select>
             </div>
-            <Button size="sm" className="h-8 text-xs" onClick={openCreateEmpAllowance}>
-              <Plus className="h-3.5 w-3.5 mr-1" />Assign Allowance
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" className="h-8 text-xs border-dashed text-primary hover:text-primary-foreground hover:bg-primary" onClick={openBulkAssignAllowance}>
+                <Users className="h-3.5 w-3.5 mr-1" />Assign to All
+              </Button>
+              <Button size="sm" className="h-8 text-xs" onClick={openCreateEmpAllowance}>
+                <Plus className="h-3.5 w-3.5 mr-1" />Assign Allowance
+              </Button>
+            </div>
           </div>
 
           <Card>
@@ -593,11 +626,11 @@ export function AllowancesModule() {
                 />
               </div>
             </div>
-            <div className="flex items-center gap-6">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
               <div className="flex items-center gap-2">
-                <Switch checked={allowForm.baseOnSalary} onCheckedChange={v => setAllowForm(p => ({ ...p, baseOnSalary: v }))} />
+                <Switch checked={allowForm.baseOnSalary} onCheckedChange={v => setAllowForm(p => ({ ...p, baseOnSalary: v }))} disabled={allowForm.allowanceType === 'fixed'} />
                 <Label className="text-xs">Base on Salary</Label>
-              </div>
+               </div>
               <div className="flex items-center gap-2">
                 <Switch checked={allowForm.isTaxable} onCheckedChange={v => setAllowForm(p => ({ ...p, isTaxable: v }))} />
                 <Label className="text-xs">Taxable</Label>
@@ -606,8 +639,35 @@ export function AllowancesModule() {
                 <Switch checked={allowForm.isProjectSpecific} onCheckedChange={v => setAllowForm(p => ({ ...p, isProjectSpecific: v }))} />
                 <Label className="text-xs">Project-Specific</Label>
               </div>
+              <div className="flex items-center gap-2">
+                <Switch 
+                  checked={allowForm.isInclusive} 
+                  onCheckedChange={v => setAllowForm(p => {
+                    const updated = { ...p, isInclusive: v }
+                    if (v) {
+                      updated.allowanceType = 'percentage'
+                      updated.baseOnSalary = true
+                    }
+                    return updated
+                  })}
+                  disabled={allowForm.allowanceType === 'fixed'}
+                />
+                <Label className="text-xs font-semibold text-amber-600 dark:text-amber-500">Inclusive of Gross</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch 
+                  checked={allowForm.isSocialCharges} 
+                  onCheckedChange={v => setAllowForm(p => ({ ...p, isSocialCharges: v }))} 
+                />
+                <Label className="text-xs font-semibold text-emerald-600 dark:text-emerald-500">Social Charges</Label>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+            {allowForm.isInclusive && (
+              <div className="text-[10px] text-amber-700 bg-amber-500/5 dark:text-amber-500 p-2 rounded border border-amber-500/10">
+                <strong>Inclusive Carve-out Active:</strong> This allowance is reverse-calculated from Gross Salary (e.g. Gross 100,000 with 10% Medical =&gt; Basic: 90,909, Medical: 9,091).
+              </div>
+            )}
+            <div className="flex items-center gap-2 pt-1">
               <Switch checked={allowForm.isActive} onCheckedChange={v => setAllowForm(p => ({ ...p, isActive: v }))} />
               <Label className="text-xs">Active</Label>
             </div>
@@ -641,20 +701,31 @@ export function AllowancesModule() {
       <Dialog open={empAllowDialogOpen} onOpenChange={setEmpAllowDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-sm">{empAllowEditId ? 'Edit Employee Allowance' : 'Assign Allowance to Employee'}</DialogTitle>
+            <DialogTitle className="text-sm">
+              {empAllowEditId 
+                ? 'Edit Employee Allowance' 
+                : isBulkAssign 
+                  ? 'Assign Allowance to All Employees' 
+                  : 'Assign Allowance to Employee'}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Employee *</Label>
-                <Select value={empAllowForm.employeeId} onValueChange={v => setEmpAllowForm(p => ({ ...p, employeeId: v }))} disabled={!!empAllowEditId}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select Employee" /></SelectTrigger>
-                  <SelectContent>
-                    {employees.map(emp => (
-                      <SelectItem key={emp.id} value={emp.id}>{emp.employeeCode} - {emp.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isBulkAssign ? (
+                  <div className="h-8 flex items-center px-3 text-xs bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 dark:text-amber-500 rounded border border-amber-500/10 font-semibold">
+                    All Active Employees
+                  </div>
+                ) : (
+                  <EmployeeCombobox
+                    employees={employees}
+                    value={empAllowForm.employeeId}
+                    onChange={v => setEmpAllowForm(p => ({ ...p, employeeId: v }))}
+                    disabled={!!empAllowEditId}
+                    placeholder="Search employee..."
+                  />
+                )}
               </div>
               <div>
                 <Label className="text-xs">Allowance *</Label>

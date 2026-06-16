@@ -2571,15 +2571,27 @@ export function EmployeeProfile() {
                     <input id="doc-file-input" type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.docx" onChange={e => { const f = e.target.files?.[0]; if (f) setUploadFile(f) }} />
                   </div>
                 ) : (
-                  <div className="mt-1 p-3 border border-slate-200 rounded-xl bg-slate-50 flex items-center gap-3">
-                    <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${getFileTypeStyle(uploadFile.type || uploadFile.name).bg}`}>
-                      {React.createElement(getFileTypeStyle(uploadFile.type || uploadFile.name).icon, { className: 'h-5 w-5' })}
+                  <div className="space-y-2 mt-1">
+                    <div className="p-3 border border-slate-200 rounded-xl bg-slate-50 flex items-center gap-3">
+                      <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${getFileTypeStyle(uploadFile.type || uploadFile.name).bg}`}>
+                        {React.createElement(getFileTypeStyle(uploadFile.type || uploadFile.name).icon, { className: 'h-5 w-5' })}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate">{uploadFile.name}</p>
+                        <p className="text-[10px] text-slate-400">{formatFileSize(uploadFile.size)}</p>
+                      </div>
+                      <button className="p-1 rounded hover:bg-slate-200 text-slate-400" onClick={() => setUploadFile(null)}><X className="h-4 w-4"/></button>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">{uploadFile.name}</p>
-                      <p className="text-[10px] text-slate-400">{formatFileSize(uploadFile.size)}</p>
-                    </div>
-                    <button className="p-1 rounded hover:bg-slate-200 text-slate-400" onClick={() => setUploadFile(null)}><X className="h-4 w-4"/></button>
+                    {/* Live Image Preview */}
+                    {(uploadFile.type.startsWith('image/') || /\.(jpg|jpeg|png|gif)$/i.test(uploadFile.name)) && (
+                      <div className="p-2 border border-slate-200 rounded-xl bg-slate-50 flex justify-center items-center overflow-hidden">
+                        <img 
+                          src={URL.createObjectURL(uploadFile)} 
+                          alt="Upload Preview" 
+                          className="max-h-[140px] max-w-full object-contain rounded-lg shadow-sm border border-white"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
                 {/* Upload Progress */}

@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { FileCheck, Plus, Pencil, Trash2, CheckCircle, DollarSign, ArrowRight, ShieldCheck } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { EmployeeCombobox } from '@/components/ui/employee-combobox'
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
@@ -84,10 +85,13 @@ export function FinalSettlementModule() {
     }
   }, [toast])
 
+  const [employees, setEmployees] = useState<any[]>([])
+
   useEffect(() => {
     queueMicrotask(() => {
       fetchSettlements()
       fetch('/api/financial-year').then(r => r.json()).then(d => setFinancialYears(Array.isArray(d) ? d : [])).catch(() => {})
+      fetch('/api/employees?pageSize=500').then(r => r.json()).then(d => setEmployees(Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [])).catch(() => {})
     })
   }, [fetchSettlements])
 
@@ -386,7 +390,15 @@ export function FinalSettlementModule() {
         <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="text-sm">Create Final Settlement</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label className="text-xs">Employee ID *</Label><Input className="h-8 text-xs" value={form.employeeId} onChange={e => setForm(p => ({ ...p, employeeId: e.target.value }))} placeholder="Enter employee ID" /></div>
+            <div>
+              <Label className="text-xs font-semibold">Select Employee *</Label>
+              <EmployeeCombobox
+                employees={employees}
+                value={form.employeeId}
+                onChange={val => setForm(p => ({ ...p, employeeId: val }))}
+                placeholder="Search employee by name, code..."
+              />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label className="text-xs">Leaving Date *</Label><Input type="date" className="h-8 text-xs" value={form.leavingDate} onChange={e => setForm(p => ({ ...p, leavingDate: e.target.value }))} /></div>
               <div><Label className="text-xs">Settlement Type *</Label>

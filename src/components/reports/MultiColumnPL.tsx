@@ -35,24 +35,24 @@ interface MultiColumnPLProps {
 }
 
 function getRowClasses(rowType: RowType): string {
-  const base = 'border-b border-border/50';
+  const base = 'border-b border-border/50 transition-colors';
   switch (rowType) {
     case 'section_header':
-      return cn(base, 'uppercase font-medium bg-muted/40 border-b border-border pt-4');
+      return cn(base, 'uppercase font-bold text-primary bg-primary/5 border-b-2 border-primary/20 pt-4 pb-2 tracking-wider');
     case 'line_item':
-      return cn(base, 'font-normal');
+      return cn(base, 'font-medium text-foreground hover:bg-accent/40');
     case 'sub_line':
-      return cn(base, 'text-muted-foreground text-xs');
+      return cn(base, 'text-muted-foreground text-sm hover:bg-accent/40');
     case 'sub_subtotal':
-      return cn(base, 'font-medium border-t border-border/50');
+      return cn(base, 'font-semibold border-t border-border/50 text-foreground bg-muted/10');
     case 'subtotal':
-      return cn(base, 'font-medium bg-muted/20 border-t border-border');
+      return cn(base, 'font-bold bg-muted/30 border-t border-border text-foreground');
     case 'grand_total':
-      return cn(base, 'font-semibold bg-muted/30 border-t-2 border-b-2 border-border');
+      return cn(base, 'font-extrabold bg-primary/10 border-t-2 border-b-2 border-primary text-primary shadow-sm text-base py-2');
     case 'highlighted':
-      return cn(base, 'font-medium bg-amber-50 border-l-[3px] border-l-amber-500');
+      return cn(base, 'font-medium bg-amber-50/50 border-l-[4px] border-l-amber-500 hover:bg-amber-50');
     case 'memo':
-      return cn(base, 'italic text-muted-foreground');
+      return cn(base, 'italic text-muted-foreground bg-muted/5');
     default:
       return base;
   }
@@ -62,8 +62,34 @@ export default function MultiColumnPL({ data, detailLevel = 'summary' }: MultiCo
   // Filter rows based on detail level - must be before early return for hooks rules
   const visibleRows = useMemo(() => {
     if (!data?.rows) return [];
-    if (detailLevel === 'detailed') return data.rows;
-    return data.rows.filter((row) => row.rowType !== 'sub_line' && row.rowType !== 'sub_subtotal');
+    let rows = data.rows;
+    if (detailLevel !== 'detailed') {
+      rows = rows.filter((row: any) => row.rowType !== 'sub_line' && row.rowType !== 'sub_subtotal');
+    }
+
+    // Filter out zero-value rows
+    rows = rows.filter((row: any) => {
+      if (row.rowType === 'line_item' || row.rowType === 'sub_line') {
+        return Object.values(row.values || {}).some(
+          (val) => typeof val === 'number' && Math.abs(val) > 0.001
+        );
+      }
+      return true;
+    });
+
+    return rows.map((row: any) => {
+      if (row.drilldownData) {
+        return {
+          ...row,
+          drilldownData: row.drilldownData.filter((drillRow: any) => {
+            return Object.values(drillRow.values || {}).some(
+              (val) => typeof val === 'number' && Math.abs(val) > 0.001
+            );
+          }),
+        };
+      }
+      return row;
+    });
   }, [data, detailLevel]);
 
   if (!data || !data.rows || data.rows.length === 0) {
@@ -138,7 +164,7 @@ export default function MultiColumnPL({ data, detailLevel = 'summary' }: MultiCo
       )}
 
       {/* P&L Table */}
-      <ScrollArea className="w-full">
+      <ScrollArea className="w-full [&_[data-radix-scroll-area-viewport]]:print:!overflow-visible print:!overflow-visible print:h-auto">
         <div className="min-w-fit">
           <table className="w-full border-collapse text-sm">
             {/* Header */}

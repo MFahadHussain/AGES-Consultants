@@ -194,9 +194,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const needsPasswordChange = authUser.forcePasswordChange && !forcePasswordResolved
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden print:h-auto print:block print:overflow-visible bg-background print:bg-white">
       {/* Desktop Sidebar */}
-      {!isMobile && <Sidebar />}
+      {!isMobile && <div className="print:hidden h-full flex-shrink-0"><Sidebar /></div>}
 
       {/* Mobile Sidebar */}
       {isMobile && (
@@ -207,22 +207,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Sheet>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <Header
-          onSearchOpen={() => {}}
-          authUser={authUser}
-          onLogout={() => {
-            setAuthUser(null)
-            router.replace('/login')
-          }}
-        />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6" style={{ background: '#F5F7FA' }}>
+      <div className="flex-1 flex flex-col min-w-0 print:block print:h-auto print:overflow-visible">
+        <div className="print:hidden">
+          <Header
+            onSearchOpen={() => {}}
+            authUser={authUser}
+            onLogout={() => {
+              setAuthUser(null)
+              router.replace('/login')
+            }}
+          />
+        </div>
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 print:overflow-visible print:h-auto print:p-0 print:block print:!bg-transparent" style={{ background: '#F5F7FA' }}>
           {children}
         </main>
-        <footer className="border-t px-5 py-2.5 bg-white shrink-0" style={{ borderColor: '#E5E7EB' }}>
+        <footer className="border-t px-5 py-2.5 bg-white shrink-0 print:border-none print:mt-12 print:bg-transparent" style={{ borderColor: '#E5E7EB' }}>
           <div className="flex items-center justify-between text-[10px]" style={{ color: '#6B7280' }}>
             <span>AcctFin ERP v1.0.0 &bull; Accounting &amp; Financial Management System</span>
-            <span className="hidden sm:inline">Multi-Project &bull; Multi-Donor &bull; Multi-Currency &bull; Multi-Location</span>
+            <span className="hidden sm:inline print:inline">Multi-Project &bull; Multi-Donor &bull; Multi-Currency &bull; Multi-Location</span>
           </div>
         </footer>
       </div>

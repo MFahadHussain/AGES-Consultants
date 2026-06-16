@@ -156,6 +156,7 @@ export async function POST(request: Request) {
     }
 
     const systemUserId = await getSystemUserId()
+    const userId = data.userId || systemUserId
     const userRole = data.userRole || 'accountant' // Default to accountant for creation
 
     // Generate voucher number
@@ -187,8 +188,8 @@ export async function POST(request: Request) {
         clientId: clientId || null,
         totalDebit,
         totalCredit,
-        createdBy: systemUserId,
-        ...(autoPost ? { reviewedBy: systemUserId, approvedBy: systemUserId, postedBy: systemUserId } : {}),
+        createdBy: userId,
+        ...(autoPost ? { reviewedBy: userId, approvedBy: userId, postedBy: userId } : {}),
         entries: {
           create: entries.map((e: any, i: number) => ({
             lineNumber: i + 1,
@@ -215,7 +216,7 @@ export async function POST(request: Request) {
       await db.voucherApproval.create({
         data: {
           voucherId: voucher.id,
-          userId: systemUserId,
+          userId: userId,
           action,
           fromStatus: 'new',
           toStatus: initialStatus,
@@ -224,7 +225,7 @@ export async function POST(request: Request) {
         },
       })
       await db.auditLog.create({
-        data: { userId: systemUserId, action, entity: 'Voucher', entityId: voucher.id, details: `Created ${voucherNumber} (status: ${initialStatus}) by ${userRole}` },
+        data: { userId: userId, action, entity: 'Voucher', entityId: voucher.id, details: `Created ${voucherNumber} (status: ${initialStatus}) by ${userRole}` },
       })
     } catch (auditError) {
       console.error('Audit log creation failed (non-critical):', auditError)

@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Landmark, Plus, Pencil, Trash2, ChevronDown, ChevronUp, DollarSign, CheckCircle, Ban } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { EmployeeCombobox } from '@/components/ui/employee-combobox'
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
@@ -84,20 +85,20 @@ export function LoansModule() {
 
   const fetchEmployees = useCallback(async () => {
     try {
-      // Employees are fetched from the seed/api endpoint - use a minimal approach
-      const res = await fetch('/api/seed')
-      // Fallback: get employees from the payroll API which has employee data
-      setEmployees([])
+      const res = await fetch('/api/employees?pageSize=500')
+      const data = await res.json()
+      setEmployees(Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [])
     } catch {
-      // Ignore - employees may be loaded differently
+      // Ignore
     }
   }, [])
 
   useEffect(() => {
     queueMicrotask(() => {
       fetchLoans()
+      fetchEmployees()
     })
-  }, [fetchLoans])
+  }, [fetchLoans, fetchEmployees])
 
   const handleCreate = async () => {
     if (!form.employeeId || !form.loanType || form.principalAmount <= 0 || form.tenureMonths <= 0) {
@@ -350,7 +351,15 @@ export function LoansModule() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle className="text-sm">Create New Loan</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label className="text-xs">Employee ID *</Label><Input className="h-8 text-xs" value={form.employeeId} onChange={e => setForm(p => ({ ...p, employeeId: e.target.value }))} placeholder="Enter employee ID" /></div>
+            <div>
+              <Label className="text-xs font-semibold">Select Employee *</Label>
+              <EmployeeCombobox
+                employees={employees}
+                value={form.employeeId}
+                onChange={val => setForm(p => ({ ...p, employeeId: val }))}
+                placeholder="Search employee by name, code..."
+              />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label className="text-xs">Loan Type *</Label>
                 <Select value={form.loanType} onValueChange={v => setForm(p => ({ ...p, loanType: v }))}>

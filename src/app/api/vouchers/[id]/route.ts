@@ -62,6 +62,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const data = await request.json()
     const systemUserId = await getSystemUserId()
     const userRole = validateRole(data.userRole || 'admin')
+    const userId = data.userId || systemUserId
 
     // Helper: create approval record with full audit trail
     const createApproval = async (action: string, fromStatus: string, toStatus: string, comments?: string) => {
@@ -69,7 +70,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         await db.voucherApproval.create({
           data: {
             voucherId: id,
-            userId: systemUserId,
+            userId: userId,
             action,
             fromStatus,
             toStatus,
@@ -79,7 +80,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         })
         await db.auditLog.create({
           data: {
-            userId: systemUserId,
+            userId: userId,
             action,
             entity: 'Voucher',
             entityId: id,
@@ -105,7 +106,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       }
       const voucher = await db.voucher.update({
         where: { id },
-        data: { status: 'pending', reviewedBy: systemUserId },
+        data: { status: 'pending', reviewedBy: userId },
       })
       await createApproval('SUBMIT', current.status, 'pending', data.comments)
       return NextResponse.json(voucher)
@@ -123,7 +124,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       }
       const voucher = await db.voucher.update({
         where: { id },
-        data: { status: 'approved', approvedBy: systemUserId },
+        data: { status: 'approved', approvedBy: userId },
       })
       await createApproval('APPROVE', 'pending', 'approved', data.comments)
       return NextResponse.json(voucher)
@@ -141,7 +142,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       }
       const voucher = await db.voucher.update({
         where: { id },
-        data: { status: 'posted', reviewedBy: systemUserId, approvedBy: systemUserId, postedBy: systemUserId },
+        data: { status: 'posted', reviewedBy: userId, approvedBy: userId, postedBy: userId },
       })
       await createApproval('POST', current.status, 'posted', data.comments || 'Payroll voucher posted to GL')
       return NextResponse.json(voucher)
@@ -182,9 +183,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         where: { id },
         data: {
           status: 'posted',
-          reviewedBy: systemUserId,
-          approvedBy: systemUserId,
-          postedBy: systemUserId,
+          reviewedBy: userId,
+          approvedBy: userId,
+          postedBy: userId,
         },
       })
       await createApproval('QUICK_POST', current.status, 'posted', data.comments || 'Quick posted to GL (bypassed workflow)')
@@ -304,7 +305,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
+    const { searchParams } = new URL(request.url)
     const systemUserId = await getSystemUserId()
+    const userId = searchParams.get('userId') || systemUserId
 
     const voucher = await db.voucher.findUnique({
       where: { id },
@@ -332,7 +335,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     try {
       await db.auditLog.create({
         data: {
-          userId: systemUserId,
+          userId: userId,
           action: 'DELETE',
           entity: 'Voucher',
           entityId: id,

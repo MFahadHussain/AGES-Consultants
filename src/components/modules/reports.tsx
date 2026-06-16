@@ -447,18 +447,7 @@ function StandardReports() {
   const relevantFilters = getRelevantFilters()
 
   const handlePrint = () => {
-    const printContent = document.getElementById('report-content')
-    if (!printContent) return
-    const reportTitle = reportTypes.find(r => r.value === reportType)?.label || reportType
-    const win = window.open('', '', 'width=1000,height=750')
-    win?.document.write(`<html><head><title>${reportTitle} - AcctFin ERP</title>
-      <style>
-        @page{margin:15mm 12mm;size:A4} *{box-sizing:border-box}
-        body{font-family:'Segoe UI',Arial,sans-serif;font-size:10px;padding:0;margin:0;color:#1a1a1a;line-height:1.4}
-        table{width:100%;border-collapse:collapse;margin-bottom:16px} th{background:#f5f5f5;font-weight:700;padding:7px 8px;text-align:left;border-bottom:2px solid #bbb;font-size:9px} td{padding:5px 8px;border-bottom:1px solid #e5e5e5} .text-right{text-align:right} .font-bold{font-weight:700} .font-mono{font-family:'Courier New',monospace}
-      </style></head><body>${printContent.innerHTML}</body></html>`)
-    win?.document.close()
-    setTimeout(() => win?.print(), 500)
+    window.print()
   }
 
   const handleExport = async (format: string) => {
@@ -496,7 +485,7 @@ function StandardReports() {
   const renderTrialBalance = () => {
     if (!reportData?.data) return <p className="text-xs text-muted-foreground text-center py-8">No data</p>
     return (
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto print:overflow-visible">
       <Table>
         <TableHeader>
           <TableRow>
@@ -510,7 +499,7 @@ function StandardReports() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {reportData.data.map((row: any, i: number) => (
+          {reportData.data.filter((row: any) => Math.abs(row.balance || 0) > 0.001 || (row.totalDebit || 0) > 0 || (row.totalCredit || 0) > 0).map((row: any, i: number) => (
             <TableRow key={i}>
               <TableCell className="font-mono text-xs">{row.code}</TableCell>
               <TableCell className="text-xs font-medium">{row.name}</TableCell>
@@ -539,11 +528,11 @@ function StandardReports() {
       <div className="space-y-6">
         <div>
           <h4 className="text-xs font-bold mb-2 text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded">ASSETS</h4>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto print:overflow-visible">
           <Table>
             <TableHeader><TableRow><TableHead className="text-[10px]">Code</TableHead><TableHead className="text-[10px]">Name</TableHead><TableHead className="text-[10px]">Sub Type</TableHead><TableHead className="text-[10px] text-right">Amount</TableHead></TableRow></TableHeader>
             <TableBody>
-              {reportData.sections.assets.map((a: any, i: number) => (
+              {reportData.sections.assets.filter((a: any) => Math.abs(a.balance || 0) > 0.001).map((a: any, i: number) => (
                 <TableRow key={i}><TableCell className="font-mono text-xs">{a.code}</TableCell><TableCell className="text-xs">{a.name}</TableCell><TableCell className="text-[10px] text-muted-foreground">{a.subType}</TableCell><TableCell className="text-xs text-right">{formatCurrency(a.balance)}</TableCell></TableRow>
               ))}
               <TableRow className="font-bold bg-emerald-50"><TableCell colSpan={3} className="text-xs">Total Assets</TableCell><TableCell className="text-xs text-right">{formatCurrency(reportData.totalAssets)}</TableCell></TableRow>
@@ -553,10 +542,10 @@ function StandardReports() {
         </div>
         <div>
           <h4 className="text-xs font-bold mb-2 text-red-700 bg-red-50 px-3 py-1.5 rounded">LIABILITIES</h4>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto print:overflow-visible">
           <Table>
             <TableBody>
-              {reportData.sections.liabilities.map((a: any, i: number) => (
+              {reportData.sections.liabilities.filter((a: any) => Math.abs(a.balance || 0) > 0.001).map((a: any, i: number) => (
                 <TableRow key={i}><TableCell className="font-mono text-xs">{a.code}</TableCell><TableCell className="text-xs">{a.name}</TableCell><TableCell className="text-xs text-right">{formatCurrency(a.balance)}</TableCell></TableRow>
               ))}
               <TableRow className="font-bold bg-red-50"><TableCell colSpan={2} className="text-xs">Total Liabilities</TableCell><TableCell className="text-xs text-right">{formatCurrency(reportData.totalLiabilities)}</TableCell></TableRow>
@@ -566,10 +555,10 @@ function StandardReports() {
         </div>
         <div>
           <h4 className="text-xs font-bold mb-2 text-violet-700 bg-violet-50 px-3 py-1.5 rounded">EQUITY</h4>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto print:overflow-visible">
           <Table>
             <TableBody>
-              {reportData.sections.equity.map((a: any, i: number) => (
+              {reportData.sections.equity.filter((a: any) => Math.abs(a.balance || 0) > 0.001).map((a: any, i: number) => (
                 <TableRow key={i}><TableCell className="font-mono text-xs">{a.code}</TableCell><TableCell className="text-xs">{a.name}</TableCell><TableCell className="text-xs text-right">{formatCurrency(a.balance)}</TableCell></TableRow>
               ))}
               <TableRow className="font-bold bg-violet-50"><TableCell colSpan={2} className="text-xs">Total Equity</TableCell><TableCell className="text-xs text-right">{formatCurrency(reportData.totalEquity)}</TableCell></TableRow>
@@ -592,10 +581,10 @@ function StandardReports() {
       <div className="space-y-4">
         <div>
           <h4 className="text-xs font-bold mb-2 text-blue-700 bg-blue-50 px-3 py-1.5 rounded">INCOME</h4>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto print:overflow-visible">
           <Table>
             <TableBody>
-              {reportData.income.map((a: any, i: number) => (
+              {reportData.income.filter((a: any) => Math.abs(a.balance || 0) > 0.001).map((a: any, i: number) => (
                 <TableRow key={i}><TableCell className="font-mono text-xs">{a.code}</TableCell><TableCell className="text-xs">{a.name}</TableCell><TableCell className="text-xs text-right">{formatCurrency(a.balance)}</TableCell></TableRow>
               ))}
               <TableRow className="font-bold bg-blue-50"><TableCell colSpan={2} className="text-xs">Total Income</TableCell><TableCell className="text-xs text-right">{formatCurrency(reportData.totalIncome)}</TableCell></TableRow>
@@ -605,10 +594,10 @@ function StandardReports() {
         </div>
         <div>
           <h4 className="text-xs font-bold mb-2 text-orange-700 bg-orange-50 px-3 py-1.5 rounded">EXPENSES</h4>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto print:overflow-visible">
           <Table>
             <TableBody>
-              {reportData.expenses.map((a: any, i: number) => (
+              {reportData.expenses.filter((a: any) => Math.abs(a.balance || 0) > 0.001).map((a: any, i: number) => (
                 <TableRow key={i}><TableCell className="font-mono text-xs">{a.code}</TableCell><TableCell className="text-xs">{a.name}</TableCell><TableCell className="text-xs text-right">{formatCurrency(a.balance)}</TableCell></TableRow>
               ))}
               <TableRow className="font-bold bg-orange-50"><TableCell colSpan={2} className="text-xs">Total Expenses</TableCell><TableCell className="text-xs text-right">{formatCurrency(reportData.totalExpenses)}</TableCell></TableRow>
@@ -633,7 +622,7 @@ function StandardReports() {
           <Card className="border-l-4 border-l-red-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Outflow</p><p className="text-sm font-bold text-red-600">{formatCurrency(reportData.totalOutflow)}</p></CardContent></Card>
           <Card className={`border-l-4 ${reportData.netCashFlow >= 0 ? 'border-l-emerald-400' : 'border-l-red-400'}`}><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Net Cash Flow</p><p className={`text-sm font-bold ${reportData.netCashFlow >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(reportData.netCashFlow)}</p></CardContent></Card>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto print:overflow-visible">
         <Table>
           <TableHeader><TableRow><TableHead className="text-[10px]">Date</TableHead><TableHead className="text-[10px]">Voucher</TableHead><TableHead className="text-[10px]">Account</TableHead><TableHead className="text-[10px] text-right">Inflow</TableHead><TableHead className="text-[10px] text-right">Outflow</TableHead></TableRow></TableHeader>
           <TableBody>
@@ -656,7 +645,7 @@ function StandardReports() {
   const renderSegmentReport = () => {
     if (!reportData?.data) return <p className="text-xs text-muted-foreground text-center py-8">No data</p>
     return (
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto print:overflow-visible">
       <Table>
         <TableHeader><TableRow>
           <TableHead className="text-[10px]">Code</TableHead>
@@ -697,7 +686,7 @@ function StandardReports() {
           <Card className="border-l-4 border-l-red-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Credit</p><p className="text-sm font-bold text-red-600">{formatCurrency(reportData.grandTotalCredit)}</p></CardContent></Card>
           <Card className={`border-l-4 ${reportData.grandBalance >= 0 ? 'border-l-emerald-400' : 'border-l-red-400'}`}><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Net Balance</p><p className={`text-sm font-bold ${reportData.grandBalance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(reportData.grandBalance)}</p></CardContent></Card>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto print:overflow-visible">
         <Table>
           <TableHeader><TableRow>
             <TableHead className="text-[10px] w-8"></TableHead>
@@ -762,7 +751,7 @@ function StandardReports() {
             <p className="text-sm font-bold">{formatCurrency(reportData.closingBalance || 0)}</p>
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto print:overflow-visible">
         <Table>
           <TableHeader><TableRow><TableHead className="text-[10px]">Date</TableHead><TableHead className="text-[10px]">Voucher</TableHead><TableHead className="text-[10px]">Narration</TableHead><TableHead className="text-[10px] text-right">Debit</TableHead><TableHead className="text-[10px] text-right">Credit</TableHead><TableHead className="text-[10px] text-right">Balance</TableHead></TableRow></TableHeader>
           <TableBody>
@@ -795,14 +784,14 @@ function StandardReports() {
       case 'budget_vs_actual': return renderSegmentReport()
       case 'donor_wise': case 'project_wise': case 'location_wise': return renderSegmentReport()
       case 'client_wise_project': return renderClientWiseProject()
-      default: return <p className="text-xs text-center py-8">Select a report type</p>
+      default: return null
     }
   }
 
   return (
     <div className="space-y-4">
       {/* Report Type & Date Controls */}
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-3 print:hidden">
         <div className="w-64">
           <Label className="text-[10px] font-medium">Report Type</Label>
           <Select value={reportType} onValueChange={setReportType}>
@@ -855,7 +844,7 @@ function StandardReports() {
 
       {/* Filter Panel */}
       {showFilters && (
-        <Card className="border-dashed">
+        <Card className="border-dashed print:hidden">
           <CardContent className="p-3">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold">Advanced Filters</p>
@@ -897,17 +886,27 @@ function StandardReports() {
         </Card>
       )}
 
-      {/* Action Bar */}
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" className="h-7 text-[10px] print:hidden" onClick={handlePrint}><Printer className="h-3 w-3 mr-1" />Print</Button>
-        <Button variant="outline" size="sm" className="h-7 text-[10px] print:hidden" onClick={() => handleExport('CSV')}><Download className="h-3 w-3 mr-1" />CSV</Button>
-      </div>
-
       {/* Report Content */}
       <div id="report-content">
         {loading ? (
           <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-        ) : renderReport()}
+        ) : reportData ? (
+          <ReportLayout
+            reportTitle={reportTypes.find(r => r.value === reportType)?.label || reportType}
+            fromDate={dateFrom}
+            toDate={dateTo}
+            projectName={projectId === 'all' ? 'All Projects' : filterData.projects.find(p => p.id === projectId)?.name}
+            onPrint={handlePrint}
+            onExportCSV={() => handleExport('CSV')}
+          >
+            {renderReport()}
+          </ReportLayout>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+            <FileSpreadsheet className="h-12 w-12 mb-4 opacity-30" />
+            <p className="text-sm font-medium">Select parameters and generate a report</p>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -919,23 +918,26 @@ function StandardReports() {
 
 export function FinancialReports() {
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Scale className="h-6 w-6 text-primary" />
-        <div>
-          <h2 className="text-lg font-bold">Financial Reports</h2>
-          <p className="text-xs text-muted-foreground">Standard & Statutory Financial Reporting Engine</p>
+    <div className="space-y-6">
+      <div className="flex items-center gap-4 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-5 rounded-2xl border border-primary/10 shadow-sm relative overflow-hidden print:hidden">
+        <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))]" />
+        <div className="p-3 bg-primary/20 rounded-xl relative z-10 shadow-inner">
+          <Scale className="h-7 w-7 text-primary animate-pulse" />
+        </div>
+        <div className="relative z-10">
+          <h2 className="text-2xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">Financial Reports Dashboard</h2>
+          <p className="text-sm font-medium text-muted-foreground mt-0.5">Advanced Standard & Statutory Financial Reporting Engine</p>
         </div>
       </div>
 
       <Tabs defaultValue="statutory" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="statutory" className="text-xs">
-            <Shield className="h-3.5 w-3.5 mr-1.5" />
+        <TabsList className="grid w-full grid-cols-2 p-1 bg-muted/50 rounded-xl print:hidden">
+          <TabsTrigger value="statutory" className="text-sm font-medium rounded-lg transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary py-2">
+            <Shield className="h-4 w-4 mr-2" />
             Statutory Reports
           </TabsTrigger>
-          <TabsTrigger value="standard" className="text-xs">
-            <FileText className="h-3.5 w-3.5 mr-1.5" />
+          <TabsTrigger value="standard" className="text-sm font-medium rounded-lg transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary py-2">
+            <FileText className="h-4 w-4 mr-2" />
             Standard Reports
           </TabsTrigger>
         </TabsList>

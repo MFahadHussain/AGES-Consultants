@@ -440,15 +440,9 @@
 
 /* Print styles */
 @media print {
-  body * { visibility: hidden; }
-  .voucher-print-area, .voucher-print-area * { visibility: visible; }
-  .voucher-print-area { position: absolute; left: 0; top: 0; width: 100%; }
   .no-print { display: none !important; }
   .print-only { display: block !important; }
   .print-only.hidden { display: block !important; }
-  table { border-collapse: collapse; }
-  table th, table td { border: 1px solid #000; padding: 4px 8px; }
-  .voucher-print-area + .voucher-print-area { page-break-before: always; }
   @page { margin: 15mm; }
 }
 

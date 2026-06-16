@@ -87,6 +87,7 @@ export async function GET(request: Request) {
       case 'balance_sheet': {
         const accounts = await db.account.findMany({
           where: { isActive: true, accountType: { in: ['ASSET', 'LIABILITY', 'EQUITY'] }, allowPosting: true },
+          include: { parent: true },
           orderBy: { code: 'asc' },
         })
 
@@ -99,6 +100,15 @@ export async function GET(request: Request) {
         let totalAssets = 0
         let totalLiabilities = 0
         let totalEquity = 0
+
+        const parentAggregates: Record<string, {
+          id: string
+          code: string
+          name: string
+          accountType: string
+          subType: string
+          balance: number
+        }> = {}
 
         for (const account of accounts) {
           const result = await db.voucherEntry.aggregate({
@@ -114,35 +124,58 @@ export async function GET(request: Request) {
             if (account.subType === 'ACCUMULATED_DEPRECIATION' || account.subType === 'CONTRA_ASSET') {
               balance = credit - debit
             }
-            totalAssets += balance
-            const entry = { code: account.code, name: account.name, subType: account.subType, balance }
+          } else if (account.accountType === 'LIABILITY' || account.accountType === 'EQUITY') {
+            balance = credit - debit
+          }
+
+          if (balance === 0 && debit === 0 && credit === 0) continue
+
+          const displayNode = account.parent || account
+
+          if (!parentAggregates[displayNode.id]) {
+            parentAggregates[displayNode.id] = {
+              id: displayNode.id,
+              code: displayNode.code,
+              name: displayNode.name,
+              accountType: displayNode.accountType,
+              subType: displayNode.subType || 'OTHER',
+              balance: 0,
+            }
+          }
+
+          parentAggregates[displayNode.id].balance += balance
+        }
+
+        const sortedParents = Object.values(parentAggregates).sort((a, b) => a.code.localeCompare(b.code))
+
+        for (const parent of sortedParents) {
+          const entry = { code: parent.code, name: parent.name, subType: parent.subType, balance: parent.balance }
+
+          if (parent.accountType === 'ASSET') {
+            totalAssets += parent.balance
             sections.assets.push(entry)
 
             // Group by sub-type
-            const st = account.subType || 'OTHER'
+            const st = parent.subType
             if (!subTypeGroups.assets[st]) subTypeGroups.assets[st] = { accounts: [], total: 0 }
             subTypeGroups.assets[st].accounts.push(entry)
-            subTypeGroups.assets[st].total += balance
-          } else if (account.accountType === 'LIABILITY') {
-            balance = credit - debit
-            totalLiabilities += balance
-            const entry = { code: account.code, name: account.name, subType: account.subType, balance }
+            subTypeGroups.assets[st].total += parent.balance
+          } else if (parent.accountType === 'LIABILITY') {
+            totalLiabilities += parent.balance
             sections.liabilities.push(entry)
 
-            const st = account.subType || 'OTHER'
+            const st = parent.subType
             if (!subTypeGroups.liabilities[st]) subTypeGroups.liabilities[st] = { accounts: [], total: 0 }
             subTypeGroups.liabilities[st].accounts.push(entry)
-            subTypeGroups.liabilities[st].total += balance
-          } else if (account.accountType === 'EQUITY') {
-            balance = credit - debit
-            totalEquity += balance
-            const entry = { code: account.code, name: account.name, subType: account.subType, balance }
+            subTypeGroups.liabilities[st].total += parent.balance
+          } else if (parent.accountType === 'EQUITY') {
+            totalEquity += parent.balance
             sections.equity.push(entry)
 
-            const st = account.subType || 'OTHER'
+            const st = parent.subType
             if (!subTypeGroups.equity[st]) subTypeGroups.equity[st] = { accounts: [], total: 0 }
             subTypeGroups.equity[st].accounts.push(entry)
-            subTypeGroups.equity[st].total += balance
+            subTypeGroups.equity[st].total += parent.balance
           }
         }
 
@@ -481,7 +514,7 @@ export async function GET(request: Request) {
       // ─── DONOR-WISE ────────────────────────────────────────────────────
       case 'donor_wise': {
         const donors = await db.donor.findMany()
-        const donorData = []
+        const donorData: any[] = []
 
         for (const donor of donors) {
           const result = await db.voucherEntry.aggregate({
@@ -503,7 +536,7 @@ export async function GET(request: Request) {
       // ─── PROJECT-WISE ──────────────────────────────────────────────────
       case 'project_wise': {
         const projects = await db.project.findMany()
-        const projectData = []
+        const projectData: any[] = []
 
         for (const project of projects) {
           const result = await db.voucherEntry.aggregate({
@@ -526,7 +559,7 @@ export async function GET(request: Request) {
       // ─── LOCATION-WISE ─────────────────────────────────────────────────
       case 'location_wise': {
         const locations = await db.location.findMany()
-        const locationData = []
+        const locationData: any[] = []
 
         for (const location of locations) {
           const result = await db.voucherEntry.aggregate({
@@ -552,7 +585,7 @@ export async function GET(request: Request) {
           orderBy: { code: 'asc' },
         })
 
-        const clientData = []
+        const clientData: any[] = []
 
         for (const client of clients) {
           const clientVoucherWhere = { ...voucherWhere, clientId: client.id }
@@ -568,7 +601,7 @@ export async function GET(request: Request) {
             distinct: ['projectId'],
           })
 
-          const projects = []
+          const projects: any[] = []
           for (const vp of clientProjects) {
             if (!vp.project) continue
             const projectResult = await db.voucherEntry.aggregate({

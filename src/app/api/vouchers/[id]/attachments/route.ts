@@ -90,6 +90,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const files = formData.getAll('files') as File[]
     const category = (formData.get('category') as string) || 'other'
     const description = (formData.get('description') as string) || null
+    const uploadedBy = (formData.get('uploadedBy') as string) || systemUserId
+
+    // Fetch user details for uploadedByName
+    let uploadedByName = 'System User'
+    if (uploadedBy && uploadedBy !== 'system') {
+      const user = await db.user.findUnique({ where: { id: uploadedBy }, select: { name: true } })
+      if (user) {
+        uploadedByName = user.name
+      }
+    }
 
     if (!files || files.length === 0) {
       return NextResponse.json({ error: 'No files provided' }, { status: 400 })
@@ -148,8 +158,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             mimeType,
             category: safeCategory,
             description,
-            uploadedBy: systemUserId,
-            uploadedByName: 'System User',
+            uploadedBy: uploadedBy,
+            uploadedByName: uploadedByName,
           },
         })
 
@@ -169,7 +179,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     try {
       await db.auditLog.create({
         data: {
-          userId: systemUserId,
+          userId: uploadedBy,
           action: 'UPLOAD',
           entity: 'VoucherAttachment',
           entityId: id,

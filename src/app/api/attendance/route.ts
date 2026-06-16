@@ -6,17 +6,17 @@ import { db } from '@/lib/db'
 // ---------------------------------------------------------------------------
 
 /** Valid attendance status codes */
-const VALID_STATUSES = ['P', 'W', 'H', 'CL', 'SL', 'EL', 'CO', 'T', 'WH', 'WW', 'CD', 'A'] as const
+const VALID_STATUSES = ['P', 'W', 'H', 'CL', 'SL', 'EL', 'CO', 'T', 'WH', 'WW', 'CD', 'A', 'PW', 'TW', 'WHW', 'PH', 'TH', 'WHH'] as const
 type AttendanceStatus = (typeof VALID_STATUSES)[number]
 
 /** Status codes that are billable — used for SC calculation and isBillable flag */
-const BILLABLE_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO'])
+const BILLABLE_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO', 'PW', 'TW', 'WHW', 'PH', 'TH', 'WHH'])
 
 /** Status codes that require/allow a project assignment (billable + paid leave statuses) */
-const PROJECT_REQUIRED_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO', 'CL', 'SL', 'EL'])
+const PROJECT_REQUIRED_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO', 'CL', 'SL', 'EL', 'PW', 'TW', 'WHW', 'PH', 'TH', 'WHH', 'A'])
 
 /** Status codes that earn Social Charges (SC) */
-const SC_EARN_STATUSES: Set<string> = new Set(['P', 'W', 'H', 'T', 'WH', 'WW'])
+const SC_EARN_STATUSES: Set<string> = new Set(['P', 'W', 'H', 'T', 'WH', 'WW', 'PW', 'TW', 'WHW', 'PH', 'TH', 'WHH'])
 
 /** Status codes that deduct Social Charges (SC) */
 const SC_DEDUCT_STATUSES: Set<string> = new Set(['CL', 'SL', 'EL', 'CO'])
@@ -38,6 +38,12 @@ const STATUS_LABELS: Record<string, string> = {
   WW: 'Work on Weekend',
   CD: 'Compensatory Deduction',
   A: 'Absent',
+  PW: 'Present on Weekend',
+  TW: 'Tour on Weekend',
+  WHW: 'Work from Home on Weekend',
+  PH: 'Present on Holiday',
+  TH: 'Tour on Holiday',
+  WHH: 'Work from Home on Holiday',
 }
 
 /** Determine the SC category for a given status */

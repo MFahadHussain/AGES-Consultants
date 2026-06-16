@@ -19,6 +19,10 @@ export async function POST(request: Request) {
     const existing = await db.project.findUnique({ where: { code: data.code } })
     if (existing) return NextResponse.json({ error: `Project with code "${data.code}" already exists` }, { status: 409 })
 
+    // Convert date strings to Date objects for Prisma
+    if (data.startDate) data.startDate = new Date(data.startDate).toISOString()
+    if (data.endDate) data.endDate = new Date(data.endDate).toISOString()
+
     const project = await db.project.create({ data })
     return NextResponse.json(project, { status: 201 })
   } catch (error) {
@@ -43,6 +47,10 @@ export async function PUT(request: Request) {
       const duplicate = await db.project.findUnique({ where: { code } })
       if (duplicate) return NextResponse.json({ error: `Project with code "${code}" already exists` }, { status: 409 })
     }
+
+    // Convert date strings to Date objects for Prisma
+    if (rest.startDate) rest.startDate = new Date(rest.startDate).toISOString()
+    if (rest.endDate) rest.endDate = new Date(rest.endDate).toISOString()
 
     const project = await db.project.update({
       where: { id },

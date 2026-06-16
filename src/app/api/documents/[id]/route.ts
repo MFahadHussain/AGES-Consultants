@@ -84,7 +84,7 @@ export async function GET(
     }
 
     // Try to serve the file from disk
-    const fullPath = path.join('/home/z/my-project', document.filePath)
+    const fullPath = path.join(process.cwd(), document.filePath)
     let fileBuffer: Buffer
     try {
       fileBuffer = await readFile(fullPath)
@@ -255,7 +255,7 @@ export async function PUT(
       const sanitizedFileName = `EMP-${employee?.employeeCode || 'UNKNOWN'}-${existing.documentType.code}-${timestamp}.${fileExtension}`
 
       // Ensure upload directory exists
-      const uploadDir = path.join('/home/z/my-project/uploads/employee-docs')
+      const uploadDir = path.join(process.cwd(), 'uploads/employee-docs')
       await mkdir(uploadDir, { recursive: true })
 
       // Write new file to disk

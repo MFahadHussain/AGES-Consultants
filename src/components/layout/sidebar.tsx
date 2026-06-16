@@ -360,7 +360,10 @@ const navigation: NavGroup[] = [
   },
   {
     label: "Reports",
-    items: [{ key: "reports", label: "Financial Reports", icon: FileBarChart }],
+    items: [
+      { key: "reports", label: "Financial Reports", icon: FileBarChart },
+      { key: "timesheet-report", label: "Staff Timesheet Report", icon: Clock },
+    ],
   },
   {
     label: "Integration",
@@ -400,6 +403,7 @@ const moduleRoutes: Record<string, string> = {
   aging: "/planning/aging",
   "financial-year": "/planning/financial-year",
   reports: "/reports/financial",
+  "timesheet-report": "/reports/timesheet",
   "import-export": "/system/import-export",
   "audit-log": "/system/audit-log",
   settings: "/settings",
@@ -445,7 +449,7 @@ export function Sidebar() {
     .map((group) => ({
       ...group,
       items: group.items
-        .filter((item) => allowedModules.has(item.key))
+        .filter((item) => allowedModules.has(item.key === "timesheet-report" ? "reports" : item.key))
         .filter(
           (item) =>
             !searchQuery ||

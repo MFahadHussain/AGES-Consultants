@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-const BILLABLE_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO', 'CL', 'SL', 'EL'])
+const BILLABLE_STATUSES = new Set(['P', 'W', 'H', 'WH', 'WW', 'T', 'CO', 'CL', 'SL', 'EL', 'PW', 'TW', 'WHW', 'PH', 'TH', 'WHH'])
 
 function parseDate(dateStr: string): Date {
   const [year, month, day] = dateStr.split('-').map(Number)

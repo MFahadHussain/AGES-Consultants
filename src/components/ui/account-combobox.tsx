@@ -137,7 +137,7 @@ export function AccountCombobox({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -176,7 +176,7 @@ export function AccountCombobox({
               onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
-          <CommandList className="max-h-[280px]">
+          <CommandList className="max-h-[280px] overflow-y-auto overscroll-contain touch-pan-y">
             <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
               {searchQuery ? `No accounts matching "${searchQuery}"` : 'No accounts found'}
             </CommandEmpty>

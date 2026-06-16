@@ -219,6 +219,7 @@ const emptyForm = {
   pfEnabled: false,
   essiEnabled: false,
   gratuityEnabled: false,
+  incomeTaxEnabled: true,
   applyToAllProjects: false,
   defaultAllocationMethod: "days",
   taxFilingStatus: "",
@@ -552,6 +553,7 @@ export function EmployeeMaster() {
       pfEnabled: emp.pfEnabled || false,
       essiEnabled: emp.essiEnabled || false,
       gratuityEnabled: emp.gratuityEnabled || false,
+      incomeTaxEnabled: emp.incomeTaxEnabled !== false,
       applyToAllProjects: emp.applyToAllProjects || false,
       defaultAllocationMethod: emp.defaultAllocationMethod || "days",
       taxFilingStatus: emp.taxFilingStatus || "",
@@ -1270,6 +1272,30 @@ export function EmployeeMaster() {
               <button
                 type="button"
                 role="switch"
+                aria-checked={!!form.incomeTaxEnabled}
+                onClick={() =>
+                  setForm((prev) => ({
+                    ...prev,
+                    incomeTaxEnabled: !prev.incomeTaxEnabled,
+                  }))
+                }
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${form.incomeTaxEnabled ? "bg-slate-900" : "bg-slate-200"}`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${form.incomeTaxEnabled ? "translate-x-4" : "translate-x-0"}`}
+                />
+              </button>
+              <div>
+                <p className="text-xs font-medium">Income Tax Applicable</p>
+                <p className="text-[10px] text-muted-foreground">
+                  Deduct income tax from salary
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-slate-200">
+              <button
+                type="button"
+                role="switch"
                 aria-checked={!!form.applyToAllProjects}
                 onClick={() =>
                   setForm((prev) => ({
@@ -1715,6 +1741,11 @@ export function EmployeeMaster() {
                   className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.pfEnabled ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
                 >
                   PF {emp.pfEnabled ? "✓" : "✗"}
+                </span>
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.incomeTaxEnabled !== false ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
+                >
+                  Tax {emp.incomeTaxEnabled !== false ? "✓" : "✗"}
                 </span>
                 <span
                   className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.applyToAllProjects ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
@@ -2174,6 +2205,11 @@ export function EmployeeMaster() {
                               className={`text-[9px] px-1 py-0.5 rounded border ${emp.pfEnabled ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
                             >
                               PF {emp.pfEnabled ? "✓" : "✗"}
+                            </span>
+                            <span
+                              className={`text-[9px] px-1 py-0.5 rounded border ${emp.incomeTaxEnabled !== false ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
+                            >
+                              Tax {emp.incomeTaxEnabled !== false ? "✓" : "✗"}
                             </span>
                           </div>
                         </TableCell>

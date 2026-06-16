@@ -133,13 +133,22 @@ export function ChartOfAccounts() {
     }
   }
 
-  const handleDeactivate = async (account: Account) => {
+  const handleDelete = async (account: Account) => {
     if (account.isSystem) {
-      toast({ title: 'Cannot Deactivate', description: 'System accounts cannot be deactivated', variant: 'destructive' })
+      toast({ title: 'Cannot Delete', description: 'System accounts cannot be deleted or deactivated', variant: 'destructive' })
       return
     }
-    await fetch(`/api/accounts/${account.id}`, { method: 'DELETE' })
-    toast({ title: 'Deactivated', description: `Account ${account.code} deactivated` })
+    const res = await fetch(`/api/accounts/${account.id}`, { method: 'DELETE' })
+    const data = await res.json()
+    if (res.ok) {
+      if (!data.isActive) {
+        toast({ title: 'Deactivated', description: `Account ${account.code} had dependencies and was deactivated instead of deleted` })
+      } else {
+        toast({ title: 'Deleted', description: `Account ${account.code} deleted successfully` })
+      }
+    } else {
+      toast({ title: 'Error', description: data.error || 'Failed to delete account', variant: 'destructive' })
+    }
     fetchData()
   }
 
@@ -282,11 +291,11 @@ export function ChartOfAccounts() {
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingAccount(account); setForm({ code: account.code, name: account.name, accountType: account.accountType, subType: account.subType || '', parentId: account.parentId || '', allowPosting: account.allowPosting, description: account.description || '' }); setDialogOpen(true) }}><Edit2 className="h-3 w-3" /></Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeactivate(account)} disabled={account.isSystem}><Trash2 className="h-3 w-3" /></Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(account)} disabled={account.isSystem}><Trash2 className="h-3 w-3" /></Button>
                           </div>
                         </TableCell>
                       </TableRow>
-                      {isExpanded && hasChildren && renderChildAccounts(accounts, account.id, 1, expandedIds, toggleExpand, setEditingAccount, setForm, setDialogOpen, handleDeactivate)}
+                      {isExpanded && hasChildren && renderChildAccounts(accounts, account.id, 1, expandedIds, toggleExpand, setEditingAccount, setForm, setDialogOpen, handleDelete)}
                     </React.Fragment>
                   )
                 })
@@ -300,7 +309,7 @@ export function ChartOfAccounts() {
   )
 }
 
-function renderChildAccounts(allAccounts: Account[], parentId: string, level: number, expandedIds: Set<string>, toggleExpand: (id: string) => void, setEditingAccount: (a: Account) => void, setForm: (f: any) => void, setDialogOpen: (o: boolean) => void, handleDeactivate: (a: Account) => void) {
+function renderChildAccounts(allAccounts: Account[], parentId: string, level: number, expandedIds: Set<string>, toggleExpand: (id: string) => void, setEditingAccount: (a: Account) => void, setForm: (f: any) => void, setDialogOpen: (o: boolean) => void, handleDelete: (a: Account) => void) {
   const children = allAccounts.filter(a => a.parentId === parentId)
   return children.map(account => {
     const hasChildren = allAccounts.some(a => a.parentId === account.id)
@@ -331,11 +340,11 @@ function renderChildAccounts(allAccounts: Account[], parentId: string, level: nu
           <TableCell>
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingAccount(account); setForm({ code: account.code, name: account.name, accountType: account.accountType, subType: account.subType || '', parentId: account.parentId || '', allowPosting: account.allowPosting, description: account.description || '' }); setDialogOpen(true) }}><Edit2 className="h-3 w-3" /></Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeactivate(account)} disabled={account.isSystem}><Trash2 className="h-3 w-3" /></Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(account)} disabled={account.isSystem}><Trash2 className="h-3 w-3" /></Button>
             </div>
           </TableCell>
         </TableRow>
-        {isExpanded && hasChildren && renderChildAccounts(allAccounts, account.id, level + 1, expandedIds, toggleExpand, setEditingAccount, setForm, setDialogOpen, handleDeactivate)}
+        {isExpanded && hasChildren && renderChildAccounts(allAccounts, account.id, level + 1, expandedIds, toggleExpand, setEditingAccount, setForm, setDialogOpen, handleDelete)}
       </React.Fragment>
     )
   })

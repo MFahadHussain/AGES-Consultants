@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { code, name, allowanceType, value, baseOnSalary, isTaxable, isProjectSpecific, isActive } = body
+    const { code, name, allowanceType, value, baseOnSalary, isTaxable, isProjectSpecific, isActive, isInclusive, isSocialCharges } = body
 
     // --- Required fields ---
     if (!code || !name) {
@@ -90,6 +90,8 @@ export async function POST(request: Request) {
         baseOnSalary: Boolean(baseOnSalary ?? false),
         isTaxable: Boolean(isTaxable ?? true),
         isProjectSpecific: Boolean(isProjectSpecific ?? false),
+        isInclusive: Boolean(isInclusive ?? false),
+        isSocialCharges: Boolean(isSocialCharges ?? false),
         isActive: Boolean(isActive ?? true),
       },
     })
@@ -139,7 +141,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json()
-    const { code, name, allowanceType, value, baseOnSalary, isTaxable, isProjectSpecific, isActive } = body
+    const { code, name, allowanceType, value, baseOnSalary, isTaxable, isProjectSpecific, isActive, isInclusive, isSocialCharges } = body
 
     // --- If code is being changed, check uniqueness ---
     if (code && code !== existing.code) {
@@ -188,6 +190,8 @@ export async function PUT(request: Request) {
     if (baseOnSalary !== undefined) updateData.baseOnSalary = Boolean(baseOnSalary)
     if (isTaxable !== undefined) updateData.isTaxable = Boolean(isTaxable)
     if (isProjectSpecific !== undefined) updateData.isProjectSpecific = Boolean(isProjectSpecific)
+    if (isInclusive !== undefined) updateData.isInclusive = Boolean(isInclusive)
+    if (isSocialCharges !== undefined) updateData.isSocialCharges = Boolean(isSocialCharges)
     if (isActive !== undefined) updateData.isActive = Boolean(isActive)
 
     const updated = await db.allowance.update({
