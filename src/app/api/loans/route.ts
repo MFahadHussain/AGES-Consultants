@@ -1,10 +1,11 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // ============================================================
 // GET /api/loans — List loans with optional filters
 // ============================================================
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
 // ============================================================
 // POST /api/loans — Create a new loan with installment schedule
 // ============================================================
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const data = await request.json()
 
@@ -202,7 +203,7 @@ export async function POST(request: Request) {
 // ============================================================
 // PUT /api/loans — Update loan / handle disbursement
 // ============================================================
-export async function PUT(request: Request) {
+async function PUT_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -383,7 +384,7 @@ export async function PUT(request: Request) {
 // ============================================================
 // DELETE /api/loans — Delete only if draft (status=active and no installments paid)
 // ============================================================
-export async function DELETE(request: Request) {
+async function DELETE_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -434,3 +435,11 @@ export async function DELETE(request: Request) {
     )
   }
 }
+
+export const POST = withAudit('loans', POST_HANDLER);
+
+export const PUT = withAudit('loans', PUT_HANDLER);
+
+export const DELETE = withAudit('loans', DELETE_HANDLER);
+
+export const GET = withAudit('loans', GET_HANDLER);

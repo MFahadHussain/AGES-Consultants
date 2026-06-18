@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
@@ -6,7 +7,7 @@ import { db } from '@/lib/db'
 // Returns ProjectCostLedger entries for a given month
 // ============================================================
 
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const month = searchParams.get('month')
@@ -151,3 +152,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+
+export const GET = withAudit('payroll', GET_HANDLER);

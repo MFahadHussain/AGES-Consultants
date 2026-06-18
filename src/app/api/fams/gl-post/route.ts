@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 import { findAccountByRole, findAccDepForCategory, findDepExpenseForCategory, findFirstBankAccount } from '@/lib/account-roles'
@@ -13,7 +14,7 @@ import { findAccountByRole, findAccDepForCategory, findDepExpenseForCategory, fi
  *   - post-acquisition: Post a single asset acquisition to GL
  *   - post-selected: Post selected journal IDs to GL
  */
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const body = await request.json()
     const action = body.action || 'post-all'
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
 /**
  * GET /api/fams/gl-post - Get GL posting status
  */
-export async function GET() {
+async function GET_HANDLER() {
   try {
     const pendingJournals = await db.fAMSJournal.findMany({
       where: { status: 'Pending Export' },
@@ -483,3 +484,7 @@ function getVoucherTypeName(type: string): string {
     default: return 'Journal Voucher'
   }
 }
+
+export const POST = withAudit('fams', POST_HANDLER);
+
+export const GET = withAudit('fams', GET_HANDLER);

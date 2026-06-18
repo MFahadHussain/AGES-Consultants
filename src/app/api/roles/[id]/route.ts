@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // GET /api/roles/[id] - Get role with permissions and user count
-export async function GET(
+async function GET_HANDLER(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -85,7 +86,7 @@ export async function GET(
 }
 
 // PUT /api/roles/[id] - Update role
-export async function PUT(
+async function PUT_HANDLER(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -202,7 +203,7 @@ export async function PUT(
 }
 
 // DELETE /api/roles/[id] - Delete role (only if not system role)
-export async function DELETE(
+async function DELETE_HANDLER(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -275,3 +276,9 @@ export async function DELETE(
     )
   }
 }
+
+export const PUT = withAudit('roles', PUT_HANDLER);
+
+export const DELETE = withAudit('roles', DELETE_HANDLER);
+
+export const GET = withAudit('roles', GET_HANDLER);

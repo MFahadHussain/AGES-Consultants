@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // GET /api/permissions - List all permissions, optionally filtered by module
-export async function GET(request: NextRequest) {
+async function GET_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const moduleFilter = searchParams.get('module')
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/permissions - Create a permission or seed default permissions
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
     const { action: postAction } = body
@@ -234,3 +235,7 @@ async function seedDefaultPermissions() {
     message: `Seeded ${created} permissions, ${skipped} already existed`,
   })
 }
+
+export const POST = withAudit('permissions', POST_HANDLER);
+
+export const GET = withAudit('permissions', GET_HANDLER);

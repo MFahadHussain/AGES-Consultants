@@ -1,9 +1,10 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { findAccDepForCategory, findDepExpenseForCategory } from '@/lib/account-roles'
 
 // GET /api/fams/depreciation
-export async function GET(request: NextRequest) {
+async function GET_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const assetId = searchParams.get('assetId')
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/fams/depreciation - Run depreciation
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
     const { financialYear, period, monthNumber } = body
@@ -128,3 +129,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to run depreciation' }, { status: 500 })
   }
 }
+
+export const POST = withAudit('fams', POST_HANDLER);
+
+export const GET = withAudit('fams', GET_HANDLER);

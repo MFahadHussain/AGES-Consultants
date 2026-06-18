@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // GET /api/security-policies - Get security policies
-export async function GET(request: NextRequest) {
+async function GET_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/security-policies - Create security policy
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
     const {
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
 }
 
 // PUT /api/security-policies - Update security policy
-export async function PUT(request: NextRequest) {
+async function PUT_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -197,3 +198,9 @@ function formatPolicy(p: any) {
     allowedLoginHoursParsed,
   }
 }
+
+export const POST = withAudit('security-policies', POST_HANDLER);
+
+export const PUT = withAudit('security-policies', PUT_HANDLER);
+
+export const GET = withAudit('security-policies', GET_HANDLER);

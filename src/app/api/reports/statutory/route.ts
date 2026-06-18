@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { findAccountsByRole } from '@/lib/account-roles'
@@ -2267,7 +2268,7 @@ function filterScheduleRows(rows: ReportRow[], section: 'ppe' | 'intangible'): R
   return filtered
 }
 
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
 
@@ -2383,3 +2384,5 @@ export async function GET(request: Request) {
     )
   }
 }
+
+export const GET = withAudit('reports', GET_HANDLER);

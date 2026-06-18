@@ -1,7 +1,8 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') || 'receivables' // receivables or payables
@@ -74,3 +75,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export const GET = withAudit('aging', GET_HANDLER);

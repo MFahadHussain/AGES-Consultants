@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 
@@ -32,7 +33,7 @@ function validateRole(role: string): string {
   return 'admin' // Default to admin for backward compatibility
 }
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function GET_HANDLER(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const voucher = await db.voucher.findUnique({
@@ -56,7 +57,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 }
 
-export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function PUT_HANDLER(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const data = await request.json()
@@ -302,7 +303,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function DELETE_HANDLER(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const { searchParams } = new URL(request.url)
@@ -352,3 +353,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export const PUT = withAudit('vouchers', PUT_HANDLER);
+
+export const DELETE = withAudit('vouchers', DELETE_HANDLER);
+
+export const GET = withAudit('vouchers', GET_HANDLER);

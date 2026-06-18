@@ -1,8 +1,10 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { revalidatePermissionsCache } from '@/lib/permissions'
 
 // GET /api/role-permissions - Get all permissions for a role
-export async function GET(request: NextRequest) {
+async function GET_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const roleId = searchParams.get('roleId')
@@ -56,7 +58,7 @@ export async function GET(request: NextRequest) {
 // 1. Replace all: { roleId, permissions: [{ permissionId, isGranted }] }
 // 2. Single mapping: { roleId, permissionId, isGranted }
 // 3. Batch grant: { roleId, permissionIds: string[] }
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
     const { roleId, permissions, permissionId, isGranted, permissionIds } = body
@@ -117,7 +119,7 @@ export async function POST(request: NextRequest) {
       } catch {
         // Non-blocking
       }
-
+      await revalidatePermissionsCache()
       return NextResponse.json({ success: true, data: result }, { status: 201 })
     }
 
@@ -179,7 +181,7 @@ export async function POST(request: NextRequest) {
         where: { roleId },
         include: { permission: true },
       })
-
+      await revalidatePermissionsCache()
       return NextResponse.json({
         success: true,
         data: updatedPermissions,
@@ -260,7 +262,7 @@ export async function POST(request: NextRequest) {
       where: { roleId },
       include: { permission: true },
     })
-
+    await revalidatePermissionsCache()
     return NextResponse.json({
       success: true,
       data: updatedPermissions,
@@ -276,7 +278,7 @@ export async function POST(request: NextRequest) {
 }
 
 // DELETE /api/role-permissions - Remove a role-permission mapping
-export async function DELETE(request: NextRequest) {
+async function DELETE_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const roleId = searchParams.get('roleId')
@@ -328,7 +330,7 @@ export async function DELETE(request: NextRequest) {
     } catch {
       // Non-blocking
     }
-
+    await revalidatePermissionsCache()
     return NextResponse.json({
       success: true,
       message: `Removed permission "${rolePermission.permission.name}" from role "${rolePermission.role.name}"`,
@@ -341,3 +343,9 @@ export async function DELETE(request: NextRequest) {
     )
   }
 }
+
+export const POST = withAudit('role-permissions', POST_HANDLER);
+
+export const DELETE = withAudit('role-permissions', DELETE_HANDLER);
+
+export const GET = withAudit('role-permissions', GET_HANDLER);

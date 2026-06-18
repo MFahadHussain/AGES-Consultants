@@ -1,9 +1,10 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 
 // POST /api/rbac/seed - Seed default RBAC data
-export async function POST() {
+async function POST_HANDLER() {
   try {
     const results = {
       roles: { created: 0, skipped: 0 },
@@ -378,3 +379,5 @@ export async function POST() {
     )
   }
 }
+
+export const POST = withAudit('rbac', POST_HANDLER);

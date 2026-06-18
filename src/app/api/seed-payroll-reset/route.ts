@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
@@ -67,7 +68,7 @@ const DEFAULT_GL_COMPONENT_TYPES = [
   { componentType: 'ADVANCE_DEDUCTION',   description: 'Advance Deduction - Credit to advance receivable account' },
 ]
 
-export async function POST() {
+async function POST_HANDLER() {
   try {
     const summary: string[] = []
 
@@ -365,6 +366,10 @@ export async function POST() {
 }
 
 // GET handler — convenience: triggers the same seed via GET
-export async function GET() {
+async function GET_HANDLER() {
   return POST()
 }
+
+export const POST = withAudit('seed-payroll-reset', POST_HANDLER);
+
+export const GET = withAudit('seed-payroll-reset', GET_HANDLER);

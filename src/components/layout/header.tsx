@@ -265,6 +265,7 @@ export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
+  const [activeFinancialYear, setActiveFinancialYear] = useState<string>("Loading FY...");
   const [notifications, setNotifications] = useState<{
     count: number;
     items: { id: string; text: string; type: string; module: ModuleKey }[];
@@ -288,6 +289,22 @@ export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
 
   useEffect(() => {
     queueMicrotask(() => setMounted(true));
+  }, []);
+
+  const fetchActiveYear = useCallback(async () => {
+    try {
+      const res = await fetch("/api/financial-year");
+      if (!res.ok) return;
+      const data = await res.json();
+      const openYear = data.find((y: any) => y.status === "open");
+      if (openYear) {
+        setActiveFinancialYear(openYear.name);
+      } else {
+        setActiveFinancialYear("No Open FY");
+      }
+    } catch (e) {
+      // Ignore
+    }
   }, []);
 
   const fetchNotifications = useCallback(async () => {
@@ -318,10 +335,13 @@ export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
   }, []);
 
   useEffect(() => {
-    queueMicrotask(() => fetchNotifications());
+    queueMicrotask(() => {
+      fetchNotifications();
+      fetchActiveYear();
+    });
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  }, [fetchNotifications, fetchActiveYear]);
 
   // Password change handler
   const handleChangePassword = async () => {
@@ -490,7 +510,7 @@ export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
         {/* FY Selector */}
         <div className="hidden sm:flex items-center px-2.5 py-1 rounded-md border border-gray-200 bg-gray-50">
           <span className="text-[11px] font-medium text-gray-500">
-            FY 2024-25
+            {activeFinancialYear}
           </span>
         </div>
 

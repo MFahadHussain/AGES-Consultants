@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 
@@ -6,7 +7,7 @@ import { db, getSystemUserId } from '@/lib/db'
  * Generic organization setup. No org-specific branding.
  * All amounts in PKR
  */
-export async function GET() {
+async function GET_HANDLER() {
   try {
     // Check if data already exists
     const existingAssets = await db.fixedAsset.count()
@@ -232,7 +233,7 @@ export async function GET() {
 /**
  * DELETE /api/fams/seed - Clear all FAMS demo/seed data
  */
-export async function DELETE() {
+async function DELETE_HANDLER() {
   try {
     // Delete in correct order to respect foreign key constraints
     const depResult = await db.fixedAssetDepreciation.deleteMany({})
@@ -263,3 +264,7 @@ export async function DELETE() {
     )
   }
 }
+
+export const DELETE = withAudit('fams', DELETE_HANDLER);
+
+export const GET = withAudit('fams', GET_HANDLER);

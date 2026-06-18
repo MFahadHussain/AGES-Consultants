@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { findAccountsByRole } from '@/lib/account-roles'
 
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') || 'general'
@@ -242,3 +243,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export const GET = withAudit('ledgers', GET_HANDLER);

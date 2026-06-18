@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
@@ -11,7 +12,7 @@ async function hashPassword(password: string): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-export async function POST() {
+async function POST_HANDLER() {
   try {
     const defaultPasswordHash = await hashPassword('AcctFin@2025')
 
@@ -56,3 +57,5 @@ export async function POST() {
     return NextResponse.json({ error: 'Failed to seed users' }, { status: 500 })
   }
 }
+
+export const POST = withAudit('auth', POST_HANDLER);

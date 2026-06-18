@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 import { calculateMonthlyPayroll } from '@/lib/payroll/calculateMonthlyPayroll'
@@ -86,7 +87,7 @@ async function recalcBatchTotals(batchId: string) {
 // ============================================================
 // GET - List payroll batches
 // ============================================================
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
@@ -136,7 +137,7 @@ export async function GET(request: Request) {
 // ============================================================
 // POST - All payroll actions
 // ============================================================
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const data = await request.json()
     const action = data.action
@@ -881,7 +882,7 @@ export async function POST(request: Request) {
 // ============================================================
 // PUT - Update batch metadata
 // ============================================================
-export async function PUT(request: Request) {
+async function PUT_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -911,7 +912,7 @@ export async function PUT(request: Request) {
 // ============================================================
 // DELETE - Delete a batch
 // ============================================================
-export async function DELETE(request: Request) {
+async function DELETE_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -1087,3 +1088,11 @@ async function buildGlEntries(batch: { batchNumber: string; projectId: string | 
 
   return { entries, totalDebit, totalCredit }
 }
+
+export const POST = withAudit('payroll', POST_HANDLER);
+
+export const PUT = withAudit('payroll', PUT_HANDLER);
+
+export const DELETE = withAudit('payroll', DELETE_HANDLER);
+
+export const GET = withAudit('payroll', GET_HANDLER);

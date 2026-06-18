@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // GET /api/sessions - List sessions
-export async function GET(request: NextRequest) {
+async function GET_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest) {
 }
 
 // DELETE /api/sessions - Terminate sessions
-export async function DELETE(request: NextRequest) {
+async function DELETE_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const sessionId = searchParams.get('sessionId')
@@ -149,3 +150,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Failed to terminate sessions' }, { status: 500 })
   }
 }
+
+export const DELETE = withAudit('sessions', DELETE_HANDLER);
+
+export const GET = withAudit('sessions', GET_HANDLER);

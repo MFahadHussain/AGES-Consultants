@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // GET /api/roles - List all roles with their permission counts
-export async function GET() {
+async function GET_HANDLER() {
   try {
     const roles = await db.role.findMany({
       orderBy: [{ level: 'asc' }, { name: 'asc' }],
@@ -46,7 +47,7 @@ export async function GET() {
 }
 
 // POST /api/roles - Create a new role
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
     const { code, name, description, level, parentRoleId, isSystem, isActive } = body
@@ -140,3 +141,7 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const POST = withAudit('roles', POST_HANDLER);
+
+export const GET = withAudit('roles', GET_HANDLER);

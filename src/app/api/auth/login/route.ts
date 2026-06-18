@@ -1,9 +1,10 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 
 // POST /api/auth/login — Enhanced authentication with lockout, session tracking, audit
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
     const { email, password, rememberMe, deviceInfo } = body
@@ -442,3 +443,5 @@ function detectOS(userAgent: string): string {
   if (ua.includes('iPhone') || ua.includes('iPad')) return 'iOS'
   return 'Unknown'
 }
+
+export const POST = withAudit('auth', POST_HANDLER);

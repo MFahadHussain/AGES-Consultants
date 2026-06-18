@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 
@@ -15,7 +16,7 @@ import { db, getSystemUserId } from '@/lib/db'
  * 6. Update fiscal year dep run status
  * 7. Create audit log
  */
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const body = await request.json()
     const { financialYear, period, reason, role } = body
@@ -170,3 +171,5 @@ export async function POST(request: Request) {
     )
   }
 }
+
+export const POST = withAudit('fams', POST_HANDLER);

@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 // ============================================================================
 // Payroll Reports API — AcctFin ERP v1.0.0
 // ============================================================================
@@ -1560,7 +1561,7 @@ async function taxPsid(searchParams: URLSearchParams) {
 // MAIN ROUTE HANDLER
 // ============================================================================
 
-export async function GET(req: NextRequest) {
+async function GET_HANDLER(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const type = searchParams.get('type')
@@ -1634,3 +1635,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export const GET = withAudit('payroll', GET_HANDLER);

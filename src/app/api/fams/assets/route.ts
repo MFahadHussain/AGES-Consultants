@@ -1,9 +1,10 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { findAccountByRole, findAccDepForCategory, findDepExpenseForCategory } from '@/lib/account-roles'
 
 // GET /api/fams/assets - List assets
-export async function GET() {
+async function GET_HANDLER() {
   try {
     const assets = await db.fixedAsset.findMany({
       orderBy: { assetId: 'asc' },
@@ -45,7 +46,7 @@ const GL_CATEGORY_MAP: Record<string, { asset: string; accDep: string; depExp: s
 }
 
 // POST /api/fams/assets - Create new asset
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
 
@@ -140,3 +141,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Failed to create asset: ${message}` }, { status: 500 })
   }
 }
+
+export const POST = withAudit('fams', POST_HANDLER);
+
+export const GET = withAudit('fams', GET_HANDLER);

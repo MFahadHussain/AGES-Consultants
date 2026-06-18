@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
@@ -87,7 +88,7 @@ function isValidTimeFormat(time: string): boolean {
 // GET /api/attendance
 // ---------------------------------------------------------------------------
 
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
 
@@ -275,7 +276,7 @@ export async function GET(request: Request) {
 //   2. Bulk records:   { records: [{ employeeId, date, status, projectId?, ... }] }
 // ---------------------------------------------------------------------------
 
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const body = await request.json()
 
@@ -300,7 +301,7 @@ export async function POST(request: Request) {
 // PUT /api/attendance?id=xxx
 // ---------------------------------------------------------------------------
 
-export async function PUT(request: Request) {
+async function PUT_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -403,7 +404,7 @@ export async function PUT(request: Request) {
 // DELETE /api/attendance?id=xxx
 // ---------------------------------------------------------------------------
 
-export async function DELETE(request: Request) {
+async function DELETE_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -701,3 +702,11 @@ async function isUsedInPayroll(employeeId: string, date: Date): Promise<{ used: 
   if (line) return { used: true, batchRef: line.batch.batchNumber }
   return { used: false }
 }
+
+export const POST = withAudit('attendance', POST_HANDLER);
+
+export const PUT = withAudit('attendance', PUT_HANDLER);
+
+export const DELETE = withAudit('attendance', DELETE_HANDLER);
+
+export const GET = withAudit('attendance', GET_HANDLER);

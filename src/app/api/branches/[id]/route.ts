@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // PUT /api/branches/[id] - Update branch
-export async function PUT(
+async function PUT_HANDLER(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -87,7 +88,7 @@ export async function PUT(
 }
 
 // DELETE /api/branches/[id] - Soft delete branch (set isActive=false)
-export async function DELETE(
+async function DELETE_HANDLER(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -153,3 +154,7 @@ export async function DELETE(
     )
   }
 }
+
+export const PUT = withAudit('branches', PUT_HANDLER);
+
+export const DELETE = withAudit('branches', DELETE_HANDLER);

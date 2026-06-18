@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { FinancialStatementEngine, CashReconciliationError } from '@/lib/reporting/financials'
 import { db } from '@/lib/db'
 
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const fromDate = searchParams.get('fromDate')
@@ -61,3 +62,5 @@ export async function GET(request: Request) {
     )
   }
 }
+
+export const GET = withAudit('statutory-reports', GET_HANDLER);

@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
@@ -508,7 +509,7 @@ const NEW_COA: COAAccount[] = [
         { code: '05-08-05-0001', name: 'Income Tax Expense', accountType: 'EXPENSE', subType: 'TAX_EXPENSE', parentCode: '05-08-05', level: 3, allowPosting: true, isSystem: true, description: 'Provision for income tax' },
 ]
 
-export async function GET() {
+async function GET_HANDLER() {
   try {
     // ═══════════════════════════════════════════════════════════
     // STEP 1: Delete ALL existing data in dependency order
@@ -713,3 +714,5 @@ export async function GET() {
     }, { status: 500 })
   }
 }
+
+export const GET = withAudit('seed', GET_HANDLER);

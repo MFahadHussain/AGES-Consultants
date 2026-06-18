@@ -1,7 +1,8 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function GET_HANDLER(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const customer = await db.customer.findUnique({ where: { id } })
@@ -12,7 +13,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 }
 
-export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function PUT_HANDLER(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const data = await request.json()
@@ -28,7 +29,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function DELETE_HANDLER(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const customer = await db.customer.update({ where: { id }, data: { isActive: false } })
@@ -42,3 +43,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export const PUT = withAudit('customers', PUT_HANDLER);
+
+export const DELETE = withAudit('customers', DELETE_HANDLER);
+
+export const GET = withAudit('customers', GET_HANDLER);

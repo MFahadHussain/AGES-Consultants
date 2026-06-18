@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 
@@ -5,7 +6,7 @@ import { db, getSystemUserId } from '@/lib/db'
  * PUT /api/fams/fiscal-years/[id] - Update fiscal year or close it
  * Body: { action?: "close", depRunStatus?: object, status?: string }
  */
-export async function PUT(
+async function PUT_HANDLER(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -124,3 +125,5 @@ export async function PUT(
     )
   }
 }
+
+export const PUT = withAudit('fams', PUT_HANDLER);

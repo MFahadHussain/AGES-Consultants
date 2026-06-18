@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // PUT /api/departments/[id] - Update department
-export async function PUT(
+async function PUT_HANDLER(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -93,7 +94,7 @@ export async function PUT(
 }
 
 // DELETE /api/departments/[id] - Soft delete department
-export async function DELETE(
+async function DELETE_HANDLER(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -158,3 +159,7 @@ export async function DELETE(
     )
   }
 }
+
+export const PUT = withAudit('departments', PUT_HANDLER);
+
+export const DELETE = withAudit('departments', DELETE_HANDLER);

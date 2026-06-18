@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
@@ -5,7 +6,7 @@ import { db } from '@/lib/db'
 // GET /api/project-assignments
 // List assignments with filters and include employee/project relations
 // ============================================================
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
 
@@ -113,7 +114,7 @@ export async function GET(request: Request) {
 // POST /api/project-assignments
 // Create a new assignment with validation
 // ============================================================
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const data = await request.json()
 
@@ -389,7 +390,7 @@ export async function POST(request: Request) {
 // PUT /api/project-assignments?id=xxx
 // Update an assignment (reactivation, deactivation, salary allocation)
 // ============================================================
-export async function PUT(request: Request) {
+async function PUT_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -695,7 +696,7 @@ export async function PUT(request: Request) {
 // DELETE /api/project-assignments?id=xxx
 // Delete an assignment (only if not used in payroll)
 // ============================================================
-export async function DELETE(request: Request) {
+async function DELETE_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -785,3 +786,11 @@ export async function DELETE(request: Request) {
     )
   }
 }
+
+export const POST = withAudit('project-assignments', POST_HANDLER);
+
+export const PUT = withAudit('project-assignments', PUT_HANDLER);
+
+export const DELETE = withAudit('project-assignments', DELETE_HANDLER);
+
+export const GET = withAudit('project-assignments', GET_HANDLER);

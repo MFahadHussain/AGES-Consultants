@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { readFile, writeFile, mkdir } from 'fs/promises'
@@ -54,7 +55,7 @@ function getContentType(fileName: string, fileType: string): string {
 // Query params:
 //   download (optional) — if "true", set Content-Disposition to attachment
 // ---------------------------------------------------------------------------
-export async function GET(
+async function GET_HANDLER(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -147,7 +148,7 @@ export async function GET(
 //   1. Metadata update: JSON body with title, documentNumber, issueDate, expiryDate, notes
 //   2. File replace: multipart/form-data with new file — archives old, creates new version
 // ---------------------------------------------------------------------------
-export async function PUT(
+async function PUT_HANDLER(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -417,7 +418,7 @@ export async function PUT(
 // DELETE /api/documents/[id] — Soft delete (archive)
 // Sets isArchived = true, does not delete the file from disk (kept for audit)
 // ---------------------------------------------------------------------------
-export async function DELETE(
+async function DELETE_HANDLER(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -486,3 +487,9 @@ export async function DELETE(
     )
   }
 }
+
+export const PUT = withAudit('documents', PUT_HANDLER);
+
+export const DELETE = withAudit('documents', DELETE_HANDLER);
+
+export const GET = withAudit('documents', GET_HANDLER);

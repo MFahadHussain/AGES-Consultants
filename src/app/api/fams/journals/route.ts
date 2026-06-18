@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // GET /api/fams/journals
-export async function GET(request: NextRequest) {
+async function GET_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
@@ -24,3 +25,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch journals' }, { status: 500 })
   }
 }
+
+export const GET = withAudit('fams', GET_HANDLER);

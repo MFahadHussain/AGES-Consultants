@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
@@ -28,7 +29,7 @@ const DEFAULT_DOCUMENT_TYPES = [
 // Query params:
 //   employeeId (optional) — if provided, include document counts per type for this employee
 // ---------------------------------------------------------------------------
-export async function GET(request: NextRequest) {
+async function GET_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')?.trim() || ''
@@ -88,7 +89,7 @@ export async function GET(request: NextRequest) {
 // POST /api/document-types — Create a new custom document type
 // Body: { name, code, isRequired?, hasExpiry?, allowedFormats?, maxFileSizeKB?, sortOrder? }
 // ---------------------------------------------------------------------------
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
 
@@ -145,3 +146,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+
+export const POST = withAudit('document-types', POST_HANDLER);
+
+export const GET = withAudit('document-types', GET_HANDLER);

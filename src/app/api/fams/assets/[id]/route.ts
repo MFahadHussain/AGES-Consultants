@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 
@@ -29,7 +30,7 @@ const GL_ACCOUNT_MAP: Record<string, { asset: string; accDep: string; depExp: st
 /**
  * GET /api/fams/assets/[id] - Single asset with depreciation records and transactions
  */
-export async function GET(
+async function GET_HANDLER(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -114,7 +115,7 @@ export async function GET(
  * - Updates FBR tax rates if category changes
  * - Creates audit log
  */
-export async function PUT(
+async function PUT_HANDLER(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -300,7 +301,7 @@ export async function PUT(
  * DELETE /api/fams/assets/[id] - Soft delete (change status to "Written Off")
  * Creates a write-off transaction and journal entries
  */
-export async function DELETE(
+async function DELETE_HANDLER(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -467,3 +468,9 @@ export async function DELETE(
     )
   }
 }
+
+export const PUT = withAudit('fams', PUT_HANDLER);
+
+export const DELETE = withAudit('fams', DELETE_HANDLER);
+
+export const GET = withAudit('fams', GET_HANDLER);

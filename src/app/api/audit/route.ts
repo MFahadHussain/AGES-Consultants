@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // GET /api/audit - Enhanced audit log with filters, pagination, and statistics
-export async function GET(request: NextRequest) {
+async function GET_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
 
@@ -156,3 +157,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Failed to fetch audit logs' }, { status: 500 })
   }
 }
+
+export const GET = withAudit('audit', GET_HANDLER);

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useAppStore } from "@/lib/store";
+import { useAppStore, hasPermission } from "@/lib/store";
 import {
   Card,
   CardContent,
@@ -312,21 +312,14 @@ export function SettingsModule() {
   const router = useRouter();
   const { authUser } = useAppStore();
 
-  // Only super admin and system admin can see RBAC (Roles & Permissions)
-  const isAdminRole =
-    authUser?.role === "admin" ||
-    authUser?.role === "super_admin" ||
-    authUser?.role === "system_admin";
-  // Also check if the user has a SUPER_ADMIN or SYSTEM_ADMIN role in their assigned roles
-  const hasAdminRoleCode = (authUser?.roles || []).some(
-    (r: any) => r.code === "SUPER_ADMIN" || r.code === "SYSTEM_ADMIN",
-  );
-  const canViewRBAC = isAdminRole || hasAdminRoleCode;
+  // Use permission hook instead of hardcoded roles
+  const canViewRBAC = hasPermission(authUser, "ROLES_VIEW") || hasPermission(authUser, "PERMISSIONS_VIEW");
   const [activeTab, setActiveTab] = useState("general");
   const [settingsMap, setSettingsMap] = useState<SettingsMap>({});
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
   const { toast } = useToast();
 
   // Form states for editing settings by category
@@ -481,6 +474,34 @@ export function SettingsModule() {
       title: "Settings Reset",
       description: `${category} form reset to saved values`,
     });
+  };
+
+  const handleManualBackup = async () => {
+    setBackupLoading(true);
+    try {
+      const res = await fetch("/api/system/backup", { method: "POST" });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast({
+          title: "Backup Successful",
+          description: "Database backup has been completed successfully.",
+        });
+      } else {
+        toast({
+          title: "Backup Failed",
+          description: data.error || "Failed to execute manual backup.",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "Backup Error",
+        description: "An unexpected error occurred during backup.",
+        variant: "destructive",
+      });
+    } finally {
+      setBackupLoading(false);
+    }
   };
 
   // ============================================================
@@ -2455,6 +2476,33 @@ export function SettingsModule() {
                   </div>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Database Operations */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Database className="h-4 w-4 text-primary" />
+              Database Operations
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Perform manual administrative tasks
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between p-3 rounded-lg border">
+              <div>
+                <Label className="text-xs font-medium">Manual Backup</Label>
+                <p className="text-[10px] text-muted-foreground">
+                  Create a manual database backup dump instantly
+                </p>
+              </div>
+              <Button size="sm" onClick={handleManualBackup} disabled={backupLoading}>
+                <Database className="h-3 w-3 mr-1.5" />
+                {backupLoading ? "Backing up..." : "Backup Now"}
+              </Button>
             </div>
           </CardContent>
         </Card>

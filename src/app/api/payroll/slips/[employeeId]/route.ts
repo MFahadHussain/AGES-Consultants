@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
@@ -237,7 +238,7 @@ ${allocs.length > 0 ? `
 </html>`
 }
 
-export async function GET(
+async function GET_HANDLER(
   request: Request,
   { params }: { params: Promise<{ employeeId: string }> }
 ) {
@@ -344,3 +345,5 @@ export async function GET(
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
+
+export const GET = withAudit('payroll', GET_HANDLER);

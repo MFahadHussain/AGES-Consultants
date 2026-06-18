@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
@@ -77,7 +78,7 @@ function computeDocumentStatus(
 //   employeeId     (required) — Employee ID to fetch documents for
 //   includeExpired (optional) — Whether to include expired docs (default: true)
 // ---------------------------------------------------------------------------
-export async function GET(request: NextRequest) {
+async function GET_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')?.trim() || ''
@@ -168,7 +169,7 @@ export async function GET(request: NextRequest) {
 // Body: { employeeId, documentTypeId, title, documentNumber?, issueDate?, expiryDate?,
 //         notes?, fileName, filePath, fileSize, fileType }
 // ---------------------------------------------------------------------------
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
 
@@ -282,3 +283,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+
+export const POST = withAudit('documents', POST_HANDLER);
+
+export const GET = withAudit('documents', GET_HANDLER);

@@ -1,7 +1,8 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const accountType = searchParams.get('accountType')
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const data = await request.json()
     const { code, name, accountType, subType, parentId, level, allowPosting, description } = data
@@ -70,3 +71,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export const POST = withAudit('accounts', POST_HANDLER);
+
+export const GET = withAudit('accounts', GET_HANDLER);

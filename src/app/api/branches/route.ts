@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // GET /api/branches - List all branches
-export async function GET() {
+async function GET_HANDLER() {
   try {
     const branches = await db.branch.findMany({
       orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
@@ -41,7 +42,7 @@ export async function GET() {
 }
 
 // POST /api/branches - Create branch
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
     const { code, name, address, city, province, phone, email, managerName, isActive } = body
@@ -102,3 +103,7 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const POST = withAudit('branches', POST_HANDLER);
+
+export const GET = withAudit('branches', GET_HANDLER);

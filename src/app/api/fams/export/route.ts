@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // GET /api/fams/export - List export batches
-export async function GET() {
+async function GET_HANDLER() {
   try {
     const batches = await db.fAMSExportBatch.findMany({ orderBy: { createdAt: 'desc' } })
     return NextResponse.json({ batches })
@@ -13,7 +14,7 @@ export async function GET() {
 }
 
 // POST /api/fams/export - Export pending journals to CSV
-export async function POST() {
+async function POST_HANDLER() {
   try {
     const journals = await db.fAMSJournal.findMany({ where: { status: 'Pending Export' }, orderBy: { date: 'asc' } })
     if (journals.length === 0) return NextResponse.json({ error: 'No pending journals to export' }, { status: 400 })
@@ -56,3 +57,7 @@ export async function POST() {
     return NextResponse.json({ error: 'Failed to export journals' }, { status: 500 })
   }
 }
+
+export const POST = withAudit('fams', POST_HANDLER);
+
+export const GET = withAudit('fams', GET_HANDLER);

@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 import { readFile, unlink } from 'fs/promises'
@@ -9,7 +10,7 @@ import path from 'path'
 // ============================================================
 
 // GET: Download a single attachment
-export async function GET(
+async function GET_HANDLER(
   request: Request,
   { params }: { params: Promise<{ id: string; attachmentId: string }> }
 ) {
@@ -54,7 +55,7 @@ export async function GET(
 
 
 // DELETE: Remove an attachment
-export async function DELETE(
+async function DELETE_HANDLER(
   request: Request,
   { params }: { params: Promise<{ id: string; attachmentId: string }> }
 ) {
@@ -114,3 +115,7 @@ export async function DELETE(
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export const DELETE = withAudit('vouchers', DELETE_HANDLER);
+
+export const GET = withAudit('vouchers', GET_HANDLER);

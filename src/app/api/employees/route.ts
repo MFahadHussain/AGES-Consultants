@@ -1,10 +1,11 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // ---------------------------------------------------------------------------
 // GET /api/employees — List employees with search, filter, pagination
 // ---------------------------------------------------------------------------
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
 
@@ -85,7 +86,7 @@ export async function GET(request: Request) {
 // ---------------------------------------------------------------------------
 // POST /api/employees — Create employee with auto-generated employeeCode
 // ---------------------------------------------------------------------------
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const body = await request.json()
 
@@ -248,7 +249,7 @@ export async function POST(request: Request) {
 // If baseSalary changes, create a salary history entry.
 // Prevent modification if isFinancialUsed is true (for critical fields).
 // ---------------------------------------------------------------------------
-export async function PUT(request: Request) {
+async function PUT_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -447,7 +448,7 @@ export async function PUT(request: Request) {
 // ---------------------------------------------------------------------------
 // DELETE /api/employees?id=xxx — Only allow if isFinancialUsed is false
 // ---------------------------------------------------------------------------
-export async function DELETE(request: Request) {
+async function DELETE_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -506,3 +507,11 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+
+export const POST = withAudit('employees', POST_HANDLER);
+
+export const PUT = withAudit('employees', PUT_HANDLER);
+
+export const DELETE = withAudit('employees', DELETE_HANDLER);
+
+export const GET = withAudit('employees', GET_HANDLER);

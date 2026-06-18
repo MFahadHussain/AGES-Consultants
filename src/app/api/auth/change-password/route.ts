@@ -1,9 +1,10 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 
 // POST /api/auth/change-password — Self-service password change or forced change
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
     const { userId, currentPassword, newPassword, confirmPassword, forceChange } = body
@@ -233,3 +234,5 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const POST = withAudit('auth', POST_HANDLER);

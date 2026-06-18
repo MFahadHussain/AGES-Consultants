@@ -12,6 +12,7 @@ interface PageProps {
     month?: string
     year?: string
     projectId?: string
+    viewType?: string
   }>
 }
 
@@ -23,6 +24,7 @@ export default async function TimesheetReportPage({ searchParams }: PageProps) {
   const month = params.month ? parseInt(params.month, 10) : now.getMonth() + 1
   const year = params.year ? parseInt(params.year, 10) : now.getFullYear()
   const projectId = params.projectId || ''
+  const viewType = params.viewType || 'employee'
 
   // 2. Fetch active projects to enable project-level filtering
   const projects = await db.project.findMany({
@@ -91,33 +93,30 @@ export default async function TimesheetReportPage({ searchParams }: PageProps) {
   const endDate = new Date(year, month, 0) // Day 0 of next month is the last day of this month
   const totalDays = endDate.getDate()
 
-  // 7. Fetch daily attendance/activity records for the specific month/year
-  const attendanceLogs = targetEmployeeId
-    ? await db.attendance.findMany({
-        where: {
-          employeeId: targetEmployeeId,
-          date: {
-            gte: startDate,
-            lte: endDate,
-          },
-        },
+  // 7. Fetch daily attendance/activity records for the specific month/year for all employees
+  const attendanceLogs = await db.attendance.findMany({
+    where: {
+      date: {
+        gte: startDate,
+        lte: endDate,
+      },
+    },
+    include: {
+      dailyProject: {
         include: {
-          dailyProject: {
-            include: {
-              project: {
-                select: { id: true, name: true, code: true },
-              },
-            },
+          project: {
+            select: { id: true, name: true, code: true },
           },
         },
-        orderBy: {
-          date: 'asc',
-        },
-      })
-    : []
+      },
+    },
+    orderBy: {
+      date: 'asc',
+    },
+  })
 
-  // 8. Data Transformation: map database logs into high-performance 1-31 day map
-  const attendanceMap: Record<number, {
+  // 8. Data Transformation: map database logs into high-performance 1-31 day map for each employee
+  const employeeAttendanceMaps: Record<string, Record<number, {
     status: string
     projectName?: string
     projectCode?: string
@@ -125,20 +124,33 @@ export default async function TimesheetReportPage({ searchParams }: PageProps) {
     checkOut?: string
     overtime?: number
     remarks?: string
-  }> = {}
+  }>> = {}
 
-  // Initialize all days of the month with a default unrecorded state
-  for (let d = 1; d <= totalDays; d++) {
-    attendanceMap[d] = {
-      status: '-',
-      overtime: 0,
+  // Initialize all active employees with a default unrecorded state
+  for (const emp of employees) {
+    employeeAttendanceMaps[emp.id] = {}
+    for (let d = 1; d <= totalDays; d++) {
+      employeeAttendanceMaps[emp.id][d] = {
+        status: '-',
+        overtime: 0,
+      }
     }
   }
 
-  // Map each attendance record to its calendar day index (1-31)
+  // Map each attendance record to its calendar day index (1-31) per employee
   for (const record of attendanceLogs) {
+    const empId = record.employeeId
+    if (!employeeAttendanceMaps[empId]) {
+      employeeAttendanceMaps[empId] = {}
+      for (let d = 1; d <= totalDays; d++) {
+        employeeAttendanceMaps[empId][d] = {
+          status: '-',
+          overtime: 0,
+        }
+      }
+    }
     const dayIndex = new Date(record.date).getDate()
-    attendanceMap[dayIndex] = {
+    employeeAttendanceMaps[empId][dayIndex] = {
       status: record.status,
       projectName: record.dailyProject?.project?.name || undefined,
       projectCode: record.dailyProject?.project?.code || undefined,
@@ -165,8 +177,9 @@ export default async function TimesheetReportPage({ searchParams }: PageProps) {
         month={month}
         year={year}
         projectId={projectId}
-        attendanceMap={attendanceMap}
+        employeeAttendanceMaps={employeeAttendanceMaps}
         totalDays={totalDays}
+        viewType={viewType}
       />
     </div>
   )

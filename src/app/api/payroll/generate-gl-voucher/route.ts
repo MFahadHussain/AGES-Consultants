@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { findAccountByRole } from '@/lib/account-roles'
@@ -912,7 +913,7 @@ async function generateSalaryVouchers(
 
 // ── POST Handler ────────────────────────────────────────────
 
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const data = await request.json()
     const { mode, period, financialYearId } = data
@@ -1210,3 +1211,5 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const POST = withAudit('payroll', POST_HANDLER);

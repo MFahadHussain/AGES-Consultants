@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { findDepExpenseForCategory, findAccDepForCategory } from '@/lib/account-roles'
 
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const data = await request.json()
 
@@ -151,3 +152,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export const POST = withAudit('fixed-assets', POST_HANDLER);
+
+export const GET = withAudit('fixed-assets', GET_HANDLER);

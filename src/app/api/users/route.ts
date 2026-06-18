@@ -1,9 +1,10 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 
 // GET /api/users - List all users with branch, department, and role info
-export async function GET() {
+async function GET_HANDLER() {
   try {
     const users = await db.user.findMany({
       where: { deletedAt: null },
@@ -91,7 +92,7 @@ export async function GET() {
 }
 
 // POST /api/users - Create a new user with enhanced fields
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
     const {
@@ -178,6 +179,18 @@ export async function POST(request: NextRequest) {
     const salt = await bcrypt.genSalt(10)
     const passwordHash = await bcrypt.hash(password, salt)
 
+    // Handle roleIds array
+    const providedRoleIds = Array.isArray(body.roleIds) ? body.roleIds : []
+    
+    // Find the default Viewer role if no roles provided
+    let fallbackRoleId = null
+    if (providedRoleIds.length === 0) {
+      const defaultRole = await db.role.findFirst({ where: { code: 'VIEWER' } })
+      if (defaultRole) fallbackRoleId = defaultRole.id
+    }
+
+    const rolesToAssign = providedRoleIds.length > 0 ? providedRoleIds : (fallbackRoleId ? [fallbackRoleId] : [])
+
     const user = await db.user.create({
       data: {
         name,
@@ -193,6 +206,12 @@ export async function POST(request: NextRequest) {
         designation: designation || null,
         forcePasswordChange: forcePasswordChange ?? true,
         passwordChangedAt: new Date(),
+        userRoles: {
+          create: rolesToAssign.map((rid, idx) => ({
+            roleId: rid,
+            isPrimary: idx === 0
+          }))
+        }
       },
       select: {
         id: true,
@@ -227,6 +246,7 @@ export async function POST(request: NextRequest) {
             name,
             email,
             role: userRole,
+            roleIds: rolesToAssign,
             branchId,
             departmentId,
             designation,
@@ -248,3 +268,7 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const POST = withAudit('users', POST_HANDLER);
+
+export const GET = withAudit('users', GET_HANDLER);

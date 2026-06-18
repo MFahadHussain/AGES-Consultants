@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // PUT /api/approval-workflows/[id] - Update workflow
-export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function PUT_HANDLER(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const body = await request.json()
@@ -69,3 +70,5 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ success: false, error: 'Failed to update approval workflow' }, { status: 500 })
   }
 }
+
+export const PUT = withAudit('approval-workflows', PUT_HANDLER);

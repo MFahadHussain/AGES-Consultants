@@ -1,8 +1,11 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/fams/fiscal-years
-export async function GET() {
+async function GET_HANDLER() {
   try {
     const fiscalYears = await db.fAMSFiscalYear.findMany({ orderBy: { startDate: 'desc' } })
     const enriched = fiscalYears.map(fy => {
@@ -24,7 +27,7 @@ export async function GET() {
 }
 
 // POST /api/fams/fiscal-years
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
     const { label, startDate, endDate } = body
@@ -50,7 +53,7 @@ export async function POST(request: NextRequest) {
 }
 
 // PUT /api/fams/fiscal-years
-export async function PUT(request: NextRequest) {
+async function PUT_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
     const { id, action } = body
@@ -93,3 +96,9 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to update fiscal year' }, { status: 500 })
   }
 }
+
+export const POST = withAudit('fams', POST_HANDLER);
+
+export const PUT = withAudit('fams', PUT_HANDLER);
+
+export const GET = withAudit('fams', GET_HANDLER);

@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 
@@ -11,7 +12,7 @@ import { db, getSystemUserId } from '@/lib/db'
  * 4. Update journal statuses to "Exported"
  * 5. Return batch info and CSV content
  */
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const userId = await getUserId()
     const body = await request.json().catch(() => ({}))
@@ -172,3 +173,5 @@ async function getUserId(): Promise<string> {
   })
   return created.id
 }
+
+export const POST = withAudit('fams', POST_HANDLER);

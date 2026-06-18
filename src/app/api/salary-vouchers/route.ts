@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { findAccountByRole } from '@/lib/account-roles'
@@ -81,7 +82,7 @@ async function nextVoucherNumber(projectCode: string, period: string): Promise<s
 
 // ── GET ──────────────────────────────────────────────────────
 
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -131,7 +132,7 @@ export async function GET(request: Request) {
 
 // ── POST ─────────────────────────────────────────────────────
 
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const body = await request.json()
     const { action } = body
@@ -520,3 +521,7 @@ async function handleWorkflow(body: any, action: string) {
 
   return NextResponse.json({ results, count: results.filter(r => !r.error).length })
 }
+
+export const POST = withAudit('salary-vouchers', POST_HANDLER);
+
+export const GET = withAudit('salary-vouchers', GET_HANDLER);

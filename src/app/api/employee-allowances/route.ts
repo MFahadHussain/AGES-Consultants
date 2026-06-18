@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
@@ -9,7 +10,7 @@ import { db } from '@/lib/db'
 //   ?isActive=true|false
 //   Includes: employee, allowance relations
 // ============================================================
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')
@@ -55,7 +56,7 @@ export async function GET(request: Request) {
 // POST /api/employee-allowances — Create an employee allowance
 //   Validates: employeeId exists, allowanceId exists
 // ============================================================
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const body = await request.json()
     const { employeeId, allowanceId, customValue, projectId, isActive, effectiveDate, assignToAll } = body
@@ -243,7 +244,7 @@ export async function POST(request: Request) {
 // ============================================================
 // PUT /api/employee-allowances?id=xxx — Update an employee allowance
 // ============================================================
-export async function PUT(request: Request) {
+async function PUT_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -357,7 +358,7 @@ export async function PUT(request: Request) {
 // ============================================================
 // DELETE /api/employee-allowances?id=xxx — Delete an employee allowance
 // ============================================================
-export async function DELETE(request: Request) {
+async function DELETE_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -408,3 +409,11 @@ export async function DELETE(request: Request) {
     )
   }
 }
+
+export const POST = withAudit('employee-allowances', POST_HANDLER);
+
+export const PUT = withAudit('employee-allowances', PUT_HANDLER);
+
+export const DELETE = withAudit('employee-allowances', DELETE_HANDLER);
+
+export const GET = withAudit('employee-allowances', GET_HANDLER);

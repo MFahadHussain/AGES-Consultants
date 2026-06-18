@@ -188,9 +188,45 @@ export default function MultiColumnPL({ data, detailLevel = 'summary' }: MultiCo
                 >
                   Note
                 </th>
-                {columns
-                  .filter((c) => !c.isConsolidated && !c.isPriorYear && !c.isVariance)
-                  .map((col) => (
+                {columns.map((col) => {
+                  if (col.isConsolidated) {
+                    return (
+                      <th
+                        key={col.id}
+                        className="text-right text-xs font-semibold bg-muted/50 px-3 py-2 whitespace-nowrap"
+                        style={{ minWidth: consolidatedColWidth, width: consolidatedColWidth }}
+                      >
+                        Consolidated
+                      </th>
+                    );
+                  }
+
+                  if (col.isPriorYear) {
+                    return (
+                      <th
+                        key={col.id}
+                        className="text-right text-xs font-medium text-muted-foreground px-3 py-2 whitespace-nowrap"
+                        style={{ minWidth: priorYearColWidth, width: priorYearColWidth }}
+                      >
+                        Prior Year
+                      </th>
+                    );
+                  }
+
+                  if (col.isVariance) {
+                    return (
+                      <th
+                        key={col.id}
+                        className="text-right text-xs font-medium px-3 py-2 whitespace-nowrap"
+                        style={{ minWidth: varianceColWidth, width: varianceColWidth }}
+                      >
+                        Variance
+                      </th>
+                    );
+                  }
+
+                  // Project column
+                  return (
                     <th
                       key={col.id}
                       className="text-right text-xs font-medium text-muted-foreground px-3 py-2 whitespace-nowrap"
@@ -214,34 +250,8 @@ export default function MultiColumnPL({ data, detailLevel = 'summary' }: MultiCo
                         )}
                       </div>
                     </th>
-                  ))}
-                {columns.filter((c) => c.isConsolidated).map((col) => (
-                  <th
-                    key={col.id}
-                    className="text-right text-xs font-semibold bg-muted/50 px-3 py-2 whitespace-nowrap"
-                    style={{ minWidth: consolidatedColWidth, width: consolidatedColWidth }}
-                  >
-                    Consolidated
-                  </th>
-                ))}
-                {columns.filter((c) => c.isPriorYear).map((col) => (
-                  <th
-                    key={col.id}
-                    className="text-right text-xs font-medium text-muted-foreground px-3 py-2 whitespace-nowrap"
-                    style={{ minWidth: priorYearColWidth, width: priorYearColWidth }}
-                  >
-                    Prior Year
-                  </th>
-                ))}
-                {columns.filter((c) => c.isVariance).map((col) => (
-                  <th
-                    key={col.id}
-                    className="text-right text-xs font-medium px-3 py-2 whitespace-nowrap"
-                    style={{ minWidth: varianceColWidth, width: varianceColWidth }}
-                  >
-                    Variance
-                  </th>
-                ))}
+                  );
+                })}
               </tr>
             </thead>
 
@@ -295,55 +305,51 @@ export default function MultiColumnPL({ data, detailLevel = 'summary' }: MultiCo
                       ) : null}
                     </td>
 
-                    {/* Project columns */}
-                    {columns
-                      .filter((c) => !c.isConsolidated && !c.isPriorYear && !c.isVariance)
-                      .map((col) => {
+                    {/* Columns */}
+                    {columns.map((col) => {
+                      if (col.isConsolidated) {
                         const val = row.values?.[col.id];
                         const { text, isNegative } = formatNegativePKR(val ?? 0);
                         return (
-                          <td key={col.id} className="text-right px-3 py-1.5 tabular-nums font-mono text-sm" style={{ minWidth: projectColWidth, width: projectColWidth }}>
+                          <td key={col.id} className="text-right px-3 py-1.5 tabular-nums font-mono text-sm font-semibold bg-muted/10" style={{ minWidth: consolidatedColWidth, width: consolidatedColWidth }}>
                             <span className={cn(isNegative && 'text-red-600')}>
                               {row.rowType === 'memo' ? '—' : text}
                             </span>
                           </td>
                         );
-                      })}
+                      }
 
-                    {/* Consolidated */}
-                    {columns.filter((c) => c.isConsolidated).map((col) => {
+                      if (col.isPriorYear) {
+                        const val = row.values?.[col.id];
+                        const { text, isNegative } = formatNegativePKR(val ?? 0);
+                        return (
+                          <td key={col.id} className="text-right px-3 py-1.5 tabular-nums font-mono text-sm text-muted-foreground" style={{ minWidth: priorYearColWidth, width: priorYearColWidth }}>
+                            <span className={cn(isNegative && 'text-red-600')}>
+                              {row.rowType === 'memo' ? '—' : text}
+                            </span>
+                          </td>
+                        );
+                      }
+
+                      if (col.isVariance) {
+                        const current = row.values?.consolidated;
+                        const prior = row.values?.priorYear;
+                        const { text, color } = formatVariance(current ?? 0, prior ?? 0);
+                        return (
+                          <td key={col.id} className="text-right px-3 py-1.5 tabular-nums font-mono text-sm" style={{ minWidth: varianceColWidth, width: varianceColWidth }}>
+                            <span className={cn(color === 'green' && 'text-emerald-600', color === 'red' && 'text-red-600')}>
+                              {row.rowType === 'memo' ? '—' : text}
+                            </span>
+                          </td>
+                        );
+                      }
+
+                      // Project columns
                       const val = row.values?.[col.id];
                       const { text, isNegative } = formatNegativePKR(val ?? 0);
                       return (
-                        <td key={col.id} className="text-right px-3 py-1.5 tabular-nums font-mono text-sm font-semibold bg-muted/10" style={{ minWidth: consolidatedColWidth, width: consolidatedColWidth }}>
+                        <td key={col.id} className="text-right px-3 py-1.5 tabular-nums font-mono text-sm" style={{ minWidth: projectColWidth, width: projectColWidth }}>
                           <span className={cn(isNegative && 'text-red-600')}>
-                            {row.rowType === 'memo' ? '—' : text}
-                          </span>
-                        </td>
-                      );
-                    })}
-
-                    {/* Prior Year */}
-                    {columns.filter((c) => c.isPriorYear).map((col) => {
-                      const val = row.values?.[col.id];
-                      const { text, isNegative } = formatNegativePKR(val ?? 0);
-                      return (
-                        <td key={col.id} className="text-right px-3 py-1.5 tabular-nums font-mono text-sm text-muted-foreground" style={{ minWidth: priorYearColWidth, width: priorYearColWidth }}>
-                          <span className={cn(isNegative && 'text-red-600')}>
-                            {row.rowType === 'memo' ? '—' : text}
-                          </span>
-                        </td>
-                      );
-                    })}
-
-                    {/* Variance */}
-                    {columns.filter((c) => c.isVariance).map((col) => {
-                      const current = row.values?.consolidated;
-                      const prior = row.values?.priorYear;
-                      const { text, color } = formatVariance(current ?? 0, prior ?? 0);
-                      return (
-                        <td key={col.id} className="text-right px-3 py-1.5 tabular-nums font-mono text-sm" style={{ minWidth: varianceColWidth, width: varianceColWidth }}>
-                          <span className={cn(color === 'green' && 'text-emerald-600', color === 'red' && 'text-red-600')}>
                             {row.rowType === 'memo' ? '—' : text}
                           </span>
                         </td>

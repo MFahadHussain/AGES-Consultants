@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
@@ -70,7 +71,7 @@ const DEFAULT_SETTINGS = [
  * GET /api/fams/settings - All FAMS settings, grouped by category
  * Returns: settings array, grouped object, flatMap for easy lookup
  */
-export async function GET() {
+async function GET_HANDLER() {
   try {
     let settings = await db.fAMSSetting.findMany({
       orderBy: [{ category: 'asc' }, { key: 'asc' }],
@@ -145,7 +146,7 @@ export async function GET() {
  * POST /api/fams/settings - Batch update settings (upsert)
  * Body: { settings: Array<{ key: string; value: string; category?: string; description?: string }> }
  */
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const body = await request.json()
     const { settings } = body as { settings: Array<{ key: string; value: string; category?: string; description?: string }> }
@@ -226,3 +227,7 @@ export async function POST(request: Request) {
     )
   }
 }
+
+export const POST = withAudit('fams', POST_HANDLER);
+
+export const GET = withAudit('fams', GET_HANDLER);

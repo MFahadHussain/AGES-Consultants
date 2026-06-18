@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { findAccountByRole, findAccountsByRole } from '@/lib/account-roles'
 
-export async function GET() {
+async function GET_HANDLER() {
   try {
     // Dashboard KPIs
     const now = new Date()
@@ -130,3 +131,5 @@ export async function GET() {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export const GET = withAudit('dashboard', GET_HANDLER);

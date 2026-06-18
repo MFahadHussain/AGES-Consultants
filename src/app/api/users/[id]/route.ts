@@ -1,9 +1,11 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 import bcrypt from 'bcryptjs'
+import { revalidatePermissionsCache } from '@/lib/permissions'
 
 // GET /api/users/[id] - Get a single user with full details
-export async function GET(
+async function GET_HANDLER(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -155,7 +157,7 @@ export async function GET(
 }
 
 // PUT /api/users/[id] - Update a user (with new fields, password reset, activation, lock/unlock)
-export async function PUT(
+async function PUT_HANDLER(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -183,6 +185,7 @@ export async function PUT(
       lock,
       unlock,
       updatedBy,
+      roleIds, // Handle new roleIds array
     } = body
 
     const existing = await db.user.findUnique({ where: { id, deletedAt: null } })
@@ -289,33 +292,80 @@ export async function PUT(
     }
 
     // Build audit details without passwordHash
-    const auditChanges = { ...updateData }
+    const auditChanges = { ...updateData, roleIds }
     if (auditChanges.passwordHash) {
       auditChanges.passwordHash = '[REDACTED]'
     }
 
-    const user = await db.user.update({
-      where: { id },
-      data: updateData,
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        username: true,
-        phone: true,
-        role: true,
-        isActive: true,
-        isLocked: true,
-        forcePasswordChange: true,
-        branchId: true,
-        departmentId: true,
-        employeeId: true,
-        designation: true,
-        avatarUrl: true,
-        lastLoginAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    const user = await db.$transaction(async (tx) => {
+      // If roleIds are provided, sync roles and check super admin rule
+      if (Array.isArray(roleIds)) {
+        // Find existing roles
+        const existingRoles = await tx.userRole.findMany({
+          where: { userId: id },
+          include: { role: true },
+        });
+
+        const hadSuperAdmin = existingRoles.some(ur => ur.role.code === 'SUPER_ADMIN' || ur.role.code === 'SYSTEM_ADMIN');
+        
+        // If they had Super Admin, check if new roles include it
+        if (hadSuperAdmin) {
+          const newRoles = await tx.role.findMany({ where: { id: { in: roleIds } } });
+          const keepsSuperAdmin = newRoles.some(r => r.code === 'SUPER_ADMIN' || r.code === 'SYSTEM_ADMIN');
+          
+          if (!keepsSuperAdmin) {
+            // They are losing Super Admin. Are there other active Super Admins?
+            const otherSuperAdmins = await tx.userRole.count({
+              where: {
+                userId: { not: id },
+                role: { code: { in: ['SUPER_ADMIN', 'SYSTEM_ADMIN'] } },
+                user: { isActive: true, deletedAt: null }
+              }
+            });
+            
+            if (otherSuperAdmins === 0) {
+              throw new Error('Cannot remove the last Super Admin from the system');
+            }
+          }
+        }
+
+        // Delete existing and insert new
+        await tx.userRole.deleteMany({ where: { userId: id } });
+        if (roleIds.length > 0) {
+          await tx.userRole.createMany({
+            data: roleIds.map((rid, idx) => ({
+              userId: id,
+              roleId: rid,
+              isPrimary: idx === 0,
+              grantedBy: updatedBy || null
+            }))
+          });
+        }
+      }
+
+      return await tx.user.update({
+        where: { id },
+        data: updateData,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          username: true,
+          phone: true,
+          role: true,
+          isActive: true,
+          isLocked: true,
+          forcePasswordChange: true,
+          branchId: true,
+          departmentId: true,
+          employeeId: true,
+          designation: true,
+          avatarUrl: true,
+          lastLoginAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      })
     })
 
     // Log the update
@@ -337,8 +387,12 @@ export async function PUT(
       // Audit log failure shouldn't block user update
     }
 
+    await revalidatePermissionsCache()
     return NextResponse.json({ success: true, data: user })
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === 'Cannot remove the last Super Admin from the system') {
+      return NextResponse.json({ success: false, error: error.message }, { status: 400 })
+    }
     console.error('Error updating user:', error)
     return NextResponse.json(
       { success: false, error: 'Failed to update user' },
@@ -348,7 +402,7 @@ export async function PUT(
 }
 
 // DELETE /api/users/[id] - Soft delete (set deletedAt)
-export async function DELETE(
+async function DELETE_HANDLER(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -405,6 +459,7 @@ export async function DELETE(
       // Non-blocking
     }
 
+    await revalidatePermissionsCache()
     return NextResponse.json({
       success: true,
       message: 'User deleted successfully',
@@ -418,3 +473,9 @@ export async function DELETE(
     )
   }
 }
+
+export const PUT = withAudit('users', PUT_HANDLER);
+
+export const DELETE = withAudit('users', DELETE_HANDLER);
+
+export const GET = withAudit('users', GET_HANDLER);

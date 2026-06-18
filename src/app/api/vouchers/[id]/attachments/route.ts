@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 import { writeFile, mkdir } from 'fs/promises'
@@ -39,7 +40,7 @@ function validateFileExtension(fileName: string, mimeType: string): boolean {
 }
 
 // GET: List all attachments for a voucher
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function GET_HANDLER(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const voucher = await db.voucher.findUnique({
@@ -68,7 +69,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 // POST: Upload attachments for a voucher
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function POST_HANDLER(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const systemUserId = await getSystemUserId()
@@ -200,3 +201,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export const POST = withAudit('vouchers', POST_HANDLER);
+
+export const GET = withAudit('vouchers', GET_HANDLER);

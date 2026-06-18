@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 
@@ -7,7 +8,7 @@ import { db, getSystemUserId } from '@/lib/db'
 // project/donor/location, status, pagination, sorting
 // ============================================================
 
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
 
@@ -139,7 +140,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const data = await request.json()
     const { voucherType, voucherTypeName, date, narration, reference, payeeName, chequeNumber, chequeDate, voucherNo, amountInWords, financialYearId, projectId, donorId, locationId, clientId, entries, autoPost } = data
@@ -237,3 +238,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export const POST = withAudit('vouchers', POST_HANDLER);
+
+export const GET = withAudit('vouchers', GET_HANDLER);

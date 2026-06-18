@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { writeFile, mkdir } from 'fs/promises'
@@ -52,7 +53,7 @@ function isFormatAllowed(allowedFormats: string, fileExtension: string): boolean
 //   notes           (optional)
 //   uploadedBy      (optional) — User who uploaded
 // ---------------------------------------------------------------------------
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const formData = await request.formData()
 
@@ -235,3 +236,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+
+export const POST = withAudit('documents', POST_HANDLER);

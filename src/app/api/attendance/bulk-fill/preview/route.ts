@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
@@ -13,7 +14,7 @@ function parseDate(dateStr: string): Date {
 // Find billable attendance records with no project yet in the given date range
 // ---------------------------------------------------------------------------
 
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const { employeeId, startDate, endDate } = await request.json()
 
@@ -72,3 +73,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+
+export const POST = withAudit('attendance', POST_HANDLER);

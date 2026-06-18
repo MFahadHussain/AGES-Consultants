@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 /** Seed 18 statutory reporting projects for the hydropower entity */
-export async function GET() {
+async function GET_HANDLER() {
   try {
     const projects = [
       { code: 'HO',  name: 'Head Office',       projectType: 'Head Office',   sortOrder: 1,  isHeadOffice: true },
@@ -72,3 +73,5 @@ export async function GET() {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export const GET = withAudit('seed-projects', GET_HANDLER);

@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
@@ -370,7 +371,7 @@ async function seedProjectAssignments(
 // POST handler — Orchestrates all seeding
 // ============================================================
 
-export async function POST() {
+async function POST_HANDLER() {
   try {
     const summary: Record<string, unknown> = {}
 
@@ -442,6 +443,10 @@ export async function POST() {
 }
 
 // GET handler — convenience: triggers the same seed via GET
-export async function GET() {
+async function GET_HANDLER() {
   return POST()
 }
+
+export const POST = withAudit('seed-payroll', POST_HANDLER);
+
+export const GET = withAudit('seed-payroll', GET_HANDLER);

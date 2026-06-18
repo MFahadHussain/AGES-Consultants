@@ -1,7 +1,8 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { ConsolidationEngine } from '@/lib/reporting/consolidation'
 
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const fromDate = searchParams.get('fromDate')
@@ -42,3 +43,5 @@ export async function GET(request: Request) {
     )
   }
 }
+
+export const GET = withAudit('statutory-reports', GET_HANDLER);

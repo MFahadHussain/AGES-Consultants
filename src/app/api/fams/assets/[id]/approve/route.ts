@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 
@@ -5,7 +6,7 @@ import { db, getSystemUserId } from '@/lib/db'
  * POST /api/fams/assets/[id]/approve - Approve or reject an asset
  * Body: { action: "approve" | "reject", approvedBy?: string, reason?: string }
  */
-export async function POST(
+async function POST_HANDLER(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -94,3 +95,5 @@ export async function POST(
     )
   }
 }
+
+export const POST = withAudit('fams', POST_HANDLER);

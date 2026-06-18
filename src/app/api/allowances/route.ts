@@ -1,10 +1,11 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // ============================================================
 // GET /api/allowances — List all allowances, optional ?isActive=true|false
 // ============================================================
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const isActive = searchParams.get('isActive')
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
 // ============================================================
 // POST /api/allowances — Create a new allowance (validates unique code)
 // ============================================================
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const body = await request.json()
     const { code, name, allowanceType, value, baseOnSalary, isTaxable, isProjectSpecific, isActive, isInclusive, isSocialCharges } = body
@@ -120,7 +121,7 @@ export async function POST(request: Request) {
 // ============================================================
 // PUT /api/allowances?id=xxx — Update an allowance
 // ============================================================
-export async function PUT(request: Request) {
+async function PUT_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -223,7 +224,7 @@ export async function PUT(request: Request) {
 // ============================================================
 // DELETE /api/allowances?id=xxx — Soft delete (isActive=false) or hard delete
 // ============================================================
-export async function DELETE(request: Request) {
+async function DELETE_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -297,3 +298,11 @@ export async function DELETE(request: Request) {
     )
   }
 }
+
+export const POST = withAudit('allowances', POST_HANDLER);
+
+export const PUT = withAudit('allowances', PUT_HANDLER);
+
+export const DELETE = withAudit('allowances', DELETE_HANDLER);
+
+export const GET = withAudit('allowances', GET_HANDLER);

@@ -1,9 +1,10 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 import { findAccountByRole, findFirstBankAccount } from '@/lib/account-roles'
 
 // GET /api/fams/transactions
-export async function GET(request: NextRequest) {
+async function GET_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const assetId = searchParams.get('assetId')
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/fams/transactions
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
     const { type } = body
@@ -211,3 +212,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to create transaction' }, { status: 500 })
   }
 }
+
+export const POST = withAudit('fams', POST_HANDLER);
+
+export const GET = withAudit('fams', GET_HANDLER);

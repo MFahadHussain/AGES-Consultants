@@ -1,7 +1,8 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-export async function GET() {
+async function GET_HANDLER() {
   try {
     const projects = await db.project.findMany({ orderBy: { code: 'asc' } })
     return NextResponse.json(projects)
@@ -10,7 +11,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const data = await request.json()
     if (!data.code || !data.name) return NextResponse.json({ error: 'Code and name are required' }, { status: 400 })
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
   }
 }
 
-export async function PUT(request: Request) {
+async function PUT_HANDLER(request: Request) {
   try {
     const data = await request.json()
     const { id, code, name, ...rest } = data
@@ -62,7 +63,7 @@ export async function PUT(request: Request) {
   }
 }
 
-export async function DELETE(request: Request) {
+async function DELETE_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -97,3 +98,11 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export const POST = withAudit('projects', POST_HANDLER);
+
+export const PUT = withAudit('projects', PUT_HANDLER);
+
+export const DELETE = withAudit('projects', DELETE_HANDLER);
+
+export const GET = withAudit('projects', GET_HANDLER);

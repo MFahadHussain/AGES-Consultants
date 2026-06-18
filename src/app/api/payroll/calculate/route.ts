@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { calculateMonthlyPayroll } from '@/lib/payroll/calculateMonthlyPayroll'
 import { validateBeforePayrollRun } from '@/lib/payroll/preRunValidation'
@@ -15,7 +16,7 @@ import { validateBeforePayrollRun } from '@/lib/payroll/preRunValidation'
 // month format: YYYY-MM (e.g., "2026-05")
 // ---------------------------------------------------------------------------
 
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const body = await request.json()
     const { employeeId, month: monthStr, allEmployees, skipValidation } = body
@@ -109,3 +110,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+
+export const POST = withAudit('payroll', POST_HANDLER);

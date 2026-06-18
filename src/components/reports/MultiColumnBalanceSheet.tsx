@@ -176,10 +176,62 @@ export default function MultiColumnBalanceSheet({ data, detailLevel }: MultiColu
                 >
                   Note
                 </th>
-                {/* Project columns */}
-                {columns
-                  .filter((c) => !c.isConsolidated && !c.isPriorYear && !c.isVariance)
-                  .map((col) => (
+                {/* Column Headers */}
+                {columns.map((col) => {
+                  if (col.isConsolidated) {
+                    return (
+                      <th
+                        key={col.id}
+                        className="text-right text-xs font-semibold bg-muted/50 px-3 py-2 whitespace-nowrap"
+                        style={{ minWidth: consolidatedColWidth, width: consolidatedColWidth }}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          Consolidated
+                          {col.isBalanced !== undefined && (
+                            col.isBalanced ? (
+                              <CheckCircle2 className="size-3 text-emerald-500" />
+                            ) : (
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <XCircle className="size-3 text-red-500" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Unbalanced (diff: {formatPKR(col.balanceDiff ?? 0)})
+                                </TooltipContent>
+                              </Tooltip>
+                            )
+                          )}
+                        </div>
+                      </th>
+                    );
+                  }
+
+                  if (col.isPriorYear) {
+                    return (
+                      <th
+                        key={col.id}
+                        className="text-right text-xs font-medium text-muted-foreground px-3 py-2 whitespace-nowrap"
+                        style={{ minWidth: priorYearColWidth, width: priorYearColWidth }}
+                      >
+                        Prior Year
+                      </th>
+                    );
+                  }
+
+                  if (col.isVariance) {
+                    return (
+                      <th
+                        key={col.id}
+                        className="text-right text-xs font-medium px-3 py-2 whitespace-nowrap"
+                        style={{ minWidth: varianceColWidth, width: varianceColWidth }}
+                      >
+                        Variance
+                      </th>
+                    );
+                  }
+
+                  // Default: Project column
+                  return (
                     <th
                       key={col.id}
                       className="text-right text-xs font-medium text-muted-foreground px-3 py-2 whitespace-nowrap"
@@ -203,53 +255,8 @@ export default function MultiColumnBalanceSheet({ data, detailLevel }: MultiColu
                         )}
                       </div>
                     </th>
-                  ))}
-                {/* Consolidated */}
-                {columns.filter((c) => c.isConsolidated).map((col) => (
-                  <th
-                    key={col.id}
-                    className="text-right text-xs font-semibold bg-muted/50 px-3 py-2 whitespace-nowrap"
-                    style={{ minWidth: consolidatedColWidth, width: consolidatedColWidth }}
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      Consolidated
-                      {col.isBalanced !== undefined && (
-                        col.isBalanced ? (
-                          <CheckCircle2 className="size-3 text-emerald-500" />
-                        ) : (
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <XCircle className="size-3 text-red-500" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              Unbalanced (diff: {formatPKR(col.balanceDiff ?? 0)})
-                            </TooltipContent>
-                          </Tooltip>
-                        )
-                      )}
-                    </div>
-                  </th>
-                ))}
-                {/* Prior Year */}
-                {columns.filter((c) => c.isPriorYear).map((col) => (
-                  <th
-                    key={col.id}
-                    className="text-right text-xs font-medium text-muted-foreground px-3 py-2 whitespace-nowrap"
-                    style={{ minWidth: priorYearColWidth, width: priorYearColWidth }}
-                  >
-                    Prior Year
-                  </th>
-                ))}
-                {/* Variance */}
-                {columns.filter((c) => c.isVariance).map((col) => (
-                  <th
-                    key={col.id}
-                    className="text-right text-xs font-medium px-3 py-2 whitespace-nowrap"
-                    style={{ minWidth: varianceColWidth, width: varianceColWidth }}
-                  >
-                    Variance
-                  </th>
-                ))}
+                  );
+                })}
               </tr>
             </thead>
 
@@ -323,29 +330,9 @@ export default function MultiColumnBalanceSheet({ data, detailLevel }: MultiColu
                         ) : null}
                       </td>
 
-                      {/* Project columns */}
-                      {columns
-                        .filter((c) => !c.isConsolidated && !c.isPriorYear && !c.isVariance)
-                        .map((col) => {
-                          const val = row.values?.[col.id];
-                          const { text, isNegative } = formatNegativePKR(val ?? 0);
-                          return (
-                            <td
-                              key={col.id}
-                              className="text-right px-3 py-1.5 tabular-nums font-mono text-sm"
-                              style={{ minWidth: projectColWidth, width: projectColWidth }}
-                            >
-                              <span className={cn(isNegative && 'text-red-600')}>
-                                {row.rowType === 'memo' ? '—' : text}
-                              </span>
-                            </td>
-                          );
-                        })}
-
-                      {/* Consolidated */}
-                      {columns
-                        .filter((c) => c.isConsolidated)
-                        .map((col) => {
+                      {/* Columns */}
+                      {columns.map((col) => {
+                        if (col.isConsolidated) {
                           const val = row.values?.[col.id];
                           const { text, isNegative } = formatNegativePKR(val ?? 0);
                           return (
@@ -359,12 +346,9 @@ export default function MultiColumnBalanceSheet({ data, detailLevel }: MultiColu
                               </span>
                             </td>
                           );
-                        })}
+                        }
 
-                      {/* Prior Year */}
-                      {columns
-                        .filter((c) => c.isPriorYear)
-                        .map((col) => {
+                        if (col.isPriorYear) {
                           const val = row.values?.[col.id];
                           const { text, isNegative } = formatNegativePKR(val ?? 0);
                           return (
@@ -378,12 +362,9 @@ export default function MultiColumnBalanceSheet({ data, detailLevel }: MultiColu
                               </span>
                             </td>
                           );
-                        })}
+                        }
 
-                      {/* Variance */}
-                      {columns
-                        .filter((c) => c.isVariance)
-                        .map((col) => {
+                        if (col.isVariance) {
                           const current = row.values?.consolidated;
                           const prior = row.values?.priorYear;
                           const { text, color } = formatVariance(current ?? 0, prior ?? 0);
@@ -403,7 +384,23 @@ export default function MultiColumnBalanceSheet({ data, detailLevel }: MultiColu
                               </span>
                             </td>
                           );
-                        })}
+                        }
+
+                        // Project columns
+                        const val = row.values?.[col.id];
+                        const { text, isNegative } = formatNegativePKR(val ?? 0);
+                        return (
+                          <td
+                            key={col.id}
+                            className="text-right px-3 py-1.5 tabular-nums font-mono text-sm"
+                            style={{ minWidth: projectColWidth, width: projectColWidth }}
+                          >
+                            <span className={cn(isNegative && 'text-red-600')}>
+                              {row.rowType === 'memo' ? '—' : text}
+                            </span>
+                          </td>
+                        );
+                      })}
                     </tr>
 
                     {/* Drilldown rows */}
@@ -428,44 +425,46 @@ export default function MultiColumnBalanceSheet({ data, detailLevel }: MultiColu
                             </Badge>
                           )}
                         </td>
-                        {columns
-                          .filter((c) => !c.isConsolidated && !c.isPriorYear && !c.isVariance)
-                          .map((col) => {
+                        {columns.map((col) => {
+                          if (col.isConsolidated) {
                             const val = drillRow.values?.[col.id];
                             const { text, isNegative } = formatNegativePKR(val ?? 0);
                             return (
-                              <td key={col.id} className="text-right px-3 py-1 tabular-nums font-mono text-xs">
+                              <td key={col.id} className="text-right px-3 py-1 tabular-nums font-mono text-xs font-semibold bg-muted/10">
                                 <span className={cn(isNegative && 'text-red-600')}>{text}</span>
                               </td>
                             );
-                          })}
-                        {columns.filter((c) => c.isConsolidated).map((col) => {
+                          }
+
+                          if (col.isPriorYear) {
+                            const val = drillRow.values?.[col.id];
+                            const { text, isNegative } = formatNegativePKR(val ?? 0);
+                            return (
+                              <td key={col.id} className="text-right px-3 py-1 tabular-nums font-mono text-xs text-muted-foreground">
+                                <span className={cn(isNegative && 'text-red-600')}>{text}</span>
+                              </td>
+                            );
+                          }
+
+                          if (col.isVariance) {
+                            const current = drillRow.values?.consolidated;
+                            const prior = drillRow.values?.priorYear;
+                            const { text, color } = formatVariance(current ?? 0, prior ?? 0);
+                            return (
+                              <td key={col.id} className="text-right px-3 py-1 tabular-nums font-mono text-xs">
+                                <span className={cn(color === 'green' && 'text-emerald-600', color === 'red' && 'text-red-600')}>
+                                  {text}
+                                </span>
+                              </td>
+                            );
+                          }
+
+                          // Project columns
                           const val = drillRow.values?.[col.id];
                           const { text, isNegative } = formatNegativePKR(val ?? 0);
-                          return (
-                            <td key={col.id} className="text-right px-3 py-1 tabular-nums font-mono text-xs font-semibold bg-muted/10">
-                              <span className={cn(isNegative && 'text-red-600')}>{text}</span>
-                            </td>
-                          );
-                        })}
-                        {columns.filter((c) => c.isPriorYear).map((col) => {
-                          const val = drillRow.values?.[col.id];
-                          const { text, isNegative } = formatNegativePKR(val ?? 0);
-                          return (
-                            <td key={col.id} className="text-right px-3 py-1 tabular-nums font-mono text-xs text-muted-foreground">
-                              <span className={cn(isNegative && 'text-red-600')}>{text}</span>
-                            </td>
-                          );
-                        })}
-                        {columns.filter((c) => c.isVariance).map((col) => {
-                          const current = drillRow.values?.consolidated;
-                          const prior = drillRow.values?.priorYear;
-                          const { text, color } = formatVariance(current ?? 0, prior ?? 0);
                           return (
                             <td key={col.id} className="text-right px-3 py-1 tabular-nums font-mono text-xs">
-                              <span className={cn(color === 'green' && 'text-emerald-600', color === 'red' && 'text-red-600')}>
-                                {text}
-                              </span>
+                              <span className={cn(isNegative && 'text-red-600')}>{text}</span>
                             </td>
                           );
                         })}

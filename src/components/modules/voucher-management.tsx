@@ -20,7 +20,9 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { numberToWords } from '@/lib/number-to-words'
 import { AccountCombobox, type AccountOption } from '@/components/ui/account-combobox'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission as globalHasPermission } from '@/lib/store'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { RecordHistory } from '@/components/shared/record-history'
 
 const voucherTypes = [
   { value: 'BP', label: 'Bank Payment', color: 'bg-red-100 text-red-800' },
@@ -43,20 +45,9 @@ const roleLabels: Record<string, string> = {
   admin: 'Admin', manager: 'Manager', accountant: 'Accountant', auditor: 'Auditor', viewer: 'Viewer'
 }
 
-// Role-based workflow permissions
-const ROLE_PERMISSIONS: Record<string, string[]> = {
-  submit: ['admin', 'manager', 'accountant'],
-  approve: ['admin', 'manager'],
-  post: ['admin'],
-  reject: ['admin', 'manager'],
-  quick_post: ['admin'],
-  edit: ['admin', 'manager', 'accountant'],
-  revoke: ['admin'],
-  delete: ['admin', 'manager', 'accountant'],
-}
-
-function hasPermission(action: string, role: string): boolean {
-  return ROLE_PERMISSIONS[action]?.includes(role) ?? false
+function hasPermission(action: string, _role: string): boolean {
+  const authUser = useAppStore.getState().authUser;
+  return globalHasPermission(authUser, `VOUCHERS_${action.toUpperCase()}`)
 }
 
 // Role colors for the selector badge
@@ -251,8 +242,8 @@ export function VoucherManagement() {
   const [rejectComments, setRejectComments] = useState('')
 
   // Attachment states
-  // Current role for workflow simulation
-  const [currentRole, setCurrentRole] = useState<string>('admin')
+  // Current role from session
+  const currentRole = authUser?.role?.toLowerCase() || 'viewer'
 
   // Attachment states
   const [uploadingFiles, setUploadingFiles] = useState(false)
@@ -701,25 +692,13 @@ export function VoucherManagement() {
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Role Selector */}
+          {/* Role Badge */}
           <div className="flex items-center gap-1.5">
             <Shield className="h-3.5 w-3.5 text-muted-foreground" />
-            <Select value={currentRole} onValueChange={setCurrentRole}>
-              <SelectTrigger className={`h-8 w-32 text-xs border-dashed ${currentRole !== 'admin' ? 'border-2' : ''}`}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {['admin', 'manager', 'accountant', 'auditor', 'viewer'].map(r => (
-                  <SelectItem key={r} value={r}>
-                    <span className="flex items-center gap-1.5">
-                      <span className={`inline-block h-2 w-2 rounded-full ${r === 'admin' ? 'bg-rose-500' : r === 'manager' ? 'bg-amber-500' : r === 'accountant' ? 'bg-sky-500' : r === 'auditor' ? 'bg-violet-500' : 'bg-gray-400'}`} />
-                      {roleLabels[r]}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Badge className={`text-[8px] ${roleColors[currentRole]}`}>{roleLabels[currentRole]}</Badge>
+            <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${roleColors[currentRole] || 'bg-gray-100 text-gray-800 border-gray-200'}`} aria-label={`Current role: ${roleLabels[currentRole] || currentRole}`}>
+              <span className={`inline-block h-2 w-2 rounded-full ${currentRole === 'admin' ? 'bg-rose-500' : currentRole === 'manager' ? 'bg-amber-500' : currentRole === 'accountant' ? 'bg-sky-500' : currentRole === 'auditor' ? 'bg-violet-500' : 'bg-gray-400'}`} />
+              {roleLabels[currentRole] || currentRole}
+            </span>
           </div>
           <Separator orientation="vertical" className="h-5" />
           <div className="relative">
@@ -904,7 +883,12 @@ export function VoucherManagement() {
             {detailVoucher?.isAssetPosted && <Badge className="text-[9px] bg-teal-100 text-teal-800">Fixed Assets → GL</Badge>}
           </DialogTitle></DialogHeader>
           {detailVoucher && (
-            <div className="space-y-4">
+            <Tabs defaultValue="details" className="w-full">
+              <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0 mb-4">
+                 <TabsTrigger value="details" className="relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-b-primary data-[state=active]:text-foreground">Details</TabsTrigger>
+                 <TabsTrigger value="history" className="relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-b-primary data-[state=active]:text-foreground">Activity History</TabsTrigger>
+              </TabsList>
+              <TabsContent value="details" className="space-y-4">
               {/* Workflow Steps */}
               <div className="p-3 rounded-md bg-muted/30 border">
                 <p className="text-[10px] text-muted-foreground mb-2 font-semibold">APPROVAL WORKFLOW</p>
@@ -1118,7 +1102,11 @@ export function VoucherManagement() {
               <div className="flex justify-end">
                 <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handlePrint(detailVoucher)}><Printer className="h-3 w-3 mr-1" />Print Preview</Button>
               </div>
-            </div>
+              </TabsContent>
+              <TabsContent value="history" className="pt-2">
+                 <RecordHistory entityId={detailVoucher.id} />
+              </TabsContent>
+            </Tabs>
           )}
         </DialogContent>
       </Dialog>

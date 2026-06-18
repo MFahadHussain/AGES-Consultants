@@ -378,7 +378,7 @@ function BankLetterTab() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    {['#', 'Employee', 'Bank', 'Account No.', 'Gross (Rs)', 'Deductions (Rs)', 'Net Payable (Rs)'].map(h => (
+                    {['#', 'Employee', 'Bank', 'Account No.', 'Net Payable (Rs)'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
@@ -393,15 +393,11 @@ function BankLetterTab() {
                       </td>
                       <td className="px-4 py-3 text-gray-600 text-xs">{row.bankName}</td>
                       <td className="px-4 py-3 font-mono text-xs text-gray-700">{row.accountNumber}</td>
-                      <td className="px-4 py-3 text-right font-mono text-gray-700">{fmt(row.grossSalary)}</td>
-                      <td className="px-4 py-3 text-right font-mono text-red-600">{fmt(row.deductions)}</td>
                       <td className="px-4 py-3 text-right font-mono font-bold text-green-700">{fmt(row.netSalary)}</td>
                     </tr>
                   ))}
                   <tr className="bg-green-50 border-t-2 border-green-200">
                     <td colSpan={4} className="px-4 py-3 font-bold text-gray-900 text-sm">TOTAL — {summary.totalEmployees} Employees</td>
-                    <td className="px-4 py-3 text-right font-bold font-mono text-gray-900">{fmt(summary.totalGross)}</td>
-                    <td className="px-4 py-3 text-right font-bold font-mono text-red-700">{fmt(summary.totalDeductions)}</td>
                     <td className="px-4 py-3 text-right font-bold font-mono text-green-700">{fmt(summary.totalNet)}</td>
                   </tr>
                 </tbody>

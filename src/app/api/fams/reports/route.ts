@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // GET /api/fams/reports?type=X&fiscalYear=YYYY-YY
-export async function GET(request: NextRequest) {
+async function GET_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') || 'asset-register'
@@ -477,3 +478,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to generate report' }, { status: 500 })
   }
 }
+
+export const GET = withAudit('fams', GET_HANDLER);

@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 
 // POST /api/seed-security - Seed demo security data
-export async function POST() {
+async function POST_HANDLER() {
   try {
     const systemUserId = await getSystemUserId()
     const now = new Date()
@@ -295,3 +296,5 @@ export async function POST() {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export const POST = withAudit('seed-security', POST_HANDLER);

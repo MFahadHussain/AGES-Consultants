@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { DepreciationEngine, toFinancialYear } from '@/lib/reporting/depreciation'
 
@@ -7,7 +8,7 @@ import { DepreciationEngine, toFinancialYear } from '@/lib/reporting/depreciatio
  * Run depreciation for a specific financial period.
  * Body: { year: number, month: number (1-12), projectId?: string }
  */
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const body = await request.json()
     const { year, month, projectId } = body as {
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
  * Retrieve depreciation charges for a date range.
  * Query params: fromDate, toDate, assetClass (optional)
  */
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const fromDate = searchParams.get('fromDate')
@@ -102,3 +103,7 @@ export async function GET(request: Request) {
     )
   }
 }
+
+export const POST = withAudit('statutory-reports', POST_HANDLER);
+
+export const GET = withAudit('statutory-reports', GET_HANDLER);

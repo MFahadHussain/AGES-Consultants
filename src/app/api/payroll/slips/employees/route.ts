@@ -1,10 +1,11 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // GET /api/payroll/slips/employees?period=2025-05
 // Returns list of employees with payroll data for a period
 
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const period = searchParams.get('period')
@@ -92,3 +93,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
+
+export const GET = withAudit('payroll', GET_HANDLER);

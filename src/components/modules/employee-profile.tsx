@@ -20,7 +20,7 @@ import {
   FileText, File, Calculator, BarChart3, PieChart, AlertCircle,
   Download, Trash2, RefreshCw, Grid3X3, List, X, CheckCircle, AlertTriangle, Clock, Shield, FolderOpen, ZoomIn, ZoomOut
 } from 'lucide-react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 
 // ── TYPES ───────────────────────────────────────────────────────────────
 
@@ -256,7 +256,7 @@ function AdvBadge({status}:{status:string}) {
 
 export function EmployeeProfile() {
   const { authUser } = useAppStore()
-  const isAdmin = authUser?.role === 'admin'
+  const isAdmin = hasPermission(authUser, 'EMPLOYEES_EDIT')
 
   // ---- State ----
   const [employees, setEmployees] = useState<EmployeeData[]>([])

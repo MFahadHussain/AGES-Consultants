@@ -1,8 +1,10 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { revalidatePermissionsCache } from '@/lib/permissions'
 
 // GET /api/user-permissions - Get permission overrides for a user
-export async function GET(request: NextRequest) {
+async function GET_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
@@ -53,7 +55,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/user-permissions - Set permission override for user
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
     const { userId, permissionId, isGranted, conditions, grantedBy, expiresAt } = body
@@ -129,7 +131,7 @@ export async function POST(request: NextRequest) {
     } catch {
       // Non-blocking
     }
-
+    await revalidatePermissionsCache()
     return NextResponse.json({ success: true, data: userPermission }, { status: 201 })
   } catch (error) {
     console.error('Error setting user permission override:', error)
@@ -141,7 +143,7 @@ export async function POST(request: NextRequest) {
 }
 
 // DELETE /api/user-permissions - Remove permission override
-export async function DELETE(request: NextRequest) {
+async function DELETE_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
@@ -196,7 +198,7 @@ export async function DELETE(request: NextRequest) {
     } catch {
       // Non-blocking
     }
-
+    await revalidatePermissionsCache()
     return NextResponse.json({
       success: true,
       message: `Removed permission override "${userPermission.permission.name}" for user "${userPermission.user.name}"`,
@@ -209,3 +211,9 @@ export async function DELETE(request: NextRequest) {
     )
   }
 }
+
+export const POST = withAudit('user-permissions', POST_HANDLER);
+
+export const DELETE = withAudit('user-permissions', DELETE_HANDLER);
+
+export const GET = withAudit('user-permissions', GET_HANDLER);

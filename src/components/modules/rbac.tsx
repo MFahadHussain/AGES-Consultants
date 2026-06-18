@@ -22,7 +22,7 @@ import {
   Clock, ArrowUpDown, UserCheck, Database
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 
 // ============================================================
 // Types matching actual API response shapes
@@ -191,10 +191,8 @@ export function RBACModule() {
   const [permissions, setPermissions] = useState<PermissionRecord[]>([])
   const [users, setUsers] = useState<UserRecord[]>([])
 
-  // Access control: Only super admin and system admin can access RBAC
-  const isAdminRole = authUser?.role === 'admin' || authUser?.role === 'super_admin' || authUser?.role === 'system_admin'
-  const hasAdminRoleCode = (authUser?.roles || []).some((r: any) => r.code === 'SUPER_ADMIN' || r.code === 'SYSTEM_ADMIN')
-  const canAccess = isAdminRole || hasAdminRoleCode
+  // Access control: Only users with RBAC view permissions
+  const canAccess = hasPermission(authUser, 'ROLES_VIEW') || hasPermission(authUser, 'PERMISSIONS_VIEW')
 
   // KPIs
   const kpis = useMemo(() => ({

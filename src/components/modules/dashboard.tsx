@@ -12,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { useAppStore } from "@/lib/store";
+import { useAppStore, hasPermission } from "@/lib/store";
 import {
   Banknote,
   TrendingUp,
@@ -118,10 +118,10 @@ const ROLE_CONFIG: Record<
 
 function useCurrentUserRole(): UserRole {
   const { authUser } = useAppStore();
-  const role = authUser?.role || "viewer";
-  if (["admin", "manager", "accountant", "auditor", "viewer"].includes(role)) {
-    return role as UserRole;
-  }
+  if (hasPermission(authUser, 'ROLES_VIEW') || hasPermission(authUser, 'PERMISSIONS_VIEW') || authUser?.role === 'super_admin') return "admin";
+  if (hasPermission(authUser, 'VOUCHERS_APPROVE') || hasPermission(authUser, 'USERS_EDIT')) return "manager";
+  if (hasPermission(authUser, 'VOUCHERS_CREATE') || hasPermission(authUser, 'VOUCHERS_EDIT')) return "accountant";
+  if (hasPermission(authUser, 'REPORTS_VIEW') && !hasPermission(authUser, 'VOUCHERS_CREATE')) return "auditor";
   return "viewer";
 }
 

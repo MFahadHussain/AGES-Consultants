@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
@@ -31,7 +32,7 @@ function numberToWords(num: number): string {
 }
 
 // GET /api/payroll/bank-letter?period=2025-05&format=json|html
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const period = searchParams.get('period')
@@ -214,8 +215,6 @@ tbody td:not(:first-child):not(:nth-child(2)) { text-align:right; font-family:mo
       <th>Employee Name / Code</th>
       <th>Bank</th>
       <th>Account No.</th>
-      <th>Gross (Rs)</th>
-      <th>Deductions (Rs)</th>
       <th>Net Payable (Rs)</th>
     </tr>
   </thead>
@@ -226,14 +225,10 @@ tbody td:not(:first-child):not(:nth-child(2)) { text-align:right; font-family:mo
       <td><strong>${row.employeeName}</strong><br><span style="font-size:9px;color:#6B7280;">${row.employeeCode} · ${row.designation}</span></td>
       <td>${row.bankName}</td>
       <td style="font-family:monospace;font-size:10px;">${row.accountNumber}</td>
-      <td>${fmtPKR(row.grossSalary)}</td>
-      <td style="color:#DC2626;">${fmtPKR(row.deductions)}</td>
       <td style="font-weight:700;color:#15803D;">${fmtPKR(row.netSalary)}</td>
     </tr>`).join('')}
     <tr class="total-row">
       <td colspan="4">TOTAL — ${rows.length} Employees</td>
-      <td>${fmtPKR(totalGross)}</td>
-      <td style="color:#DC2626;">${fmtPKR(totalDeductions)}</td>
       <td style="color:#15803D;">${fmtPKR(totalNet)}</td>
     </tr>
   </tbody>
@@ -275,3 +270,5 @@ tbody td:not(:first-child):not(:nth-child(2)) { text-align:right; font-family:mo
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
+
+export const GET = withAudit('payroll', GET_HANDLER);

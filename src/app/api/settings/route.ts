@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
@@ -54,7 +55,7 @@ const DEFAULT_SETTINGS: Record<string, { value: string; category: string; descri
 let _seeded = false
 
 // GET /api/settings - Get all settings (optionally filtered by category)
-export async function GET(request: NextRequest) {
+async function GET_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category')
@@ -90,7 +91,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/settings - Update settings (batch update)
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
     const { settings } = body as { settings: Record<string, string> }
@@ -150,3 +151,7 @@ async function seedDefaults() {
     console.error('Error seeding defaults:', error)
   }
 }
+
+export const POST = withAudit('settings', POST_HANDLER);
+
+export const GET = withAudit('settings', GET_HANDLER);

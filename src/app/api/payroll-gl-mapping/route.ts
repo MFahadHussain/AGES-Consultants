@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
@@ -47,7 +48,7 @@ async function enrichMappings(mappings: Array<Record<string, unknown>>) {
 // ============================================================
 // GET /api/payroll-gl-mapping — List all mappings with account details
 // ============================================================
-export async function GET() {
+async function GET_HANDLER() {
   try {
     const mappings = await db.payrollAccountMapping.findMany({
       orderBy: { componentType: 'asc' },
@@ -68,7 +69,7 @@ export async function GET() {
 // ============================================================
 // POST /api/payroll-gl-mapping — Create mapping or seed defaults
 // ============================================================
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const data = await request.json()
 
@@ -177,7 +178,7 @@ export async function POST(request: Request) {
 // ============================================================
 // PUT /api/payroll-gl-mapping — Update mapping
 // ============================================================
-export async function PUT(request: Request) {
+async function PUT_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -265,7 +266,7 @@ export async function PUT(request: Request) {
 // ============================================================
 // DELETE /api/payroll-gl-mapping — Delete mapping
 // ============================================================
-export async function DELETE(request: Request) {
+async function DELETE_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -295,3 +296,11 @@ export async function DELETE(request: Request) {
     )
   }
 }
+
+export const POST = withAudit('payroll-gl-mapping', POST_HANDLER);
+
+export const PUT = withAudit('payroll-gl-mapping', PUT_HANDLER);
+
+export const DELETE = withAudit('payroll-gl-mapping', DELETE_HANDLER);
+
+export const GET = withAudit('payroll-gl-mapping', GET_HANDLER);

@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
@@ -8,7 +9,7 @@ import { db } from '@/lib/db'
 //   - mode=export&entity=accounts|customers|suppliers|projects|vouchers|trial_balance|balance_sheet|pnl|general_ledger|...
 // ============================================================
 
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const mode = searchParams.get('mode') || 'logs'
@@ -347,7 +348,7 @@ export async function GET(request: Request) {
 // Returns: { success: true, imported: N, skipped: N, errors: [...] }
 // ============================================================
 
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const body = await request.json()
 
@@ -723,3 +724,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export const POST = withAudit('import-export', POST_HANDLER);
+
+export const GET = withAudit('import-export', GET_HANDLER);

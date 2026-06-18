@@ -1,8 +1,10 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { revalidatePermissionsCache } from '@/lib/permissions'
 
 // GET /api/user-roles - Get roles for a user
-export async function GET(request: NextRequest) {
+async function GET_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
@@ -65,7 +67,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/user-roles - Assign role to user
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
     const { userId, roleId, isPrimary, grantedBy, expiresAt } = body
@@ -153,7 +155,7 @@ export async function POST(request: NextRequest) {
     } catch {
       // Non-blocking
     }
-
+    await revalidatePermissionsCache()
     return NextResponse.json({ success: true, data: userRole }, { status: 201 })
   } catch (error) {
     console.error('Error assigning user role:', error)
@@ -165,7 +167,7 @@ export async function POST(request: NextRequest) {
 }
 
 // DELETE /api/user-roles - Remove role from user
-export async function DELETE(request: NextRequest) {
+async function DELETE_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
@@ -217,7 +219,7 @@ export async function DELETE(request: NextRequest) {
     } catch {
       // Non-blocking
     }
-
+    await revalidatePermissionsCache()
     return NextResponse.json({
       success: true,
       message: `Removed role "${userRole.role.name}" from user "${userRole.user.name}"`,
@@ -230,3 +232,9 @@ export async function DELETE(request: NextRequest) {
     )
   }
 }
+
+export const POST = withAudit('user-roles', POST_HANDLER);
+
+export const DELETE = withAudit('user-roles', DELETE_HANDLER);
+
+export const GET = withAudit('user-roles', GET_HANDLER);

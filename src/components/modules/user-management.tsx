@@ -30,7 +30,7 @@ import {
   ShieldCheck, Activity, History, ArrowUpRight, Copy,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 
 // ============================================================
 // Types
@@ -92,6 +92,8 @@ interface UserRecord {
   lastLogin: string | null
   branch: BranchOption | null
   department: DepartmentOption | null
+  roles?: { id: string; code: string; name: string; level: number; isPrimary: boolean }[]
+  primaryRole?: { id: string; code: string; name: string; level: number } | null
   auditCount: number
   actionCount: number
 }
@@ -102,6 +104,7 @@ interface UserForm {
   username: string
   phone: string
   role: string
+  roleIds: string[]
   isActive: boolean
   isLocked: boolean
   forcePasswordChange: boolean
@@ -185,6 +188,7 @@ const DEFAULT_FORM: UserForm = {
   username: '',
   phone: '',
   role: 'viewer',
+  roleIds: [],
   isActive: true,
   isLocked: false,
   forcePasswordChange: false,
@@ -274,8 +278,35 @@ function getPasswordStrength(password: string): { score: number; label: string; 
   return { score, label: 'Very Strong', color: 'bg-emerald-600' }
 }
 
-function getRoleBadge(role: string) {
-  switch (role) {
+function getRoleBadge(user: UserRecord) {
+  if (user.roles && user.roles.length > 0) {
+    const primary = user.primaryRole || user.roles[0]
+    const extraCount = user.roles.length - 1
+    return (
+      <div className="flex items-center space-x-1">
+        <Badge variant={primary.level >= 90 ? 'default' : 'outline'} className={`text-[10px] px-2 py-0.5 ${primary.level >= 90 ? 'bg-slate-900 text-white hover:bg-slate-800' : 'border-blue-200 text-blue-700 bg-blue-50'}`}>
+          {primary.name}
+        </Badge>
+        {extraCount > 0 && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <Badge variant="secondary" className="text-[9px] px-1 h-4 cursor-pointer">+{extraCount}</Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-xs space-y-1">
+                  {user.roles.map(r => <div key={r.id}>{r.name}</div>)}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
+    )
+  }
+
+  // Fallback to legacy role
+  switch (user.role) {
     case 'admin':
       return <Badge className="bg-slate-900 text-white hover:bg-slate-800 text-[10px] px-2 py-0.5">Admin</Badge>
     case 'manager':
@@ -287,7 +318,7 @@ function getRoleBadge(role: string) {
     case 'viewer':
       return <Badge variant="outline" className="border-slate-200 text-slate-500 bg-slate-50 text-[10px] px-2 py-0.5">Viewer</Badge>
     default:
-      return <Badge variant="outline" className="text-[10px] px-2 py-0.5">{role}</Badge>
+      return <Badge variant="outline" className="text-[10px] px-2 py-0.5">{user.role}</Badge>
   }
 }
 
@@ -441,6 +472,7 @@ function UserFormModal({
         employeeId: editingUser.employeeId || '',
         designation: editingUser.designation || '',
         avatarUrl: editingUser.avatarUrl || '',
+        roleIds: editingUser.roles?.map(r => r.id) || [],
       }
     : { ...DEFAULT_FORM }
 
@@ -478,12 +510,16 @@ function UserFormModal({
       }
     }
 
+    if (form.roleIds.length === 0) {
+      errors.roleIds = 'At least one role must be assigned'
+    }
+
     setFormErrors(errors)
     if (Object.keys(errors).length > 0) {
       // Switch to the tab with errors
       if (errors.name || errors.email || errors.username || errors.phone || errors.password || errors.confirmPassword) {
         setActiveTab('basic')
-      } else if (errors.branchId || errors.departmentId || errors.employeeId || errors.designation) {
+      } else if (errors.branchId || errors.departmentId || errors.employeeId || errors.designation || errors.roleIds) {
         setActiveTab('organization')
       }
     }
@@ -707,20 +743,39 @@ function UserFormModal({
 
             {/* Organization Tab */}
             <TabsContent value="organization" className="px-6 py-4 mt-0 space-y-4">
-              {/* Role */}
+              {/* Assigned Roles */}
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-700">Role (Legacy)</Label>
-                <Select value={form.role} onValueChange={v => updateField('role', v)}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ROLE_OPTIONS.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-[10px] text-muted-foreground">This sets the legacy role. Use RBAC module for granular permissions.</p>
+                <Label className="text-xs font-medium text-slate-700">Assigned Roles</Label>
+                <ScrollArea className="h-32 w-full rounded-md border border-slate-200 bg-white">
+                  <div className="p-3 space-y-3">
+                    {roles.length === 0 ? (
+                      <p className="text-xs text-slate-500 italic">No roles available</p>
+                    ) : (
+                      roles.map(role => (
+                        <div key={role.id} className="flex items-start space-x-2">
+                          <Checkbox
+                            id={`role-${role.id}`}
+                            checked={form.roleIds.includes(role.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                updateField('roleIds', [...form.roleIds, role.id])
+                              } else {
+                                updateField('roleIds', form.roleIds.filter(id => id !== role.id))
+                              }
+                            }}
+                          />
+                          <div className="space-y-0.5 leading-none">
+                            <Label htmlFor={`role-${role.id}`} className="text-xs font-medium cursor-pointer">
+                              {role.name} {role.isSystem && <Badge variant="secondary" className="ml-1 text-[9px] px-1 h-3">System</Badge>}
+                            </Label>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+                {formErrors.roleIds && <p className="text-[10px] text-red-500">{formErrors.roleIds}</p>}
+                <p className="text-[10px] text-muted-foreground">Select one or more roles to grant access. A user must have at least one role.</p>
               </div>
 
               {/* Branch */}
@@ -1011,7 +1066,7 @@ function UserDetailPanel({
               <SheetTitle className="text-lg font-semibold text-slate-900 truncate">{user.name}</SheetTitle>
               <SheetDescription className="text-xs text-muted-foreground truncate">{user.email}</SheetDescription>
               <div className="flex items-center gap-2 mt-1.5">
-                {getRoleBadge(user.role)}
+                {getRoleBadge(user)}
                 {getStatusIndicator(user)}
               </div>
             </div>
@@ -1449,8 +1504,9 @@ function ResetPasswordDialog({
 
 export function UserManagement() {
   const { toast } = useToast()
-  const currentUser = useCurrentUser()
-  const isAdmin = currentUser.role === 'admin'
+  const { authUser } = useAppStore()
+  const currentUser = authUser || { role: 'viewer', id: '', name: '' }
+  const isAdmin = hasPermission(authUser, 'USERS_EDIT')
 
   // Data state
   const [users, setUsers] = useState<UserRecord[]>([])
@@ -1659,7 +1715,7 @@ export function UserManagement() {
   // Save Handler (Add/Edit)
   // ============================================================
 
-  const handleSave = async (form: UserForm) => {
+  const executeSave = async (form: UserForm) => {
     setSaving(true)
     try {
       if (editingUser) {
@@ -1669,6 +1725,7 @@ export function UserManagement() {
           username: form.username || null,
           phone: form.phone || null,
           role: form.role,
+          roleIds: form.roleIds,
           forcePasswordChange: form.forcePasswordChange,
           branchId: form.branchId || null,
           departmentId: form.departmentId || null,
@@ -1715,6 +1772,7 @@ export function UserManagement() {
           username: form.username || null,
           phone: form.phone || null,
           role: form.role,
+          roleIds: form.roleIds,
           isActive: form.isActive,
           password: form.password,
           forcePasswordChange: form.forcePasswordChange,
@@ -1745,6 +1803,32 @@ export function UserManagement() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleSave = async (form: UserForm) => {
+    // Check if permissions are being reduced
+    if (editingUser && editingUser.roles) {
+      const oldRoleIds = editingUser.roles.map(r => r.id)
+      const removedRoles = oldRoleIds.filter(id => !form.roleIds.includes(id))
+      
+      if (removedRoles.length > 0) {
+        const removedRoleNames = removedRoles.map(id => roles.find(r => r.id === id)?.name).filter(Boolean)
+        setConfirmDialog({
+          open: true,
+          title: 'Confirm Role Reduction',
+          description: `Warning: You are removing the following roles: ${removedRoleNames.join(', ')}. This user will lose access to modules governed by these roles. Proceed?`,
+          confirmLabel: 'Yes, reduce access',
+          variant: 'warning',
+          onConfirm: async () => {
+            setConfirmDialog(prev => ({ ...prev, open: false }))
+            await executeSave(form)
+          }
+        })
+        return
+      }
+    }
+    
+    await executeSave(form)
   }
 
   // ============================================================
@@ -2245,7 +2329,7 @@ export function UserManagement() {
                     </td>
 
                     {/* Role */}
-                    <td className="px-4 py-3">{getRoleBadge(user.role)}</td>
+                    <td className="px-4 py-3">{getRoleBadge(user)}</td>
 
                     {/* Branch */}
                     <td className="px-4 py-3 hidden lg:table-cell">

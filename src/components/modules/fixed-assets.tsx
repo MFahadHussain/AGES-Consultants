@@ -478,7 +478,8 @@ export function FixedAssetsModule() {
   const [showFilters, setShowFilters] = useState(false)
 
   // Role-based access state
-  const [currentRole, setCurrentRole] = useState<string>('super-admin')
+  const sessionRole = authUser?.role?.toLowerCase() || 'viewer'
+  const currentRole = sessionRole === 'admin' ? 'super-admin' : sessionRole
 
   // COA Category accounts for dropdown
   const [coaCategories, setCoaCategories] = useState<Array<{ id: string; code: string; name: string; category: string }>>([])
@@ -631,7 +632,7 @@ export function FixedAssetsModule() {
 
   const fetchFiscalYears = useCallback(async () => {
     try {
-      const res = await fetch('/api/fams/fiscal-years')
+      const res = await fetch('/api/fams/fiscal-years', { cache: 'no-store' })
       if (res.ok) {
         const data = await res.json()
         setFiscalYears(Array.isArray(data) ? data : data.fiscalYears || [])
@@ -2724,15 +2725,16 @@ export function FixedAssetsModule() {
       <Card>
         <CardContent className="p-4">
           <Button className="h-8 text-xs gap-1" onClick={async () => {
-            const nextLabel = `${new Date().getFullYear()}-${String(new Date().getFullYear() + 1).slice(2)}`
+            const nextYear = fiscalYears.length > 0 ? new Date(fiscalYears[0].startDate).getFullYear() + 1 : new Date().getFullYear()
+            const nextLabel = `${nextYear}-${String(nextYear + 1).slice(2)}`
             try {
               const res = await fetch('/api/fams/fiscal-years', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   label: nextLabel,
-                  startDate: `${new Date().getFullYear()}-07-01`,
-                  endDate: `${new Date().getFullYear() + 1}-06-30`,
+                  startDate: `${nextYear}-07-01`,
+                  endDate: `${nextYear + 1}-06-30`,
                 }),
               })
               if (res.ok) {
@@ -3111,24 +3113,7 @@ export function FixedAssetsModule() {
           <p className="text-xs text-muted-foreground">Fixed Assets Management System (FAMS)</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5">
-            <Shield className="h-4 w-4 text-muted-foreground" />
-            <Select value={currentRole} onValueChange={setCurrentRole}>
-              <SelectTrigger className="w-40 h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(ROLES).map(([key, role]) => (
-                  <SelectItem key={key} value={key}>
-                    <span className="flex items-center gap-1.5">
-                      <span>{role.icon}</span>
-                      <span>{role.label}</span>
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+
           <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={refreshAll}><RefreshCw className="h-3.5 w-3.5" />Refresh</Button>
         </div>
       </div>

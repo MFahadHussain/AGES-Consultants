@@ -1,8 +1,9 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // GET /api/approval-workflows - List workflows
-export async function GET(request: NextRequest) {
+async function GET_HANDLER(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const moduleFilter = searchParams.get('module')
@@ -108,7 +109,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/approval-workflows - Create workflow with steps
-export async function POST(request: NextRequest) {
+async function POST_HANDLER(request: NextRequest) {
   try {
     const body = await request.json()
     const { name, code, description, module: wfModule, entityType, isActive, createdBy, steps } = body
@@ -180,3 +181,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Failed to create approval workflow' }, { status: 500 })
   }
 }
+
+export const POST = withAudit('approval-workflows', POST_HANDLER);
+
+export const GET = withAudit('approval-workflows', GET_HANDLER);

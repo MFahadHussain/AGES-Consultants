@@ -1,3 +1,4 @@
+import { withAudit } from '@/lib/audit-wrapper'
 import { NextResponse } from 'next/server'
 import { db, getSystemUserId } from '@/lib/db'
 import { findAccountsByRole } from '@/lib/account-roles'
@@ -13,7 +14,7 @@ import { findAccountsByRole } from '@/lib/account-roles'
 //   POST { action: 'create-statement', ... } → Create bank statement (legacy)
 // ============================================================
 
-export async function GET(request: Request) {
+async function GET_HANDLER(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const action = searchParams.get('action') || 'init'
@@ -206,7 +207,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+async function POST_HANDLER(request: Request) {
   try {
     const data = await request.json()
 
@@ -343,3 +344,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export const POST = withAudit('bank-reconciliation', POST_HANDLER);
+
+export const GET = withAudit('bank-reconciliation', GET_HANDLER);
