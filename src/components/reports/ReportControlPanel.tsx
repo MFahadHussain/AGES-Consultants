@@ -162,7 +162,7 @@ export default function ReportControlPanel({
     switch (validationStatus) {
       case 'ready':
         return (
-          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300 gap-1">
+          <Badge className="bg-[#EEF1F8] text-emerald-700 border-emerald-300 gap-1">
             <CheckCircle2 className="size-3" /> ✓ Ready
           </Badge>
         );

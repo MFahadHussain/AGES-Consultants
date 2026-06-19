@@ -170,10 +170,10 @@ export function TaxSlabsModule() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-green-500">
+        <Card className="border-l-4 border-l-[#0F2D78]">
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
-              <Calculator className="h-4 w-4 text-green-500" />
+              <Calculator className="h-4 w-4 text-[#1E3C87]" />
               <div>
                 <p className="text-[10px] text-muted-foreground">Active Slabs</p>
                 <p className="text-sm font-bold">{activeSlabs}</p>
@@ -240,7 +240,7 @@ export function TaxSlabsModule() {
                   <TableCell className="text-xs text-right">{slab.maxAmount ? formatCurrency(slab.maxAmount) : '∞'}</TableCell>
                   <TableCell className="text-xs text-right">{formatCurrency(slab.fixedAmount)}</TableCell>
                   <TableCell className="text-xs text-right">{slab.rate}%</TableCell>
-                  <TableCell><Badge className={`text-[9px] ${slab.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{slab.isActive ? 'Active' : 'Inactive'}</Badge></TableCell>
+                  <TableCell><Badge className={`text-[9px] ${slab.isActive ? 'bg-[#EEF1F8] text-[#0F2D78]' : 'bg-gray-100 text-gray-800'}`}>{slab.isActive ? 'Active' : 'Inactive'}</Badge></TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(slab)}>

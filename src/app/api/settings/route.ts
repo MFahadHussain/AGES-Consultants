@@ -4,12 +4,12 @@ import { db } from '@/lib/db'
 
 // Default settings that will be seeded if not present
 const DEFAULT_SETTINGS: Record<string, { value: string; category: string; description: string; isPublic: boolean }> = {
-  company_name: { value: 'AcctFin Enterprises', category: 'general', description: 'Company legal name', isPublic: true },
-  company_short_name: { value: 'AcctFin', category: 'general', description: 'Short name for display', isPublic: true },
+  company_name: { value: 'AGES Consultants', category: 'general', description: 'Company legal name', isPublic: true },
+  company_short_name: { value: 'AGES', category: 'general', description: 'Short name for display', isPublic: true },
   company_address: { value: '123 Finance Street, Business District, Karachi 74000', category: 'general', description: 'Company address', isPublic: true },
   company_phone: { value: '+92-21-1234567', category: 'general', description: 'Company phone number', isPublic: true },
-  company_email: { value: 'info@acctfin.com', category: 'general', description: 'Company email', isPublic: true },
-  company_website: { value: 'www.acctfin.com', category: 'general', description: 'Company website', isPublic: true },
+  company_email: { value: 'info@agesconsultants.com', category: 'general', description: 'Company email', isPublic: true },
+  company_website: { value: 'www.agesconsultants.com', category: 'general', description: 'Company website', isPublic: true },
   company_tax_number: { value: 'NTN-1234567-8', category: 'general', description: 'National Tax Number', isPublic: false },
   company_registration: { value: 'REG-2024-001', category: 'general', description: 'Company registration number', isPublic: false },
   base_currency: { value: 'PKR', category: 'general', description: 'Base currency code', isPublic: true },

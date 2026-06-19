@@ -42,10 +42,10 @@ async function main() {
   const passwordHash = await bcrypt.hash('admin123', 10)
 
   const admin = await db.user.upsert({
-    where: { email: 'admin@acctfin.erp' },
+    where: { email: 'admin@ages.erp' },
     update: {},
     create: {
-      email: 'admin@acctfin.erp',
+      email: 'admin@ages.erp',
       username: 'admin',
       name: 'System Administrator',
       passwordHash,

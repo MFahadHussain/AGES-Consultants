@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# AcctFin ERP - PostgreSQL Backup Script
+# AGES Consultants ERP - PostgreSQL Backup Script
 # ============================================================
 # Usage: ./scripts/backup-pg.sh [OPTIONS]
 #
@@ -58,7 +58,7 @@ mkdir -p "${BACKUP_DIR}"
 BASENAME="${PGDATABASE}_${BACKUP_TYPE}_${TIMESTAMP}"
 
 echo "============================================"
-echo "AcctFin ERP - PostgreSQL Backup"
+echo "AGES Consultants ERP - PostgreSQL Backup"
 echo "============================================"
 echo "Database:   ${PGDATABASE}"
 echo "Host:       ${PGHOST}:${PGPORT}"

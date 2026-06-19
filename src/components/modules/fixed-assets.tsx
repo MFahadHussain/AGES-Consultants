@@ -46,7 +46,7 @@ const FBR_RATES: Record<string, number> = {
   'Office Equipment': 15, 'IT Assets': 30, 'Machinery': 10, 'Other': 10
 }
 const MONTHS = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
-const CHART_COLORS = ['#16a34a', '#2563eb', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#be185d', '#65a30d']
+const CHART_COLORS = ['#0F2D78', '#2563eb', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#be185d', '#65a30d']
 const ITEMS_PER_PAGE = 20
 
 const GL_CATEGORY_MAP: Record<string, { asset: string; accDep: string; depExp: string }> = {
@@ -357,7 +357,7 @@ const getCategoryIcon = (category: string) => {
 
 const statusBadge = (status: string) => {
   const map: Record<string, string> = {
-    'Active': 'bg-emerald-100 text-emerald-800',
+    'Active': 'bg-[#EEF1F8] text-[#0F2D78]',
     'Disposed': 'bg-red-100 text-red-800',
     'Transferred': 'bg-sky-100 text-sky-800',
     'Under Maintenance': 'bg-amber-100 text-amber-800',
@@ -368,7 +368,7 @@ const statusBadge = (status: string) => {
 
 const approvalBadge = (status: string) => {
   const map: Record<string, string> = {
-    'Approved': 'bg-emerald-100 text-emerald-800',
+    'Approved': 'bg-[#EEF1F8] text-[#0F2D78]',
     'Pending Approval': 'bg-amber-100 text-amber-800',
     'Draft': 'bg-gray-100 text-gray-800',
     'Rejected': 'bg-red-100 text-red-800',
@@ -379,7 +379,7 @@ const approvalBadge = (status: string) => {
 const journalBadge = (status: string) => {
   const map: Record<string, string> = {
     'Pending Export': 'bg-amber-100 text-amber-800',
-    'Exported': 'bg-emerald-100 text-emerald-800',
+    'Exported': 'bg-[#EEF1F8] text-[#0F2D78]',
     'Reversed': 'bg-red-100 text-red-800',
     'N/A': 'bg-gray-100 text-gray-600',
   }
@@ -499,7 +499,7 @@ export function FixedAssetsModule() {
   const ROLES: Record<string, { label: string; color: string; icon: string }> = {
     'super-admin': { label: 'Super Admin', color: 'bg-red-100 text-red-800', icon: '👑' },
     'cfo': { label: 'CFO', color: 'bg-amber-100 text-amber-800', icon: '🏛️' },
-    'finance-officer': { label: 'Finance Officer', color: 'bg-emerald-100 text-emerald-800', icon: '💰' },
+    'finance-officer': { label: 'Finance Officer', color: 'bg-[#EEF1F8] text-[#0F2D78]', icon: '💰' },
     'asset-manager': { label: 'Asset Manager', color: 'bg-sky-100 text-sky-800', icon: '📦' },
     'custodian': { label: 'Custodian', color: 'bg-violet-100 text-violet-800', icon: '🔑' },
     'auditor': { label: 'Auditor', color: 'bg-gray-100 text-gray-800', icon: '🔍' },
@@ -1406,7 +1406,7 @@ export function FixedAssetsModule() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-emerald-100 p-2.5"><Package className="h-5 w-5 text-emerald-600" /></div>
+              <div className="rounded-lg bg-[#EEF1F8] p-2.5"><Package className="h-5 w-5 text-[#0F2D78]" /></div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Assets</p>
                 <p className="text-xl font-bold">{summary.totalCount}</p>
@@ -1530,7 +1530,7 @@ export function FixedAssetsModule() {
                   <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `${Math.round(v / 1000000)}M`} />
                   <RechartsTooltip formatter={(value: number) => pkr(value)} />
-                  <Bar dataKey="depreciation" fill="#16a34a" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="depreciation" fill="#0F2D78" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -1593,14 +1593,14 @@ export function FixedAssetsModule() {
                 <p className="text-xs font-medium text-violet-800">{pendingJournals} journal(s) pending export to AFMS</p>
               </div>
             )}
-            <div className="flex items-center gap-3 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-              <p className="text-xs font-medium text-emerald-800">Depreciation run: Current period status available in Depreciation tab</p>
+            <div className="flex items-center gap-3 p-2.5 rounded-lg bg-emerald-50 border border-[#A5B4D2]">
+              <CheckCircle2 className="h-4 w-4 text-[#0F2D78] shrink-0" />
+              <p className="text-xs font-medium text-[#0F2D78]">Depreciation run: Current period status available in Depreciation tab</p>
             </div>
             {nearFullDepAssets.length === 0 && insuranceExpiring.length === 0 && pendingApprovals === 0 && pendingJournals === 0 && (
-              <div className="flex items-center gap-3 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                <p className="text-xs font-medium text-emerald-800">All clear — no alerts at this time</p>
+              <div className="flex items-center gap-3 p-2.5 rounded-lg bg-emerald-50 border border-[#A5B4D2]">
+                <CheckCircle2 className="h-4 w-4 text-[#0F2D78] shrink-0" />
+                <p className="text-xs font-medium text-[#0F2D78]">All clear — no alerts at this time</p>
               </div>
             )}
           </CardContent>
@@ -2142,8 +2142,8 @@ export function FixedAssetsModule() {
                 </div>
                 {wizardForm.purchasePrice > 0 && depCalculation.annual > 0 && (
                   <div className="grid grid-cols-3 gap-3 mt-4">
-                    <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-center">
-                      <p className="text-[10px] text-emerald-600 font-medium uppercase tracking-wider">Annual</p>
+                    <div className="p-3 rounded-lg bg-emerald-50 border border-[#A5B4D2] text-center">
+                      <p className="text-[10px] text-[#0F2D78] font-medium uppercase tracking-wider">Annual</p>
                       <p className="text-sm font-bold text-emerald-900 mt-0.5">{pkr(depCalculation.annual)}</p>
                     </div>
                     <div className="p-3 rounded-lg bg-sky-50 border border-sky-200 text-center">
@@ -2378,13 +2378,13 @@ export function FixedAssetsModule() {
                 const status = parsedStatus[periodKey] || 'Pending'
                 return (
                   <div key={periodKey} className={`p-2 rounded-lg text-center border ${
-                    status === 'Complete' ? 'bg-emerald-50 border-emerald-200' :
+                    status === 'Complete' ? 'bg-emerald-50 border-[#A5B4D2]' :
                     status === 'Reversed' ? 'bg-red-50 border-red-200' :
                     'bg-amber-50 border-amber-200'
                   }`}>
                     <p className="text-[10px] font-medium">{m}</p>
                     <p className="text-[9px] text-muted-foreground">{year}</p>
-                    {status === 'Complete' ? <CheckCircle2 className="h-4 w-4 text-emerald-600 mx-auto mt-1" /> :
+                    {status === 'Complete' ? <CheckCircle2 className="h-4 w-4 text-[#0F2D78] mx-auto mt-1" /> :
                      status === 'Reversed' ? <RotateCcw className="h-4 w-4 text-red-600 mx-auto mt-1" /> :
                      <Clock className="h-4 w-4 text-amber-600 mx-auto mt-1" />}
                   </div>
@@ -2573,7 +2573,7 @@ export function FixedAssetsModule() {
                       <TableCell className="text-xs max-w-48 truncate">{t.description || '—'}</TableCell>
                       <TableCell className="text-xs text-right">{pkr(t.amount)}</TableCell>
                       <TableCell className="text-xs text-right">{pkr(t.proceeds)}</TableCell>
-                      <TableCell className={`text-xs text-right ${(t.gainLoss || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{pkr(t.gainLoss || 0)}</TableCell>
+                      <TableCell className={`text-xs text-right ${(t.gainLoss || 0) >= 0 ? 'text-[#0F2D78]' : 'text-red-600'}`}>{pkr(t.gainLoss || 0)}</TableCell>
                       <TableCell>{statusBadge(t.status)}</TableCell>
                     </TableRow>
                   ))}
@@ -2666,7 +2666,7 @@ export function FixedAssetsModule() {
               <div>
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Calendar className="h-4 w-4" />FY {fy.label}
-                  <Badge variant="secondary" className={fy.status === 'Closed' ? 'bg-gray-100 text-gray-800' : 'bg-emerald-100 text-emerald-800'}>{fy.status}</Badge>
+                  <Badge variant="secondary" className={fy.status === 'Closed' ? 'bg-gray-100 text-gray-800' : 'bg-[#EEF1F8] text-[#0F2D78]'}>{fy.status}</Badge>
                 </CardTitle>
                 <CardDescription className="text-xs">{formatDate(fy.startDate)} — {formatDate(fy.endDate)}</CardDescription>
               </div>
@@ -2700,12 +2700,12 @@ export function FixedAssetsModule() {
                 const status = fy.depRunStatusParsed[periodKey] || 'Pending'
                 return (
                   <div key={periodKey} className={`p-1.5 rounded text-center border text-[10px] ${
-                    status === 'Complete' ? 'bg-emerald-50 border-emerald-200' :
+                    status === 'Complete' ? 'bg-emerald-50 border-[#A5B4D2]' :
                     status === 'Reversed' ? 'bg-red-50 border-red-200' :
                     'bg-amber-50 border-amber-200'
                   }`}>
                     <div className="font-medium">{m}</div>
-                    {status === 'Complete' ? <CheckCircle2 className="h-3 w-3 text-emerald-600 mx-auto" /> :
+                    {status === 'Complete' ? <CheckCircle2 className="h-3 w-3 text-[#0F2D78] mx-auto" /> :
                      status === 'Reversed' ? <RotateCcw className="h-3 w-3 text-red-600 mx-auto" /> :
                      <Clock className="h-3 w-3 text-amber-600 mx-auto" />}
                   </div>
@@ -2883,7 +2883,7 @@ export function FixedAssetsModule() {
             {selectedAsset && (
               <div className="p-3 rounded-lg bg-muted text-xs space-y-1">
                 <div><span className="text-muted-foreground">NBV:</span> {pkr(selectedAsset.netBookValue)}</div>
-                <div><span className="text-muted-foreground">Gain/Loss:</span> <span className={gainLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}>{pkr(gainLoss)}</span></div>
+                <div><span className="text-muted-foreground">Gain/Loss:</span> <span className={gainLoss >= 0 ? 'text-[#0F2D78]' : 'text-red-600'}>{pkr(gainLoss)}</span></div>
               </div>
             )}
             <div><Label className="text-xs">Description</Label><Textarea value={disposalForm.description} onChange={e => setDisposalForm(f => ({ ...f, description: e.target.value }))} rows={2} /></div>
@@ -2963,7 +2963,7 @@ export function FixedAssetsModule() {
             {selectedAsset && (
               <div className="p-3 rounded-lg bg-muted text-xs space-y-1">
                 <div><span className="text-muted-foreground">Current NBV:</span> {pkr(selectedAsset.netBookValue)}</div>
-                <div><span className="text-muted-foreground">Difference:</span> <span className={((adjustmentForm.newValue as number) - selectedAsset.netBookValue) >= 0 ? 'text-emerald-600' : 'text-red-600'}>{pkr((adjustmentForm.newValue as number) - selectedAsset.netBookValue)}</span></div>
+                <div><span className="text-muted-foreground">Difference:</span> <span className={((adjustmentForm.newValue as number) - selectedAsset.netBookValue) >= 0 ? 'text-[#0F2D78]' : 'text-red-600'}>{pkr((adjustmentForm.newValue as number) - selectedAsset.netBookValue)}</span></div>
               </div>
             )}
             <div><Label className="text-xs">Description</Label><Textarea value={adjustmentForm.description as string} onChange={e => setAdjustmentForm(f => ({ ...f, description: e.target.value }))} rows={2} /></div>

@@ -161,15 +161,15 @@ function PasswordStrengthBar({ password }: { password: string }) {
     "bg-orange-500",
     "bg-yellow-500",
     "bg-green-400",
-    "bg-green-600",
+    "bg-[#0F2D78]",
   ];
   const textColors = [
     "",
     "text-red-500",
     "text-orange-500",
     "text-yellow-600",
-    "text-green-500",
-    "text-green-600",
+    "text-[#1E3C87]",
+    "text-[#0F2D78]",
   ];
 
   if (!password) return null;
@@ -199,12 +199,12 @@ function PasswordCheck({ label, met }: { label: string; met: boolean }) {
   return (
     <div className="flex items-center gap-1.5">
       {met ? (
-        <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />
+        <CheckCircle className="h-3 w-3 text-[#1E3C87] shrink-0" />
       ) : (
         <div className="h-3 w-3 rounded-full border border-gray-300 shrink-0" />
       )}
       <span
-        className={`text-[10px] ${met ? "text-green-600" : "text-muted-foreground"}`}
+        className={`text-[10px] ${met ? "text-[#0F2D78]" : "text-muted-foreground"}`}
       >
         {label}
       </span>
@@ -580,7 +580,7 @@ export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                className="w-full h-7 text-[10px] text-[#1A7A4A] hover:text-[#15693F] hover:bg-[#F0FDF4]"
+                className="w-full h-7 text-[10px] text-[#0F2D78] hover:text-[#0A1F54] hover:bg-[#EEF1F8]"
                 onClick={() => router.push("/accounting/vouchers")}
               >
                 View All Vouchers
@@ -611,7 +611,7 @@ export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
             <button className="flex items-center gap-2.5 pl-3 border-l border-gray-200 cursor-pointer hover:bg-gray-50 rounded-md px-2 py-1.5 transition-colors ml-1">
               <div
                 className="h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-bold"
-                style={{ background: "#1A7A4A", color: "#FFFFFF" }}
+                style={{ background: "#0F2D78", color: "#FFFFFF" }}
               >
                 {(authUser?.name || "A").charAt(0).toUpperCase()}
               </div>
@@ -620,7 +620,7 @@ export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
                   {authUser?.name || "Admin"}
                 </p>
                 <p className="text-[10px] text-gray-400">
-                  {authUser?.email || "admin@acctfin.com"}
+                  {authUser?.email || "admin@agesconsultants.com"}
                 </p>
               </div>
             </button>
@@ -630,7 +630,7 @@ export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
               <div className="flex items-center gap-3">
                 <div
                   className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold"
-                  style={{ background: "#1A7A4A", color: "#FFFFFF" }}
+                  style={{ background: "#0F2D78", color: "#FFFFFF" }}
                 >
                   {(authUser?.name || "A").charAt(0).toUpperCase()}
                 </div>
@@ -642,7 +642,7 @@ export function Header({ onSearchOpen, authUser, onLogout }: HeaderProps) {
                     {authUser?.name || "Admin"}
                   </p>
                   <p className="text-xs text-gray-400 truncate">
-                    {authUser?.email || "admin@acctfin.com"}
+                    {authUser?.email || "admin@agesconsultants.com"}
                   </p>
                 </div>
               </div>

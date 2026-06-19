@@ -982,7 +982,7 @@ export function SettingsModule() {
               label: "Active",
               value: safeUsers.filter((u) => u.isActive).length,
               icon: CheckCircle,
-              color: "text-green-600",
+              color: "text-[#0F2D78]",
             },
             {
               label: "Admins",
@@ -1102,7 +1102,7 @@ export function SettingsModule() {
                           </TableCell>
                           <TableCell>
                             {user.isActive ? (
-                              <Badge className="text-[9px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                              <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78] dark:bg-[#0F2D78]/30 dark:text-[#96A5C3]">
                                 Active
                               </Badge>
                             ) : (
@@ -1139,7 +1139,7 @@ export function SettingsModule() {
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className={`h-7 w-7 p-0 ${user.isActive ? "text-destructive" : "text-green-600"}`}
+                                      className={`h-7 w-7 p-0 ${user.isActive ? "text-destructive" : "text-[#0F2D78]"}`}
                                       onClick={() =>
                                         handleToggleUserActive(user)
                                       }
@@ -1454,35 +1454,35 @@ export function SettingsModule() {
                     </TableCell>
                     <TableCell className="text-center">
                       {mp.admin ? (
-                        <CheckCircle className="h-3.5 w-3.5 text-green-600 mx-auto" />
+                        <CheckCircle className="h-3.5 w-3.5 text-[#0F2D78] mx-auto" />
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </TableCell>
                     <TableCell className="text-center">
                       {mp.manager ? (
-                        <CheckCircle className="h-3.5 w-3.5 text-green-600 mx-auto" />
+                        <CheckCircle className="h-3.5 w-3.5 text-[#0F2D78] mx-auto" />
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </TableCell>
                     <TableCell className="text-center">
                       {mp.accountant ? (
-                        <CheckCircle className="h-3.5 w-3.5 text-green-600 mx-auto" />
+                        <CheckCircle className="h-3.5 w-3.5 text-[#0F2D78] mx-auto" />
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </TableCell>
                     <TableCell className="text-center">
                       {mp.auditor ? (
-                        <CheckCircle className="h-3.5 w-3.5 text-green-600 mx-auto" />
+                        <CheckCircle className="h-3.5 w-3.5 text-[#0F2D78] mx-auto" />
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </TableCell>
                     <TableCell className="text-center">
                       {mp.viewer ? (
-                        <CheckCircle className="h-3.5 w-3.5 text-green-600 mx-auto" />
+                        <CheckCircle className="h-3.5 w-3.5 text-[#0F2D78] mx-auto" />
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
@@ -2367,7 +2367,7 @@ export function SettingsModule() {
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {[
-                { label: "Application", value: "AcctFin ERP", icon: Settings },
+                { label: "Application", value: "AGES Consultants ERP", icon: Settings },
                 { label: "Version", value: "1.0.0", icon: Info },
                 {
                   label: "Framework",
@@ -2461,12 +2461,12 @@ export function SettingsModule() {
                   key={item.title}
                   className={`p-3 rounded-lg border flex items-center gap-3 ${
                     item.status === "pass"
-                      ? "border-green-200 bg-green-50/50 dark:border-green-900/30 dark:bg-green-900/10"
+                      ? "border-[#A5B4D2] bg-[#EEF1F8]/50 dark:border-green-900/30 dark:bg-green-900/10"
                       : "border-amber-200 bg-amber-50/50 dark:border-amber-900/30 dark:bg-amber-900/10"
                   }`}
                 >
                   <CheckCircle
-                    className={`h-5 w-5 shrink-0 ${item.status === "pass" ? "text-green-600" : "text-amber-600"}`}
+                    className={`h-5 w-5 shrink-0 ${item.status === "pass" ? "text-[#0F2D78]" : "text-amber-600"}`}
                   />
                   <div>
                     <p className="text-xs font-semibold">{item.title}</p>

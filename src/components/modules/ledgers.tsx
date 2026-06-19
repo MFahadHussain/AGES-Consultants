@@ -93,8 +93,8 @@ export function Ledgers() {
     const colors: Record<string, string> = {
       draft: 'bg-yellow-100 text-yellow-800',
       pending: 'bg-blue-100 text-blue-800',
-      approved: 'bg-green-100 text-green-800',
-      posted: 'bg-emerald-100 text-emerald-800',
+      approved: 'bg-[#EEF1F8] text-[#0F2D78]',
+      posted: 'bg-[#EEF1F8] text-[#0F2D78]',
       rejected: 'bg-red-100 text-red-800',
     }
     return <Badge className={`text-[8px] ${colors[status] || 'bg-gray-100 text-gray-800'}`}>{status}</Badge>
@@ -188,8 +188,8 @@ export function Ledgers() {
                               <Badge className={`text-[8px] ${
                                 e.voucher.voucherType === 'BP' ? 'bg-red-100 text-red-800' :
                                 e.voucher.voucherType === 'CP' ? 'bg-orange-100 text-orange-800' :
-                                e.voucher.voucherType === 'BR' ? 'bg-emerald-100 text-emerald-800' :
-                                e.voucher.voucherType === 'CR' ? 'bg-green-100 text-green-800' :
+                                e.voucher.voucherType === 'BR' ? 'bg-[#EEF1F8] text-[#0F2D78]' :
+                                e.voucher.voucherType === 'CR' ? 'bg-[#EEF1F8] text-[#0F2D78]' :
                                 e.voucher.voucherType === 'JV' ? 'bg-blue-100 text-blue-800' :
                                 'bg-purple-100 text-purple-800'
                               }`}>{e.voucher.voucherTypeName}</Badge>

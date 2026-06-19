@@ -307,7 +307,7 @@ export function BankReconciliation() {
           .section-title { font-size: 13px; font-weight: 600; margin-top: 20px; margin-bottom: 8px; }
           .header-bar { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 16px; }
           .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; }
-          .badge-green { background: #dcfce7; color: #166534; }
+          .badge-green { background: #EEF1F8; color: #166534; }
           .cleared { text-decoration: line-through; color: #999; }
           .footer { margin-top: 40px; font-size: 10px; color: #777; border-top: 1px solid #ddd; padding-top: 8px; }
         </style>
@@ -373,7 +373,7 @@ export function BankReconciliation() {
         </table>
 
         <div class="footer">
-          <p>Prepared by: Admin | Date: ${new Date().toLocaleDateString()} | Generated from AcctFin ERP</p>
+          <p>Prepared by: Admin | Date: ${new Date().toLocaleDateString()} | Generated from AGES Consultants ERP</p>
         </div>
       </body>
       </html>
@@ -520,7 +520,7 @@ export function BankReconciliation() {
               <Lock className="h-2.5 w-2.5 mr-0.5" /> Locked
             </Badge>
           ) : isCleared ? (
-            <Badge className="text-[8px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+            <Badge className="text-[8px] bg-[#EEF1F8] text-[#0F2D78] dark:bg-[#0F2D78]/30 dark:text-[#96A5C3]">
               <CheckCircle className="h-2.5 w-2.5 mr-0.5" /> Cleared
             </Badge>
           ) : (
@@ -749,7 +749,7 @@ export function BankReconciliation() {
                 </div>
                 <div className="flex items-center gap-1 pt-1">
                   {proofMatch ? (
-                    <Badge className="text-[9px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                    <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78] dark:bg-[#0F2D78]/30 dark:text-[#96A5C3]">
                       <CheckCircle className="h-3 w-3 mr-1" /> Matches statement balance
                     </Badge>
                   ) : parsedStatementBalance > 0 ? (
@@ -814,7 +814,7 @@ export function BankReconciliation() {
           <div className="flex items-center justify-between mt-4 pt-3 border-t">
             <div className="flex items-center gap-2">
               {isMatch && parsedStatementBalance > 0 ? (
-                <Badge className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 px-3 py-1">
+                <Badge className="text-xs bg-[#EEF1F8] text-[#0F2D78] dark:bg-[#0F2D78]/30 dark:text-[#96A5C3] px-3 py-1">
                   <CheckCircle className="h-4 w-4 mr-1.5" /> RECONCILED — Balances match. Ready to finalize.
                 </Badge>
               ) : parsedStatementBalance > 0 ? (
@@ -903,7 +903,7 @@ export function BankReconciliation() {
           </div>
           <Separator />
           <div className="text-[10px] text-muted-foreground space-y-0.5">
-            <p>Prepared by: Admin (admin@acctfin.com)</p>
+            <p>Prepared by: Admin (admin@agesconsultants.com)</p>
             <p>Date: {new Date().toLocaleDateString()}</p>
           </div>
         </div>

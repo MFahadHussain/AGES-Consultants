@@ -295,7 +295,7 @@ function KpiCards({ kpi, currency }: { kpi: KpiData; currency: string }) {
         <CardContent className="px-4 pb-3">
           <p className={cn(
             'text-lg font-bold font-mono tabular-nums',
-            kpi.netBookValue >= 0 ? 'text-emerald-600' : 'text-red-600',
+            kpi.netBookValue >= 0 ? 'text-[#0F2D78]' : 'text-red-600',
           )}>
             {formatPKR(kpi.netBookValue)}
           </p>
@@ -568,7 +568,7 @@ function MultiColumnScheduleTable({
                       >
                         <span
                           className={cn(
-                            color === 'green' && 'text-emerald-600',
+                            color === '#0F2D78' && 'text-[#0F2D78]',
                             color === 'red' && 'text-red-600',
                           )}
                         >

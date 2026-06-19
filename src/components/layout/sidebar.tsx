@@ -53,6 +53,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { BRAND } from "@/lib/config/branding";
 
 // ============================================================
 // Role-Based Module Access Control
@@ -464,7 +465,7 @@ export function Sidebar() {
     system_admin: "bg-red-500 text-white",
     admin: "bg-slate-900 text-white",
     manager: "bg-blue-100 text-blue-700",
-    accountant: "bg-emerald-100 text-emerald-700",
+    accountant: "bg-[#EEF1F8] text-emerald-700",
     auditor: "bg-amber-100 text-amber-700",
     viewer: "bg-slate-100 text-slate-500",
   };
@@ -473,34 +474,33 @@ export function Sidebar() {
     <aside
       className={cn(
         "border-r bg-white transition-all duration-300 flex flex-col h-full overflow-hidden",
-        sidebarOpen ? "w-[220px]" : "w-16",
+        sidebarOpen ? "w-[270px]" : "w-16",
       )}
       style={{ borderColor: "#E5E7EB" }}
     >
       {/* Logo */}
-      <div
-        className="flex items-center gap-2.5 px-4 py-4 border-b shrink-0"
-        style={{ borderColor: "#E5E7EB" }}
-      >
-        <div
-          className="flex items-center justify-center w-8 h-8 rounded-lg text-white font-bold text-sm shrink-0"
-          style={{ background: "#1A7A4A" }}
-        >
-          AF
-        </div>
-        {sidebarOpen && (
-          <div className="overflow-hidden">
-            <h1
-              className="text-sm font-bold truncate"
-              style={{ color: "#1a1a2e" }}
-            >
-              AcctFin ERP
-            </h1>
-            <p className="text-[10px] text-gray-400 truncate">
-              Accounting & Finance
-            </p>
+      <div className="border-b shrink-0" style={{ borderColor: "#E5E7EB" }}>
+        <div className="flex items-center gap-3 px-4 py-3">
+          <img
+            src={BRAND.logoPath}
+            alt={BRAND.companyName}
+            className="h-9 w-auto object-contain"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.nextElementSibling?.classList.remove('hidden');
+            }}
+          />
+          <div className="hidden w-9 h-9 rounded-md bg-[#0F2D78] flex items-center 
+                          justify-center text-white font-bold text-sm shrink-0">
+            {BRAND.initials}
           </div>
-        )}
+          {sidebarOpen && (
+            <div className="flex flex-col leading-tight overflow-hidden">
+              <span className="font-semibold text-sm truncate">{BRAND.companyName}</span>
+              <span className="text-xs text-muted-foreground truncate">{BRAND.tagline}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Search */}
@@ -510,7 +510,7 @@ export function Sidebar() {
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
             <Input
               placeholder="Search modules..."
-              className="pl-8 h-8 text-xs bg-gray-50 border-gray-200 focus:border-[#1A7A4A] focus:ring-[#1A7A4A]/20"
+              className="pl-8 h-8 text-xs bg-gray-50 border-gray-200 focus:border-[#0F2D78] focus:ring-[#0F2D78]/20"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -550,7 +550,7 @@ export function Sidebar() {
                         className={cn(
                           "flex items-center gap-2.5 w-full rounded-md px-2.5 py-2 text-[13px] font-medium transition-all duration-150",
                           isActive
-                            ? "bg-[#F0FDF4] text-[#1A7A4A] border-l-[3px] border-[#1A7A4A]"
+                            ? "bg-[#EEF1F8] text-[#0F2D78] border-l-[3px] border-[#0F2D78]"
                             : "text-gray-500 hover:bg-gray-50 hover:text-gray-700 border-l-[3px] border-transparent",
                         )}
                       >
@@ -566,7 +566,7 @@ export function Sidebar() {
                               className={cn(
                                 "flex items-center justify-center w-full rounded-md p-2.5 transition-all duration-150",
                                 isActive
-                                  ? "bg-[#F0FDF4] text-[#1A7A4A]"
+                                  ? "bg-[#EEF1F8] text-[#0F2D78]"
                                   : "text-gray-400 hover:bg-gray-50 hover:text-gray-600",
                               )}
                             >

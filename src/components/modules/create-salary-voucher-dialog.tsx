@@ -651,7 +651,7 @@ export function CreateSalaryVoucherDialog({
       </style>
       </head>
       <body>
-        <h1>AcctFin ERP — Salary Voucher</h1>
+        <h1>AGES Consultants ERP — Salary Voucher</h1>
         <p><strong>Voucher No:</strong> ${voucher.voucherNumber} | <strong>Employee:</strong> ${voucher.employeeName} (${voucher.employeeCode}) | <strong>Project:</strong> ${voucher.projectName} [${voucher.projectCode}] | <strong>Period:</strong> ${voucher.period}</p>
         <table>
           <tr><th>#</th><th>Account Code</th><th>Account Name</th><th class="right">Debit (PKR)</th><th class="right">Credit (PKR)</th><th>Description</th></tr>
@@ -734,7 +734,7 @@ export function CreateSalaryVoucherDialog({
             <FileText className="h-4 w-4 text-violet-600" />
             Create Salary Voucher
             <Badge variant="outline" className="text-[9px] ml-2">{batch?.period}</Badge>
-            <Badge className="text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-200">
+            <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78] border border-[#A5B4D2]">
               {lines.length} Approved Line(s)
             </Badge>
           </DialogTitle>
@@ -760,7 +760,7 @@ export function CreateSalaryVoucherDialog({
                   isCurrent
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : isActive
-                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    ? 'bg-[#EEF1F8] text-[#0F2D78] border-emerald-300'
                     : 'bg-muted text-muted-foreground border-muted'
                 }`}>
                   <span className="font-bold">{s.num}.</span>
@@ -781,7 +781,7 @@ export function CreateSalaryVoucherDialog({
               <div className="flex justify-between text-xs"><span className="text-muted-foreground">Batch:</span><strong>{batch?.name || batch?.batchNumber}</strong></div>
               <div className="flex justify-between text-xs"><span className="text-muted-foreground">Period:</span><strong>{batch?.period}</strong></div>
               <div className="flex justify-between text-xs"><span className="text-muted-foreground">Approved Lines:</span><strong>{lines.length}</strong></div>
-              <div className="flex justify-between text-xs"><span className="text-muted-foreground">Net Pay Total:</span><strong className="text-green-600">{formatCurrency(lines.reduce((s, l) => s + l.netPay, 0))}</strong></div>
+              <div className="flex justify-between text-xs"><span className="text-muted-foreground">Net Pay Total:</span><strong className="text-[#0F2D78]">{formatCurrency(lines.reduce((s, l) => s + l.netPay, 0))}</strong></div>
             </div>
 
             {/* Project Groups */}
@@ -875,7 +875,7 @@ export function CreateSalaryVoucherDialog({
                           </TableCell>
                           <TableCell className="text-xs py-1.5 text-right font-mono">{formatCurrency(line.grossSalary)}</TableCell>
                           <TableCell className="text-xs py-1.5 text-right font-mono">{formatCurrency(line.incomeTax)}</TableCell>
-                          <TableCell className="text-xs py-1.5 text-right font-mono text-green-700">{formatCurrency(line.netPay)}</TableCell>
+                          <TableCell className="text-xs py-1.5 text-right font-mono text-[#0A1F54]">{formatCurrency(line.netPay)}</TableCell>
                           <TableCell className="text-xs py-1.5 text-right font-mono text-orange-700">{formatCurrency(line.socialCharges)}</TableCell>
                         </TableRow>
                       )
@@ -886,13 +886,13 @@ export function CreateSalaryVoucherDialog({
             </div>
 
             {/* Selection summary */}
-            <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+            <div className="p-3 rounded-lg bg-emerald-50 border border-[#A5B4D2]">
               <div className="flex items-center justify-between">
                 <div className="text-xs">
                   <strong>{selectedLineIds.size > 0 ? selectedLineIds.size : effectiveLines.length}</strong> employee(s) selected
                   {selectedProjectIds.size > 0 && <span> · <strong>{selectedProjectIds.size}</strong> project(s) filtered</span>}
                 </div>
-                <div className="text-xs font-bold text-green-700">
+                <div className="text-xs font-bold text-[#0A1F54]">
                   Net Pay: {formatCurrency(effectiveTotals.netPay)}
                 </div>
               </div>
@@ -924,9 +924,9 @@ export function CreateSalaryVoucherDialog({
               {[
                 { label: 'Gross Salary', value: grandTotals.grossSalary, color: '' },
                 { label: 'Tax', value: grandTotals.tax, color: 'text-red-700' },
-                { label: 'Net Salary', value: grandTotals.netSalary, color: 'text-green-700' },
+                { label: 'Net Salary', value: grandTotals.netSalary, color: 'text-[#0A1F54]' },
                 { label: 'Social Charges', value: grandTotals.sc, color: 'text-orange-700' },
-                { label: 'Total (Net + SC)', value: grandTotals.total, color: 'text-emerald-800' },
+                { label: 'Total (Net + SC)', value: grandTotals.total, color: 'text-[#0F2D78]' },
               ].map(item => (
                 <div key={item.label} className="text-center p-2 rounded bg-muted/50 border">
                   <p className="text-[9px] text-muted-foreground">{item.label}</p>
@@ -971,7 +971,7 @@ export function CreateSalaryVoucherDialog({
                               <TableCell className="text-[10px] py-1 text-center">{row.weightPct}</TableCell>
                               <TableCell className="text-[10px] py-1 text-right font-mono">{formatCurrency(row.grossSalary)}</TableCell>
                               <TableCell className="text-[10px] py-1 text-right font-mono">{formatCurrency(row.tax)}</TableCell>
-                              <TableCell className="text-[10px] py-1 text-right font-mono text-green-700">{formatCurrency(row.netSalary)}</TableCell>
+                              <TableCell className="text-[10px] py-1 text-right font-mono text-[#0A1F54]">{formatCurrency(row.netSalary)}</TableCell>
                               <TableCell className="text-[10px] py-1 text-right font-mono text-orange-700">{formatCurrency(row.sc)}</TableCell>
                               <TableCell className="text-[10px] py-1 text-center">
                                 {row.hasAccountError ? (
@@ -979,7 +979,7 @@ export function CreateSalaryVoucherDialog({
                                 ) : row.weightWarning ? (
                                   <Badge className="text-[8px] bg-amber-100 text-amber-800 border border-amber-200">Warn</Badge>
                                 ) : (
-                                  <Badge className="text-[8px] bg-emerald-100 text-emerald-800 border border-emerald-200">OK</Badge>
+                                  <Badge className="text-[8px] bg-[#EEF1F8] text-[#0F2D78] border border-[#A5B4D2]">OK</Badge>
                                 )}
                               </TableCell>
                             </TableRow>
@@ -1006,9 +1006,9 @@ export function CreateSalaryVoucherDialog({
               <div className="grid grid-cols-1 sm:grid-cols-5 gap-1 text-[9px]">
                 <div className="p-1.5 rounded bg-red-50 text-red-800 text-center"><strong>DR</strong> Salary Expense</div>
                 <div className="p-1.5 rounded bg-red-50 text-red-800 text-center"><strong>DR</strong> SC Expense</div>
-                <div className="p-1.5 rounded bg-green-50 text-green-800 text-center"><strong>CR</strong> Salary Payable</div>
-                <div className="p-1.5 rounded bg-green-50 text-green-800 text-center"><strong>CR</strong> Tax Payable</div>
-                <div className="p-1.5 rounded bg-green-50 text-green-800 text-center"><strong>CR</strong> SC Payable</div>
+                <div className="p-1.5 rounded bg-[#EEF1F8] text-[#0F2D78] text-center"><strong>CR</strong> Salary Payable</div>
+                <div className="p-1.5 rounded bg-[#EEF1F8] text-[#0F2D78] text-center"><strong>CR</strong> Tax Payable</div>
+                <div className="p-1.5 rounded bg-[#EEF1F8] text-[#0F2D78] text-center"><strong>CR</strong> SC Payable</div>
               </div>
               <p className="text-[9px] text-violet-700 mt-1">Voucher Number: SV-{batch?.period}-[ProjectCode]-[Seq]</p>
             </div>
@@ -1042,7 +1042,7 @@ export function CreateSalaryVoucherDialog({
                 <p className="text-[10px] font-semibold">Financial Summary</p>
                 <div className="flex justify-between text-xs"><span>Gross:</span><span>{formatCurrency(grandTotals.grossSalary)}</span></div>
                 <div className="flex justify-between text-xs"><span>Tax:</span><span>{formatCurrency(grandTotals.tax)}</span></div>
-                <div className="flex justify-between text-xs"><span>Net:</span><span className="text-green-700">{formatCurrency(grandTotals.netSalary)}</span></div>
+                <div className="flex justify-between text-xs"><span>Net:</span><span className="text-[#0A1F54]">{formatCurrency(grandTotals.netSalary)}</span></div>
                 <div className="flex justify-between text-xs"><span>SC:</span><span className="text-orange-700">{formatCurrency(grandTotals.sc)}</span></div>
                 <Separator />
                 <div className="flex justify-between text-xs font-bold"><span>Total DR/CR:</span><span>{formatCurrency(grandTotals.total)}</span></div>
@@ -1064,8 +1064,8 @@ export function CreateSalaryVoucherDialog({
         {step === 4 && (
           <div className="space-y-4">
             {/* Success banner */}
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
-              <CheckCircle className="h-6 w-6 text-emerald-600" />
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-50 border border-[#A5B4D2]">
+              <CheckCircle className="h-6 w-6 text-[#0F2D78]" />
               <div>
                 <h3 className="text-sm font-bold text-emerald-900">
                   {generatedVouchers.length} Salary Voucher{generatedVouchers.length !== 1 ? 's' : ''} Created
@@ -1079,7 +1079,7 @@ export function CreateSalaryVoucherDialog({
             {/* Bulk actions */}
             <div className="flex items-center gap-2">
               {generatedVouchers.filter(v => v.status === 'draft').length > 0 && (
-                <Button size="sm" onClick={handlePostAll} className="bg-emerald-600 hover:bg-emerald-700 h-7 text-[10px]">
+                <Button size="sm" onClick={handlePostAll} className="bg-[#0F2D78] hover:bg-emerald-700 h-7 text-[10px]">
                   <Send className="h-3 w-3 mr-1" /> Post All to GL ({generatedVouchers.filter(v => v.status === 'draft').length})
                 </Button>
               )}
@@ -1136,13 +1136,13 @@ export function CreateSalaryVoucherDialog({
                         <TableCell className="text-xs py-1.5 text-right font-mono">{formatCurrency(v.totalCredit)}</TableCell>
                         <TableCell className="text-xs py-1.5 text-center">
                           {v.balanced ? (
-                            <Badge className="text-[8px] bg-emerald-100 text-emerald-800 border border-emerald-200"><CheckCircle className="h-2.5 w-2.5 mr-0.5" />Bal</Badge>
+                            <Badge className="text-[8px] bg-[#EEF1F8] text-[#0F2D78] border border-[#A5B4D2]"><CheckCircle className="h-2.5 w-2.5 mr-0.5" />Bal</Badge>
                           ) : (
                             <Badge className="text-[8px] bg-red-100 text-red-800 border border-red-200"><AlertCircle className="h-2.5 w-2.5 mr-0.5" />Imbal</Badge>
                           )}
                         </TableCell>
                         <TableCell className="text-xs py-1.5">
-                          <Badge className={`text-[9px] border ${v.status === 'draft' ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200'}`}>
+                          <Badge className={`text-[9px] border ${v.status === 'draft' ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-[#EEF1F8] text-[#0F2D78] border-[#A5B4D2]'}`}>
                             {v.status === 'draft' ? 'DRAFT' : 'POSTED'}
                           </Badge>
                         </TableCell>
@@ -1186,7 +1186,7 @@ export function CreateSalaryVoucherDialog({
                                 </TableHeader>
                                 <TableBody>
                                   {v.entries.map((entry, idx) => (
-                                    <TableRow key={idx} className={entry.debit > 0 ? 'bg-red-50/20' : 'bg-green-50/20'}>
+                                    <TableRow key={idx} className={entry.debit > 0 ? 'bg-red-50/20' : 'bg-[#EEF1F8]/20'}>
                                       <TableCell className="text-[10px] py-1 font-mono">{entry.lineNumber}</TableCell>
                                       <TableCell className="text-[10px] py-1 font-mono">{entry.accountCode}</TableCell>
                                       <TableCell className="text-[10px] py-1 font-medium">{entry.accountName}</TableCell>
@@ -1208,7 +1208,7 @@ export function CreateSalaryVoucherDialog({
                             <div className="mt-2 flex items-center gap-3 flex-wrap">
                               <Badge className="text-[9px] bg-blue-50 text-blue-800 border border-blue-200">Gross: {formatCurrency(v.breakdown.grossSalary)}</Badge>
                               <Badge className="text-[9px] bg-red-50 text-red-800 border border-red-200">Tax: {formatCurrency(v.breakdown.tax)}</Badge>
-                              <Badge className="text-[9px] bg-green-50 text-green-800 border border-green-200">Net: {formatCurrency(v.breakdown.netSalary)}</Badge>
+                              <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78] border border-[#A5B4D2]">Net: {formatCurrency(v.breakdown.netSalary)}</Badge>
                               <Badge className="text-[9px] bg-orange-50 text-orange-800 border border-orange-200">SC: {formatCurrency(v.breakdown.sc)}</Badge>
                               <Badge className="text-[9px] bg-muted text-muted-foreground border">Weight: {v.breakdown.weightPct}</Badge>
                             </div>
@@ -1225,12 +1225,12 @@ export function CreateSalaryVoucherDialog({
                     <TableCell className="text-[10px] py-2 text-right font-mono">{formatCurrency(generatedVouchers.reduce((s, v) => s + v.totalDebit, 0))}</TableCell>
                     <TableCell className="text-[10px] py-2 text-right font-mono">{formatCurrency(generatedVouchers.reduce((s, v) => s + v.totalCredit, 0))}</TableCell>
                     <TableCell className="text-[10px] py-2 text-center">
-                      <Badge className={`text-[8px] border ${generatedVouchers.every(v => v.balanced) ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
+                      <Badge className={`text-[8px] border ${generatedVouchers.every(v => v.balanced) ? 'bg-[#EEF1F8] text-emerald-700 border-[#A5B4D2]' : 'bg-red-100 text-red-700 border-red-200'}`}>
                         {generatedVouchers.every(v => v.balanced) ? '✓ All Balanced' : '✗ Unbalanced'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-[10px] py-2">
-                      <Badge className="text-[8px] bg-emerald-100 text-emerald-700 border border-emerald-200">
+                      <Badge className="text-[8px] bg-[#EEF1F8] text-emerald-700 border border-[#A5B4D2]">
                         {generatedVouchers.filter(v => v.status === 'posted').length}/{generatedVouchers.length} Posted
                       </Badge>
                     </TableCell>

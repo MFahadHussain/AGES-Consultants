@@ -429,14 +429,14 @@ export default function CashFlow({
 
       {/* ── Reconciliation Callout ── */}
       {data.reconciled ? (
-        <Card className="border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30">
+        <Card className="border-[#A5B4D2] bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30">
           <CardContent className="flex items-start gap-3 py-4">
-            <CheckCircle2 className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
+            <CheckCircle2 className="h-5 w-5 text-[#0F2D78] mt-0.5 shrink-0" />
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="border-emerald-400 text-emerald-700 dark:border-emerald-600 dark:text-emerald-300 text-[10px]">
                 Reconciled
               </Badge>
-              <p className="text-sm text-emerald-800 dark:text-emerald-200">
+              <p className="text-sm text-[#0F2D78] dark:text-emerald-200">
                 Closing cash PKR{' '}
                 {formatPKR(data.closingCashAndBankBalances)} reconciles to Cash
                 and bank balances on the Balance Sheet.

@@ -145,7 +145,7 @@ function unwrap<T>(res: unknown): T[] {
 function getActionColor(action: string): string {
   const colors: Record<string, string> = {
     view: 'bg-sky-100 text-sky-600',
-    create: 'bg-emerald-100 text-emerald-600',
+    create: 'bg-[#EEF1F8] text-[#0F2D78]',
     edit: 'bg-amber-100 text-amber-600',
     delete: 'bg-red-100 text-red-600',
     approve: 'bg-violet-100 text-violet-600',
@@ -354,7 +354,7 @@ export function RBACModule() {
         <Card className="border border-slate-200 rounded-xl">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-emerald-600 flex items-center justify-center shrink-0">
+              <div className="h-10 w-10 rounded-lg bg-[#0F2D78] flex items-center justify-center shrink-0">
                 <Key className="h-5 w-5 text-white" />
               </div>
               <div>
@@ -651,7 +651,7 @@ function RolesTab({ roles, permissions, onRefresh }: {
                             <p className="text-xs font-semibold text-slate-500 mb-2">Permissions ({rolePerms.length})</p>
                             <div className="flex flex-wrap gap-1.5">
                               {rolePerms.map(rp => (
-                                <Badge key={rp.id} variant="outline" className={`text-[10px] font-normal ${rp.isGranted ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                <Badge key={rp.id} variant="outline" className={`text-[10px] font-normal ${rp.isGranted ? 'bg-emerald-50 text-emerald-700 border-[#A5B4D2]' : 'bg-red-50 text-red-700 border-red-200'}`}>
                                   {rp.isGranted ? <Check className="h-2.5 w-2.5 mr-0.5" /> : <X className="h-2.5 w-2.5 mr-0.5" />}
                                   {rp.permission.name}
                                 </Badge>
@@ -1049,7 +1049,7 @@ function PermissionMatrixTab({ roles, permissions, onRefresh }: {
       {/* Legend */}
       <div className="flex items-center gap-4 text-xs flex-wrap">
         <div className="flex items-center gap-1.5">
-          <span className="h-5 w-5 rounded border-2 border-emerald-500 bg-emerald-100 flex items-center justify-center"><Check className="h-3 w-3 text-emerald-600" /></span>
+          <span className="h-5 w-5 rounded border-2 border-emerald-500 bg-[#EEF1F8] flex items-center justify-center"><Check className="h-3 w-3 text-[#0F2D78]" /></span>
           <span className="text-slate-600">Granted</span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -1157,12 +1157,12 @@ function PermissionMatrixTab({ roles, permissions, onRefresh }: {
                                     onClick={() => toggleCell(role.id, perm.id)}
                                     disabled={isSaving}
                                     className={`h-7 w-7 rounded-md border-2 flex items-center justify-center transition-all duration-150 hover:scale-110
-                                      ${value === true ? 'border-emerald-500 bg-emerald-100 hover:bg-emerald-200' : value === false ? 'border-red-500 bg-red-100 hover:bg-red-200' : 'border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-slate-400'}
+                                      ${value === true ? 'border-emerald-500 bg-[#EEF1F8] hover:bg-emerald-200' : value === false ? 'border-red-500 bg-red-100 hover:bg-red-200' : 'border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-slate-400'}
                                       ${isSaving ? 'opacity-50' : ''}
                                     `}
                                   >
                                     {isSaving ? <Loader2 className="h-3 w-3 animate-spin text-slate-400" />
-                                      : value === true ? <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                      : value === true ? <Check className="h-3.5 w-3.5 text-[#0F2D78]" />
                                       : value === false ? <X className="h-3.5 w-3.5 text-red-600" />
                                       : <Minus className="h-3.5 w-3.5 text-slate-400" />}
                                   </button>
@@ -1385,7 +1385,7 @@ function UserAssignmentsTab({ users, roles, onRefresh }: {
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <button onClick={() => openAssignDialog(user.id)} className="h-7 w-7 rounded-md flex items-center justify-center text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors">
+                              <button onClick={() => openAssignDialog(user.id)} className="h-7 w-7 rounded-md flex items-center justify-center text-slate-400 hover:text-[#0F2D78] hover:bg-emerald-50 transition-colors">
                                 <Plus className="h-3.5 w-3.5" />
                               </button>
                             </TooltipTrigger>
@@ -1510,7 +1510,7 @@ function AddOverrideButton({ userId, onAdd, existingOverrides }: {
           <div className="space-y-2">
             <Input placeholder="Search permissions…" value={search} onChange={e => setSearch(e.target.value)} className="h-8 text-xs" />
             <div className="flex items-center gap-2 text-xs">
-              <button onClick={() => setGrantType(true)} className={`px-2 py-1 rounded text-xs ${grantType ? 'bg-emerald-100 text-emerald-700 font-medium' : 'text-slate-500'}`}>Grant</button>
+              <button onClick={() => setGrantType(true)} className={`px-2 py-1 rounded text-xs ${grantType ? 'bg-[#EEF1F8] text-emerald-700 font-medium' : 'text-slate-500'}`}>Grant</button>
               <button onClick={() => setGrantType(false)} className={`px-2 py-1 rounded text-xs ${!grantType ? 'bg-red-100 text-red-700 font-medium' : 'text-slate-500'}`}>Deny</button>
             </div>
             <ScrollArea className="max-h-[200px]">

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * AcctFin ERP - SQLite to PostgreSQL Data Migration Script
+ * AGES Consultants ERP - SQLite to PostgreSQL Data Migration Script
  * =========================================================
  * Migrates all data from the existing SQLite database to PostgreSQL.
  *
@@ -646,7 +646,7 @@ async function main() {
   const overallStart = Date.now()
 
   log('============================================')
-  log('AcctFin ERP - SQLite to PostgreSQL Migration')
+  log('AGES Consultants ERP - SQLite to PostgreSQL Migration')
   log('============================================')
   log(`SQLite DB:      ${SQLITE_DB_PATH}`)
   log(`DATABASE_URL:   ${process.env.DATABASE_URL?.replace(/:[^:@]+@/, ':****@')}`)

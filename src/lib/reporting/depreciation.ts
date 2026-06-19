@@ -1,5 +1,5 @@
 /**
- * Depreciation Engine — AcctFin ERP Statutory Financial Reporting
+ * Depreciation Engine — AGES Consultants ERP Statutory Financial Reporting
  *
  * Core service that computes monthly depreciation charges, runs period-wide
  * depreciation batches, and produces asset schedules for statutory reports

@@ -242,12 +242,12 @@ export default function CashFlowStatement({ data }: CashFlowStatementProps) {
         <CardContent className="py-4 px-4">
           <div className="flex items-start gap-3">
             {isReconciled ? (
-              <CheckCircle2 className="size-5 text-emerald-600 mt-0.5 shrink-0" />
+              <CheckCircle2 className="size-5 text-[#0F2D78] mt-0.5 shrink-0" />
             ) : (
               <AlertCircle className="size-5 text-red-600 mt-0.5 shrink-0" />
             )}
             <div className="space-y-1">
-              <h4 className={cn('font-semibold text-sm', isReconciled ? 'text-emerald-800' : 'text-red-800')}>
+              <h4 className={cn('font-semibold text-sm', isReconciled ? 'text-[#0F2D78]' : 'text-red-800')}>
                 {isReconciled
                   ? 'Cash Flow Reconciliation — Verified'
                   : 'Cash Flow Reconciliation — Mismatch Detected'}

@@ -22,7 +22,7 @@ interface Account {
 }
 
 const typeColors: Record<string, string> = {
-  ASSET: 'bg-emerald-100 text-emerald-800',
+  ASSET: 'bg-[#EEF1F8] text-[#0F2D78]',
   LIABILITY: 'bg-red-100 text-red-800',
   EQUITY: 'bg-violet-100 text-violet-800',
   INCOME: 'bg-blue-100 text-blue-800',
@@ -283,7 +283,7 @@ export function ChartOfAccounts() {
                         <TableCell className="text-[10px] text-muted-foreground">{formatSubType(account.subType)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
-                            {account.isActive ? <Badge className="text-[9px] bg-green-100 text-green-800">Active</Badge> : <Badge className="text-[9px] bg-gray-100 text-gray-800">Inactive</Badge>}
+                            {account.isActive ? <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78]">Active</Badge> : <Badge className="text-[9px] bg-gray-100 text-gray-800">Inactive</Badge>}
                             {account.allowPosting && <Badge className="text-[9px] bg-blue-100 text-blue-800">Posting</Badge>}
                           </div>
                         </TableCell>
@@ -332,7 +332,7 @@ function renderChildAccounts(allAccounts: Account[], parentId: string, level: nu
           <TableCell className="text-[10px] text-muted-foreground">{formatSubType(account.subType)}</TableCell>
           <TableCell>
             <div className="flex items-center gap-1">
-              {account.isActive ? <Badge className="text-[9px] bg-green-100 text-green-800">Active</Badge> : <Badge className="text-[9px] bg-gray-100 text-gray-800">Inactive</Badge>}
+              {account.isActive ? <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78]">Active</Badge> : <Badge className="text-[9px] bg-gray-100 text-gray-800">Inactive</Badge>}
               {account.allowPosting && <Badge className="text-[9px] bg-blue-100 text-blue-800">Posting</Badge>}
             </div>
           </TableCell>

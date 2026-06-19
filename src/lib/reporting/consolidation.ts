@@ -2,7 +2,7 @@
  * Consolidation Engine & Validation Engine
  * ==========================================
  * Multi-project consolidation and cross-statement validation for the
- * AcctFin ERP Statutory Financial Reporting system.
+ * AGES Consultants ERP Statutory Financial Reporting system.
  *
  * The **ConsolidationEngine** aggregates financial statements across
  * multiple projects, eliminates intra-company balances, and produces

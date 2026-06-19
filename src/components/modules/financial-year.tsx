@@ -81,7 +81,7 @@ export function FinancialYearManagement() {
   }
 
   const statusStyles: Record<string, string> = {
-    open: 'bg-green-100 text-green-800',
+    open: 'bg-[#EEF1F8] text-[#0F2D78]',
     closing: 'bg-yellow-100 text-yellow-800',
     closed: 'bg-gray-100 text-gray-800',
   }
@@ -102,7 +102,7 @@ export function FinancialYearManagement() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {years.map(yr => (
-            <Card key={yr.id} className={`border-l-4 ${yr.status === 'open' ? 'border-l-green-500' : yr.status === 'closing' ? 'border-l-yellow-500' : 'border-l-gray-400'}`}>
+            <Card key={yr.id} className={`border-l-4 ${yr.status === 'open' ? 'border-l-[#0F2D78]' : yr.status === 'closing' ? 'border-l-yellow-500' : 'border-l-gray-400'}`}>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div>

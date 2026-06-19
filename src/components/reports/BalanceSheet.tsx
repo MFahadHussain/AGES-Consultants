@@ -127,7 +127,7 @@ export function BalanceSheet({
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-muted-foreground">Accounting Equation:</span>
             {equationHolds(data) ? (
-              <Badge className="text-[9px] bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-100">
+              <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78] border-[#A5B4D2] hover:bg-[#EEF1F8]">
                 Balanced
               </Badge>
             ) : (

@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { Mail, Eye, EyeOff, AlertCircle, ArrowLeft, ShieldCheck, Loader2 } from 'lucide-react'
+import { BRAND } from '@/lib/config/branding'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 interface LoginPageProps {
@@ -153,17 +154,16 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       <div className="relative w-full max-w-[420px] bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {/* ── Brand block ──────────────────────────────────────────────── */}
         <div className="flex flex-col items-center pt-8 pb-6 border-b border-slate-100">
-          {/* Logo mark — 2×2 grid, bottom-right is blue */}
-          <div className="w-12 h-12 bg-slate-900 rounded-xl grid grid-cols-2 grid-rows-2 gap-[3px] p-[6px]">
-            <div className="bg-slate-700 rounded-[3px]" />
-            <div className="bg-slate-700 rounded-[3px]" />
-            <div className="bg-slate-700 rounded-[3px]" />
-            <div className="bg-blue-600 rounded-[3px]" />
-          </div>
+          {/* Logo Image */}
+          <img
+            src={BRAND.logoPath}
+            alt={BRAND.companyName}
+            className="h-16 w-auto object-contain"
+          />
 
           {/* Product name */}
-          <h1 className="mt-3 text-[18px] font-semibold tracking-tight text-slate-900">
-            <span className="text-blue-600">AGES </span>Consultant
+          <h1 className="mt-4 text-[18px] font-semibold tracking-tight text-slate-900">
+            <span className="text-[#0F2D78]">AGES </span>Consultants
           </h1>
 
           {/* Tagline */}
@@ -330,29 +330,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             )}
           </button>
 
-          {/* ── Divider ─────────────────────────────────────────────────── */}
-          <div className="mt-6 flex items-center gap-3">
-            <div className="flex-1 h-px bg-slate-200" />
-            <span className="text-[11px] uppercase tracking-wider text-slate-400">
-              or continue with
-            </span>
-            <div className="flex-1 h-px bg-slate-200" />
-          </div>
 
-          {/* ── Google SSO ──────────────────────────────────────────────── */}
-          <button
-            type="button"
-            className="mt-4 flex w-full items-center justify-center gap-2.5 h-[42px] rounded-lg border border-slate-300 bg-white hover:bg-slate-50 active:scale-[0.99] text-[13px] font-medium text-slate-700 transition-all"
-          >
-            {/* Google 2×2 colored grid icon */}
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <rect x="0" y="0" width="8.5" height="8.5" rx="1.5" fill="#4285F4" />
-              <rect x="9.5" y="0" width="8.5" height="8.5" rx="1.5" fill="#EA4335" />
-              <rect x="0" y="9.5" width="8.5" height="8.5" rx="1.5" fill="#FBBC05" />
-              <rect x="9.5" y="9.5" width="8.5" height="8.5" rx="1.5" fill="#34A853" />
-            </svg>
-            Continue with Google Workspace
-          </button>
 
           {/* ── Security badge ──────────────────────────────────────────── */}
           <div className="border-t border-slate-50 mt-5 pt-4">
@@ -392,8 +370,8 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
             {/* Success alert */}
             {resetSent && (
-              <div className="mt-4 flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2.5 text-[13px] text-green-700">
-                <ShieldCheck className="h-4 w-4 shrink-0 text-green-500" />
+              <div className="mt-4 flex items-center gap-2 rounded-lg bg-[#EEF1F8] border border-[#A5B4D2] px-3 py-2.5 text-[13px] text-[#0A1F54]">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-[#1E3C87]" />
                 <span>Reset link sent — check your inbox</span>
               </div>
             )}

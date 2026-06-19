@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 /**
  * Shared account lookup utility for the ERP system.
  * Replaces hardcoded account code lookups with semantic role-based queries.
- * Updated for AcctFin ERP v1.0.0 — Partnership Firm COA (01-XX-XX-XXXX format).
+ * Updated for AGES Consultants ERP v1.0.0 — Partnership Firm COA (01-XX-XX-XXXX format).
  */
 
 // Account role definitions — maps a semantic role to lookup criteria

@@ -138,7 +138,7 @@ export default function MultiColumnPL({ data, detailLevel = 'summary' }: MultiCo
                   <span
                     className={cn(
                       'text-sm font-mono tabular-nums font-medium',
-                      kpi.grossProfit >= 0 ? 'text-emerald-600' : 'text-red-600'
+                      kpi.grossProfit >= 0 ? 'text-[#0F2D78]' : 'text-red-600'
                     )}
                   >
                     {formatPKR(kpi.grossProfit)}
@@ -151,7 +151,7 @@ export default function MultiColumnPL({ data, detailLevel = 'summary' }: MultiCo
                   <span
                     className={cn(
                       'text-sm font-mono tabular-nums font-medium',
-                      kpi.netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'
+                      kpi.netProfit >= 0 ? 'text-[#0F2D78]' : 'text-red-600'
                     )}
                   >
                     {formatPKR(kpi.netProfit)}
@@ -337,7 +337,7 @@ export default function MultiColumnPL({ data, detailLevel = 'summary' }: MultiCo
                         const { text, color } = formatVariance(current ?? 0, prior ?? 0);
                         return (
                           <td key={col.id} className="text-right px-3 py-1.5 tabular-nums font-mono text-sm" style={{ minWidth: varianceColWidth, width: varianceColWidth }}>
-                            <span className={cn(color === 'green' && 'text-emerald-600', color === 'red' && 'text-red-600')}>
+                            <span className={cn(color === '#0F2D78' && 'text-[#0F2D78]', color === 'red' && 'text-red-600')}>
                               {row.rowType === 'memo' ? '—' : text}
                             </span>
                           </td>

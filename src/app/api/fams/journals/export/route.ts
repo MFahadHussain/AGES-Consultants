@@ -165,11 +165,11 @@ async function POST_HANDLER(request: Request) {
 
 /** Helper to get system user ID for this route */
 async function getUserId(): Promise<string> {
-  const existing = await db.user.findFirst({ where: { email: 'system@acctfin.erp' } })
+  const existing = await db.user.findFirst({ where: { email: 'system@ages.erp' } })
   if (existing) return existing.id
 
   const created = await db.user.create({
-    data: { email: 'system@acctfin.erp', name: 'System', role: 'admin', isActive: true },
+    data: { email: 'system@ages.erp', name: 'System', role: 'admin', isActive: true },
   })
   return created.id
 }

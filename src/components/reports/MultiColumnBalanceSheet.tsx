@@ -376,7 +376,7 @@ export default function MultiColumnBalanceSheet({ data, detailLevel }: MultiColu
                             >
                               <span
                                 className={cn(
-                                  color === 'green' && 'text-emerald-600',
+                                  color === '#0F2D78' && 'text-[#0F2D78]',
                                   color === 'red' && 'text-red-600',
                                 )}
                               >
@@ -452,7 +452,7 @@ export default function MultiColumnBalanceSheet({ data, detailLevel }: MultiColu
                             const { text, color } = formatVariance(current ?? 0, prior ?? 0);
                             return (
                               <td key={col.id} className="text-right px-3 py-1 tabular-nums font-mono text-xs">
-                                <span className={cn(color === 'green' && 'text-emerald-600', color === 'red' && 'text-red-600')}>
+                                <span className={cn(color === '#0F2D78' && 'text-[#0F2D78]', color === 'red' && 'text-red-600')}>
                                   {text}
                                 </span>
                               </td>

@@ -348,7 +348,7 @@ function StatutoryReports() {
             <Badge variant="destructive" className="text-[10px]">Validation Issues Found</Badge>
           )}
           {validationStatus === 'ready' && reportData && (
-            <Badge className="text-[10px] bg-green-100 text-green-800">✓ All Checks Passed</Badge>
+            <Badge className="text-[10px] bg-[#EEF1F8] text-[#0F2D78]">✓ All Checks Passed</Badge>
           )}
         </div>
       )}
@@ -569,7 +569,7 @@ function StandardReports() {
         <div className="p-3 rounded-lg border-2 text-center">
           <p className="text-xs font-bold">Assets = Liabilities + Equity</p>
           <p className="text-[10px] text-muted-foreground">{formatCurrency(reportData.totalAssets)} = {formatCurrency(reportData.totalLiabilities)} + {formatCurrency(reportData.totalEquity)}</p>
-          <Badge className={`mt-1 text-[9px] ${reportData.check === 'Balanced' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{reportData.check}</Badge>
+          <Badge className={`mt-1 text-[9px] ${reportData.check === 'Balanced' ? 'bg-[#EEF1F8] text-[#0F2D78]' : 'bg-red-100 text-red-800'}`}>{reportData.check}</Badge>
         </div>
       </div>
     )
@@ -605,7 +605,7 @@ function StandardReports() {
           </Table>
           </div>
         </div>
-        <div className={`p-4 rounded-lg border-2 text-center ${reportData.netSurplus >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+        <div className={`p-4 rounded-lg border-2 text-center ${reportData.netSurplus >= 0 ? 'bg-[#EEF1F8] border-[#A5B4D2]' : 'bg-red-50 border-red-200'}`}>
           <p className="text-xs font-bold">{reportData.netSurplus >= 0 ? 'NET SURPLUS' : 'NET DEFICIT'}</p>
           <p className="text-2xl font-bold">{formatCurrency(Math.abs(reportData.netSurplus))}</p>
         </div>
@@ -618,9 +618,9 @@ function StandardReports() {
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-3 gap-3">
-          <Card className="border-l-4 border-l-emerald-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Inflow</p><p className="text-sm font-bold text-emerald-600">{formatCurrency(reportData.totalInflow)}</p></CardContent></Card>
+          <Card className="border-l-4 border-l-emerald-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Inflow</p><p className="text-sm font-bold text-[#0F2D78]">{formatCurrency(reportData.totalInflow)}</p></CardContent></Card>
           <Card className="border-l-4 border-l-red-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Outflow</p><p className="text-sm font-bold text-red-600">{formatCurrency(reportData.totalOutflow)}</p></CardContent></Card>
-          <Card className={`border-l-4 ${reportData.netCashFlow >= 0 ? 'border-l-emerald-400' : 'border-l-red-400'}`}><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Net Cash Flow</p><p className={`text-sm font-bold ${reportData.netCashFlow >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(reportData.netCashFlow)}</p></CardContent></Card>
+          <Card className={`border-l-4 ${reportData.netCashFlow >= 0 ? 'border-l-emerald-400' : 'border-l-red-400'}`}><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Net Cash Flow</p><p className={`text-sm font-bold ${reportData.netCashFlow >= 0 ? 'text-[#0F2D78]' : 'text-red-600'}`}>{formatCurrency(reportData.netCashFlow)}</p></CardContent></Card>
         </div>
         <div className="overflow-x-auto print:overflow-visible">
         <Table>
@@ -631,7 +631,7 @@ function StandardReports() {
                 <TableCell className="text-xs">{new Date(e.voucher?.date).toLocaleDateString()}</TableCell>
                 <TableCell className="text-xs font-mono">{e.voucher?.voucherNumber}</TableCell>
                 <TableCell className="text-xs">{e.account?.code} - {e.account?.name}</TableCell>
-                <TableCell className="text-xs text-right text-emerald-600">{e.debit > 0 ? formatCurrency(e.debit) : ''}</TableCell>
+                <TableCell className="text-xs text-right text-[#0F2D78]">{e.debit > 0 ? formatCurrency(e.debit) : ''}</TableCell>
                 <TableCell className="text-xs text-right text-red-600">{e.credit > 0 ? formatCurrency(e.credit) : ''}</TableCell>
               </TableRow>
             ))}
@@ -682,9 +682,9 @@ function StandardReports() {
     return (
       <div className="space-y-1">
         <div className="grid grid-cols-3 gap-3 mb-4">
-          <Card className="border-l-4 border-l-emerald-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Debit</p><p className="text-sm font-bold text-emerald-600">{formatCurrency(reportData.grandTotalDebit)}</p></CardContent></Card>
+          <Card className="border-l-4 border-l-emerald-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Debit</p><p className="text-sm font-bold text-[#0F2D78]">{formatCurrency(reportData.grandTotalDebit)}</p></CardContent></Card>
           <Card className="border-l-4 border-l-red-400"><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Total Credit</p><p className="text-sm font-bold text-red-600">{formatCurrency(reportData.grandTotalCredit)}</p></CardContent></Card>
-          <Card className={`border-l-4 ${reportData.grandBalance >= 0 ? 'border-l-emerald-400' : 'border-l-red-400'}`}><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Net Balance</p><p className={`text-sm font-bold ${reportData.grandBalance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(reportData.grandBalance)}</p></CardContent></Card>
+          <Card className={`border-l-4 ${reportData.grandBalance >= 0 ? 'border-l-emerald-400' : 'border-l-red-400'}`}><CardContent className="p-3 text-center"><p className="text-[10px] text-muted-foreground">Net Balance</p><p className={`text-sm font-bold ${reportData.grandBalance >= 0 ? 'text-[#0F2D78]' : 'text-red-600'}`}>{formatCurrency(reportData.grandBalance)}</p></CardContent></Card>
         </div>
         <div className="overflow-x-auto print:overflow-visible">
         <Table>
@@ -760,7 +760,7 @@ function StandardReports() {
                 <TableCell className="text-xs">{new Date(e.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</TableCell>
                 <TableCell className="font-mono text-xs">{e.voucherNumber}</TableCell>
                 <TableCell className="text-xs max-w-[200px] truncate">{e.narration}</TableCell>
-                <TableCell className="text-xs text-right text-emerald-600">{e.debit > 0 ? formatCurrency(e.debit) : ''}</TableCell>
+                <TableCell className="text-xs text-right text-[#0F2D78]">{e.debit > 0 ? formatCurrency(e.debit) : ''}</TableCell>
                 <TableCell className="text-xs text-right text-red-600">{e.credit > 0 ? formatCurrency(e.credit) : ''}</TableCell>
                 <TableCell className={`text-xs text-right font-semibold ${e.balance >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatCurrency(e.balance)}</TableCell>
               </TableRow>

@@ -26,7 +26,7 @@ function formatDate(date: string | Date) {
 const statusStyles: Record<string, string> = {
   draft: 'bg-yellow-100 text-yellow-800',
   approved: 'bg-blue-100 text-blue-800',
-  paid: 'bg-green-100 text-green-800',
+  paid: 'bg-[#EEF1F8] text-[#0F2D78]',
   posted: 'bg-purple-100 text-purple-800',
 }
 
@@ -233,13 +233,13 @@ export function FinalSettlementModule() {
     <div className="space-y-4">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <Card className="border-l-4 border-l-green-500">
+        <Card className="border-l-4 border-l-[#0F2D78]">
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-green-500" />
+              <DollarSign className="h-4 w-4 text-[#1E3C87]" />
               <div>
                 <p className="text-[10px] text-muted-foreground">Total Payable</p>
-                <p className="text-sm font-bold text-green-600">{formatCurrency(totalPayable)}</p>
+                <p className="text-sm font-bold text-[#0F2D78]">{formatCurrency(totalPayable)}</p>
               </div>
             </div>
           </CardContent>
@@ -340,9 +340,9 @@ export function FinalSettlementModule() {
                 <p className="text-[10px] text-muted-foreground">Basic Salary</p>
                 <p className="text-xs font-bold">{formatCurrency(settlement.basicSalary)}</p>
               </div>
-              <div className="text-center p-2 rounded bg-green-50">
+              <div className="text-center p-2 rounded bg-[#EEF1F8]">
                 <p className="text-[10px] text-muted-foreground">Total Payable</p>
-                <p className="text-xs font-bold text-green-600">{formatCurrency(settlement.totalPayable)}</p>
+                <p className="text-xs font-bold text-[#0F2D78]">{formatCurrency(settlement.totalPayable)}</p>
               </div>
               <div className="text-center p-2 rounded bg-red-50">
                 <p className="text-[10px] text-muted-foreground">Total Deductions</p>

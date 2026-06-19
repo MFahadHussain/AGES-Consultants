@@ -25,14 +25,14 @@ function formatDate(date: string | Date) {
 }
 
 const statusStyles: Record<string, string> = {
-  active: 'bg-green-100 text-green-800',
+  active: 'bg-[#EEF1F8] text-[#0F2D78]',
   closed: 'bg-gray-100 text-gray-800',
   written_off: 'bg-red-100 text-red-800',
 }
 
 const installmentStatusStyles: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800',
-  paid: 'bg-green-100 text-green-800',
+  paid: 'bg-[#EEF1F8] text-[#0F2D78]',
   partially_paid: 'bg-blue-100 text-blue-800',
   waived: 'bg-gray-100 text-gray-800',
 }
@@ -211,10 +211,10 @@ export function LoansModule() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-green-500">
+        <Card className="border-l-4 border-l-[#0F2D78]">
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
+              <CheckCircle className="h-4 w-4 text-[#1E3C87]" />
               <div>
                 <p className="text-[10px] text-muted-foreground">Active Loans</p>
                 <p className="text-sm font-bold">{activeLoans}</p>
@@ -329,7 +329,7 @@ export function LoansModule() {
                         <TableCell className="text-xs text-right">{formatCurrency(inst.amount)}</TableCell>
                         <TableCell className="text-xs text-right">{formatCurrency(inst.principalPart)}</TableCell>
                         <TableCell className="text-xs text-right">{formatCurrency(inst.interestPart)}</TableCell>
-                        <TableCell className="text-xs text-right text-green-600">{inst.paidAmount > 0 ? formatCurrency(inst.paidAmount) : '-'}</TableCell>
+                        <TableCell className="text-xs text-right text-[#0F2D78]">{inst.paidAmount > 0 ? formatCurrency(inst.paidAmount) : '-'}</TableCell>
                         <TableCell><Badge className={`text-[9px] ${installmentStatusStyles[inst.status] || ''}`}>{inst.status}</Badge></TableCell>
                       </TableRow>
                     ))}

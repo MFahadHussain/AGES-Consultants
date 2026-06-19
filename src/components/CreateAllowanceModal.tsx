@@ -93,7 +93,7 @@ export default function CreateAllowanceModal({ isOpen, onClose, onSubmit }: Crea
       <DialogContent className="sm:max-w-[480px] p-6 gap-6 rounded-xl border bg-card text-card-foreground shadow-lg">
         <DialogHeader className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
+            <div className="p-2 rounded-lg bg-emerald-50 text-[#0F2D78] dark:bg-emerald-950/30 dark:text-emerald-400">
               <Gift className="h-5 w-5" />
             </div>
             <DialogTitle className="text-lg font-semibold tracking-tight">Configure Allowance</DialogTitle>
@@ -238,7 +238,7 @@ export default function CreateAllowanceModal({ isOpen, onClose, onSubmit }: Crea
                 {/* 5. Social Charges Toggle */}
                 <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/30 transition-colors">
                   <div className="space-y-0.5">
-                    <Label className="text-xs font-semibold text-emerald-600 dark:text-emerald-500">Social Charges</Label>
+                    <Label className="text-xs font-semibold text-[#0F2D78] dark:text-emerald-500">Social Charges</Label>
                     <p className="text-[10px] text-muted-foreground">Subject allowance to social charges processing</p>
                   </div>
                   <Switch
@@ -277,7 +277,7 @@ export default function CreateAllowanceModal({ isOpen, onClose, onSubmit }: Crea
               type="submit"
               size="sm"
               disabled={isSubmitting}
-              className="text-xs h-9 bg-emerald-600 text-white hover:bg-emerald-700"
+              className="text-xs h-9 bg-[#0F2D78] text-white hover:bg-emerald-700"
             >
               {isSubmitting ? 'Configuring...' : 'Save Configuration'}
             </Button>

@@ -146,12 +146,12 @@ export function Customers() {
                 <TableCell className="text-xs">{c.email || '-'}</TableCell>
                 <TableCell className="text-xs">{c.phone || '-'}</TableCell>
                 <TableCell className="text-xs">{c.creditTerms} days</TableCell>
-                <TableCell>{c.isActive ? <Badge className="text-[9px] bg-green-100 text-green-800">Active</Badge> : <Badge className="text-[9px] bg-gray-100 text-gray-800">Inactive</Badge>}</TableCell>
+                <TableCell>{c.isActive ? <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78]">Active</Badge> : <Badge className="text-[9px] bg-gray-100 text-gray-800">Inactive</Badge>}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEdit(c)} title="Edit"><Pencil className="h-3 w-3" /></Button>
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleToggleActive(c)} title={c.isActive ? 'Deactivate' : 'Activate'}>
-                      {c.isActive ? <ToggleRight className="h-3 w-3 text-green-600" /> : <ToggleLeft className="h-3 w-3 text-gray-400" />}
+                      {c.isActive ? <ToggleRight className="h-3 w-3 text-[#0F2D78]" /> : <ToggleLeft className="h-3 w-3 text-gray-400" />}
                     </Button>
                     <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => handleDelete(c)} title="Delete"><Trash2 className="h-3 w-3" /></Button>
                   </div>
@@ -298,12 +298,12 @@ export function Suppliers() {
                 <TableCell className="text-xs font-mono">{s.taxNumber || '-'}</TableCell>
                 <TableCell className="text-xs">{s.creditTerms} days</TableCell>
                 <TableCell className="text-xs">{s.bankName || '-'}</TableCell>
-                <TableCell>{s.isActive ? <Badge className="text-[9px] bg-green-100 text-green-800">Active</Badge> : <Badge className="text-[9px] bg-gray-100 text-gray-800">Inactive</Badge>}</TableCell>
+                <TableCell>{s.isActive ? <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78]">Active</Badge> : <Badge className="text-[9px] bg-gray-100 text-gray-800">Inactive</Badge>}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEdit(s)} title="Edit"><Pencil className="h-3 w-3" /></Button>
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleToggleActive(s)} title={s.isActive ? 'Deactivate' : 'Activate'}>
-                      {s.isActive ? <ToggleRight className="h-3 w-3 text-green-600" /> : <ToggleLeft className="h-3 w-3 text-gray-400" />}
+                      {s.isActive ? <ToggleRight className="h-3 w-3 text-[#0F2D78]" /> : <ToggleLeft className="h-3 w-3 text-gray-400" />}
                     </Button>
                     <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => handleDelete(s)} title="Delete"><Trash2 className="h-3 w-3" /></Button>
                   </div>

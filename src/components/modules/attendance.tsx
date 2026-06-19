@@ -754,13 +754,13 @@ export function AttendanceModule() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-green-500">
+        <Card className="border-l-4 border-l-[#0F2D78]">
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-green-500" />
+              <Users className="h-4 w-4 text-[#1E3C87]" />
               <div>
                 <p className="text-[10px] text-muted-foreground">Present %</p>
-                <p className="text-sm font-bold text-green-600">{presentPct}%</p>
+                <p className="text-sm font-bold text-[#0F2D78]">{presentPct}%</p>
               </div>
             </div>
           </CardContent>
@@ -1094,7 +1094,7 @@ export function AttendanceModule() {
                             </TableCell>
                           )
                         })}
-                        <TableCell className="text-[10px] text-center font-bold text-green-700">{present}</TableCell>
+                        <TableCell className="text-[10px] text-center font-bold text-[#0A1F54]">{present}</TableCell>
                         <TableCell className="text-[10px] text-center font-bold text-red-700">{absent}</TableCell>
                         <TableCell className="text-[10px] text-center font-bold text-amber-700">{leave}</TableCell>
                         <TableCell className="text-[10px] text-center font-bold text-emerald-700">{scEarn}</TableCell>
@@ -1137,7 +1137,7 @@ export function AttendanceModule() {
             {VALID_STATUSES.map(s => {
               const cat = getScCategory(s)
               const scLabel = cat === 'earn' ? 'SC ✓' : cat === 'deduct' ? 'SC ✗' : 'SC —'
-              const scColor = cat === 'earn' ? 'text-green-600' : cat === 'deduct' ? 'text-orange-600' : 'text-gray-400'
+              const scColor = cat === 'earn' ? 'text-[#0F2D78]' : cat === 'deduct' ? 'text-orange-600' : 'text-gray-400'
               const isBillable = BILLABLE_STATUSES.has(s)
               return (
                 <div key={s} className="flex items-center gap-1">
@@ -1348,7 +1348,7 @@ export function AttendanceModule() {
                         <div className="text-[9px] text-muted-foreground">Unassigned</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-lg font-bold text-green-600">{bulkFillPreview.alreadyAssignedDays}</div>
+                        <div className="text-lg font-bold text-[#0F2D78]">{bulkFillPreview.alreadyAssignedDays}</div>
                         <div className="text-[9px] text-muted-foreground">Assigned</div>
                       </div>
                       <div className="text-center">

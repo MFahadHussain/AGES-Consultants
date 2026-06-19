@@ -43,11 +43,11 @@ async function POST_HANDLER() {
     let demoUsers = users
     if (users.length < 3) {
       const additionalUsers = [
-        { email: 'ahmed@acctfin.erp', name: 'Ahmed Khan', role: 'admin', isActive: true },
-        { email: 'sarah@acctfin.erp', name: 'Sarah Williams', role: 'manager', isActive: true },
-        { email: 'ali@acctfin.erp', name: 'Ali Raza', role: 'accountant', isActive: true },
-        { email: 'fatima@acctfin.erp', name: 'Fatima Noor', role: 'auditor', isActive: true },
-        { email: 'john@acctfin.erp', name: 'John Smith', role: 'viewer', isActive: false },
+        { email: 'ahmed@ages.erp', name: 'Ahmed Khan', role: 'admin', isActive: true },
+        { email: 'sarah@ages.erp', name: 'Sarah Williams', role: 'manager', isActive: true },
+        { email: 'ali@ages.erp', name: 'Ali Raza', role: 'accountant', isActive: true },
+        { email: 'fatima@ages.erp', name: 'Fatima Noor', role: 'auditor', isActive: true },
+        { email: 'john@ages.erp', name: 'John Smith', role: 'viewer', isActive: false },
       ]
       for (const u of additionalUsers) {
         const exists = await db.user.findUnique({ where: { email: u.email } })

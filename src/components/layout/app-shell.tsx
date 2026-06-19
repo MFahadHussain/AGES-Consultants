@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useToast } from '@/hooks/use-toast'
 import { Lock, Eye, EyeOff, CheckCircle, AlertTriangle } from 'lucide-react'
+import { BRAND } from '@/lib/config/branding'
 
 // ── Forced Password Change Dialog ─────────────────────────────────────────────
 
@@ -110,8 +111,8 @@ function ForcedPasswordChangeDialog({ userId, onComplete }: { userId: string; on
               <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
                 {Object.entries(checks).map(([key, met]) => (
                   <div key={key} className="flex items-center gap-1.5">
-                    {met ? <CheckCircle className="h-3 w-3 text-green-500 shrink-0" /> : <div className="h-3 w-3 rounded-full border border-gray-300 shrink-0" />}
-                    <span className={`text-[10px] ${met ? 'text-green-600' : 'text-muted-foreground'}`}>
+                    {met ? <CheckCircle className="h-3 w-3 text-[#1E3C87] shrink-0" /> : <div className="h-3 w-3 rounded-full border border-gray-300 shrink-0" />}
+                    <span className={`text-[10px] ${met ? 'text-[#0F2D78]' : 'text-muted-foreground'}`}>
                       {key === 'minLength' ? 'At least 8 characters' :
                        key === 'uppercase' ? 'One uppercase letter' :
                        key === 'lowercase' ? 'One lowercase letter' :
@@ -186,7 +187,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!authUser) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#1A7A4A] border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#0F2D78] border-t-transparent" />
       </div>
     )
   }
@@ -201,7 +202,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Mobile Sidebar */}
       {isMobile && (
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetContent side="left" className="p-0 w-64">
+          <SheetContent side="left" className="p-0 w-[270px]">
             <Sidebar />
           </SheetContent>
         </Sheet>
@@ -223,7 +224,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
         <footer className="border-t px-5 py-2.5 bg-white shrink-0 print:border-none print:mt-12 print:bg-transparent" style={{ borderColor: '#E5E7EB' }}>
           <div className="flex items-center justify-between text-[10px]" style={{ color: '#6B7280' }}>
-            <span>AcctFin ERP v1.0.0 &bull; Accounting &amp; Financial Management System</span>
+            <span>{BRAND.companyName} ERP {BRAND.version} &bull; {BRAND.tagline}</span>
             <span className="hidden sm:inline print:inline">Multi-Project &bull; Multi-Donor &bull; Multi-Currency &bull; Multi-Location</span>
           </div>
         </footer>

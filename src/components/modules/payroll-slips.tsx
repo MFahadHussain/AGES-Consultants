@@ -53,12 +53,12 @@ function PreviewModal({ url, title, onClose }: { url: string; title: string; onC
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[92vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-green-600" />
+            <FileText className="w-4 h-4 text-[#0F2D78]" />
             <span className="font-semibold text-sm text-gray-900">{title}</span>
           </div>
           <div className="flex items-center gap-2">
             <a href={url} target="_blank" rel="noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#0F2D78] text-white rounded-lg hover:bg-[#0A1F54] transition-colors">
               <Download className="w-3.5 h-3.5" /> Open in new tab
             </a>
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-all">
@@ -166,17 +166,17 @@ function SalarySlipsTab() {
           <div className="flex-1 min-w-[140px]">
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Period</label>
             <input type="month" value={period} onChange={e => setPeriod(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F2D78]" />
           </div>
           <div className="flex-1 min-w-[180px]">
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Search</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
               <input type="text" placeholder="Name or code..." value={search} onChange={e => setSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F2D78]" />
             </div>
           </div>
-          <Button onClick={handleLoad} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white h-9 px-5">
+          <Button onClick={handleLoad} disabled={loading} className="bg-[#0F2D78] hover:bg-[#0A1F54] text-white h-9 px-5">
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
             {loading ? 'Loading...' : 'Load'}
           </Button>
@@ -193,7 +193,7 @@ function SalarySlipsTab() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KpiCard label="Total Gross" value={fmtPKR(totals.gross)} icon={<DollarSign className="w-4 h-4" />} color="#2563EB" />
           <KpiCard label="Total Tax" value={fmtPKR(totals.tax)} icon={<TrendingDown className="w-4 h-4" />} color="#DC2626" />
-          <KpiCard label="Total Net" value={fmtPKR(totals.net)} icon={<TrendingUp className="w-4 h-4" />} color="#16A34A" />
+          <KpiCard label="Total Net" value={fmtPKR(totals.net)} icon={<TrendingUp className="w-4 h-4" />} color="#0F2D78" />
           <KpiCard label="Total SC" value={fmtPKR(totals.sc)} icon={<Shield className="w-4 h-4" />} color="#D97706" />
         </div>
       )}
@@ -202,9 +202,9 @@ function SalarySlipsTab() {
       {employees.length > 0 && (
         <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm">
           <button onClick={() => setSelected(selected.size === filtered.length ? new Set() : new Set(filtered.map((e: any) => e.employeeId)))}
-            className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-green-600 transition-colors">
+            className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-[#0F2D78] transition-colors">
             {selected.size === filtered.length
-              ? <CheckSquare className="w-4 h-4 text-green-600" />
+              ? <CheckSquare className="w-4 h-4 text-[#0F2D78]" />
               : <Square className="w-4 h-4" />}
             {selected.size === filtered.length ? 'Deselect All' : 'Select All'}
           </button>
@@ -238,7 +238,7 @@ function SalarySlipsTab() {
         <div className="space-y-3">
           {filtered.map((emp: any) => (
             <div key={emp.employeeId}
-              className={`bg-white border rounded-xl p-4 transition-all ${selected.has(emp.employeeId) ? 'border-green-500 ring-1 ring-green-500' : 'border-gray-200 hover:border-gray-300'}`}>
+              className={`bg-white border rounded-xl p-4 transition-all ${selected.has(emp.employeeId) ? 'border-[#1E3C87] ring-1 ring-green-500' : 'border-gray-200 hover:border-gray-300'}`}>
               <div className="flex items-start gap-3">
                 <button onClick={() => setSelected(prev => {
                   const next = new Set(prev)
@@ -246,17 +246,17 @@ function SalarySlipsTab() {
                   return next
                 })} className="mt-0.5 flex-shrink-0">
                   {selected.has(emp.employeeId)
-                    ? <CheckSquare className="w-5 h-5 text-green-600" />
+                    ? <CheckSquare className="w-5 h-5 text-[#0F2D78]" />
                     : <Square className="w-5 h-5 text-gray-400" />}
                 </button>
-                <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-[#EEF1F8] text-[#0A1F54] flex items-center justify-center font-bold text-sm flex-shrink-0">
                   {emp.employeeName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-gray-900 text-sm">{emp.employeeName}</span>
                     <span className="text-xs text-gray-400 font-mono">{emp.employeeCode}</span>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#EEF1F8] text-[#0A1F54] border border-[#A5B4D2]">
                       {emp.batchStatus}
                     </span>
                   </div>
@@ -265,7 +265,7 @@ function SalarySlipsTab() {
                     {[
                       { label: 'Gross', value: emp.grossSalary, color: 'bg-blue-50 text-blue-700' },
                       { label: 'Tax', value: emp.incomeTax, color: 'bg-red-50 text-red-700' },
-                      { label: 'Net Pay', value: emp.netSalary, color: 'bg-green-50 text-green-700' },
+                      { label: 'Net Pay', value: emp.netSalary, color: 'bg-[#EEF1F8] text-[#0A1F54]' },
                       { label: 'SC', value: emp.totalSC, color: 'bg-amber-50 text-amber-700' },
                     ].map(chip => (
                       <div key={chip.label} className={`px-3 py-1.5 rounded-lg ${chip.color}`}>
@@ -281,7 +281,7 @@ function SalarySlipsTab() {
                     <Eye className="w-4 h-4" />
                   </button>
                   <button onClick={() => handleDownload(emp)} disabled={!!downloading[emp.employeeId]} title="Open Slip"
-                    className="p-2 rounded-lg text-gray-500 hover:text-green-600 hover:bg-green-50 transition-all disabled:opacity-40">
+                    className="p-2 rounded-lg text-gray-500 hover:text-[#0F2D78] hover:bg-[#EEF1F8] transition-all disabled:opacity-40">
                     {downloading[emp.employeeId] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
                   </button>
                 </div>
@@ -339,9 +339,9 @@ function BankLetterTab() {
           <div className="flex-1 min-w-[140px]">
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Period</label>
             <input type="month" value={period} onChange={e => setPeriod(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F2D78]" />
           </div>
-          <Button onClick={handleLoad} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white h-9 px-5">
+          <Button onClick={handleLoad} disabled={loading} className="bg-[#0F2D78] hover:bg-[#0A1F54] text-white h-9 px-5">
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
             {loading ? 'Loading...' : 'Generate Preview'}
           </Button>
@@ -365,7 +365,7 @@ function BankLetterTab() {
             <KpiCard label="Employees" value={String(summary.totalEmployees)} icon={<Users className="w-4 h-4" />} color="#2563EB" />
             <KpiCard label="Total Gross" value={fmtPKR(summary.totalGross)} icon={<DollarSign className="w-4 h-4" />} color="#6B7280" />
             <KpiCard label="Total Deductions" value={fmtPKR(summary.totalDeductions)} icon={<TrendingDown className="w-4 h-4" />} color="#DC2626" />
-            <KpiCard label="Net Disbursement" value={fmtPKR(summary.totalNet)} icon={<CheckCircle2 className="w-4 h-4" />} color="#16A34A" />
+            <KpiCard label="Net Disbursement" value={fmtPKR(summary.totalNet)} icon={<CheckCircle2 className="w-4 h-4" />} color="#0F2D78" />
           </div>
 
           {/* Table */}
@@ -393,12 +393,12 @@ function BankLetterTab() {
                       </td>
                       <td className="px-4 py-3 text-gray-600 text-xs">{row.bankName}</td>
                       <td className="px-4 py-3 font-mono text-xs text-gray-700">{row.accountNumber}</td>
-                      <td className="px-4 py-3 text-right font-mono font-bold text-green-700">{fmt(row.netSalary)}</td>
+                      <td className="px-4 py-3 text-right font-mono font-bold text-[#0A1F54]">{fmt(row.netSalary)}</td>
                     </tr>
                   ))}
-                  <tr className="bg-green-50 border-t-2 border-green-200">
+                  <tr className="bg-[#EEF1F8] border-t-2 border-[#A5B4D2]">
                     <td colSpan={4} className="px-4 py-3 font-bold text-gray-900 text-sm">TOTAL — {summary.totalEmployees} Employees</td>
-                    <td className="px-4 py-3 text-right font-bold font-mono text-green-700">{fmt(summary.totalNet)}</td>
+                    <td className="px-4 py-3 text-right font-bold font-mono text-[#0A1F54]">{fmt(summary.totalNet)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -469,12 +469,12 @@ function FBRReportTab() {
   return (
     <div className="space-y-4">
       {/* Header info */}
-      <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+      <div className="bg-[#EEF1F8] border border-[#A5B4D2] rounded-xl p-4">
         <div className="flex items-start gap-3">
-          <Landmark className="w-5 h-5 text-green-700 flex-shrink-0 mt-0.5" />
+          <Landmark className="w-5 h-5 text-[#0A1F54] flex-shrink-0 mt-0.5" />
           <div>
-            <div className="font-semibold text-green-900 text-sm">FBR WHT Statement — Section 149</div>
-            <div className="text-xs text-green-700 mt-1">
+            <div className="font-semibold text-[#0A1F54] text-sm">FBR WHT Statement — Section 149</div>
+            <div className="text-xs text-[#0A1F54] mt-1">
               Monthly Withholding Tax on Salary under Income Tax Ordinance 2001.
               Export CSV for FBR IRIS portal upload. CNIC format: 13 digits, no dashes.
             </div>
@@ -488,9 +488,9 @@ function FBRReportTab() {
           <div className="flex-1 min-w-[140px]">
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Period</label>
             <input type="month" value={period} onChange={e => setPeriod(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F2D78]" />
           </div>
-          <Button onClick={handleLoad} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white h-9 px-5">
+          <Button onClick={handleLoad} disabled={loading} className="bg-[#0F2D78] hover:bg-[#0A1F54] text-white h-9 px-5">
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
             {loading ? 'Loading...' : 'Generate Report'}
           </Button>
@@ -518,10 +518,10 @@ function FBRReportTab() {
 
       {/* PSID Payment Box */}
       {totals && totals.totalTaxAmount > 0 && (
-        <div className="bg-white border-2 border-green-600 rounded-xl p-4">
+        <div className="bg-white border-2 border-[#0F2D78] rounded-xl p-4">
           <div className="flex items-center gap-2 mb-3">
-            <Landmark className="w-4 h-4 text-green-700" />
-            <span className="font-semibold text-green-900 text-sm">CPR / PSID Payment Details</span>
+            <Landmark className="w-4 h-4 text-[#0A1F54]" />
+            <span className="font-semibold text-[#0A1F54] text-sm">CPR / PSID Payment Details</span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             {[
@@ -558,7 +558,7 @@ function FBRReportTab() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="bg-green-800 text-white">
+                <tr className="bg-[#0F2D78] text-white">
                   <th className="px-3 py-3 text-left font-semibold uppercase tracking-wider">#</th>
                   <th className="px-3 py-3 text-left font-semibold uppercase tracking-wider">Employee Name</th>
                   <th className="px-3 py-3 text-left font-semibold uppercase tracking-wider">CNIC (13 Digits)</th>
@@ -572,7 +572,7 @@ function FBRReportTab() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {records.map((r: any, i: number) => (
-                  <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-green-50/30'}>
+                  <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-[#EEF1F8]/30'}>
                     <td className="px-3 py-2.5 text-gray-500">{i + 1}</td>
                     <td className="px-3 py-2.5 font-medium text-gray-900">{r.TaxPayer_Name}</td>
                     <td className="px-3 py-2.5 font-mono text-gray-700">
@@ -581,7 +581,7 @@ function FBRReportTab() {
                     <td className="px-3 py-2.5 font-mono text-gray-600">{r.TaxPayer_NTN || '—'}</td>
                     <td className="px-3 py-2.5 text-gray-600">{r.TaxPayer_City || '—'}</td>
                     <td className="px-3 py-2.5">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${r.TaxPayer_Status === 'Filer' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${r.TaxPayer_Status === 'Filer' ? 'bg-[#EEF1F8] text-[#0A1F54]' : 'bg-amber-100 text-amber-700'}`}>
                         {r.TaxPayer_Status || '—'}
                       </span>
                     </td>
@@ -591,8 +591,8 @@ function FBRReportTab() {
                   </tr>
                 ))}
                 {totals && (
-                  <tr className="bg-green-100 border-t-2 border-green-600 font-bold">
-                    <td colSpan={7} className="px-3 py-3 text-green-900">TOTAL — {totals.totalRecords} Employee(s)</td>
+                  <tr className="bg-[#EEF1F8] border-t-2 border-[#0F2D78] font-bold">
+                    <td colSpan={7} className="px-3 py-3 text-[#0A1F54]">TOTAL — {totals.totalRecords} Employee(s)</td>
                     <td className="px-3 py-3 text-right font-mono text-gray-900">{fmt(totals.totalTaxableAmount)}</td>
                     <td className="px-3 py-3 text-right font-mono text-red-700">{fmt(totals.totalTaxAmount)}</td>
                   </tr>
@@ -619,7 +619,7 @@ export function PayrollSlips() {
         {/* Page Header */}
         <div className="mb-6">
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-green-600" />
+            <FileText className="w-5 h-5 text-[#0F2D78]" />
             Payroll Documents
           </h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -629,13 +629,13 @@ export function PayrollSlips() {
 
         <Tabs defaultValue="slips">
           <TabsList className="mb-5 bg-white border border-gray-200 p-1 rounded-xl shadow-sm">
-            <TabsTrigger value="slips" className="flex items-center gap-1.5 text-xs font-medium rounded-lg data-[state=active]:bg-green-600 data-[state=active]:text-white">
+            <TabsTrigger value="slips" className="flex items-center gap-1.5 text-xs font-medium rounded-lg data-[state=active]:bg-[#0F2D78] data-[state=active]:text-white">
               <FileText className="w-3.5 h-3.5" /> Salary Slips
             </TabsTrigger>
-            <TabsTrigger value="bank" className="flex items-center gap-1.5 text-xs font-medium rounded-lg data-[state=active]:bg-green-600 data-[state=active]:text-white">
+            <TabsTrigger value="bank" className="flex items-center gap-1.5 text-xs font-medium rounded-lg data-[state=active]:bg-[#0F2D78] data-[state=active]:text-white">
               <Building2 className="w-3.5 h-3.5" /> Bank Letter
             </TabsTrigger>
-            <TabsTrigger value="fbr" className="flex items-center gap-1.5 text-xs font-medium rounded-lg data-[state=active]:bg-green-600 data-[state=active]:text-white">
+            <TabsTrigger value="fbr" className="flex items-center gap-1.5 text-xs font-medium rounded-lg data-[state=active]:bg-[#0F2D78] data-[state=active]:text-white">
               <Landmark className="w-3.5 h-3.5" /> FBR WHT Report
             </TabsTrigger>
           </TabsList>

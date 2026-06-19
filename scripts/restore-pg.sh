@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# AcctFin ERP - PostgreSQL Restore Script
+# AGES Consultants ERP - PostgreSQL Restore Script
 # ============================================================
 # Usage: ./scripts/restore-pg.sh <backup_file> [OPTIONS]
 #
@@ -67,7 +67,7 @@ if [ ! -f "${BACKUP_FILE}" ]; then
 fi
 
 echo "============================================"
-echo "AcctFin ERP - PostgreSQL Restore"
+echo "AGES Consultants ERP - PostgreSQL Restore"
 echo "============================================"
 echo "Database:   ${PGDATABASE}"
 echo "Host:       ${PGHOST}:${PGPORT}"

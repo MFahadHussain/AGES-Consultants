@@ -158,7 +158,7 @@ export function Projects() {
                   {p.description && <p className="text-[10px] text-muted-foreground mt-1">{p.description}</p>}
                 </div>
                 <div className="flex items-center gap-1">
-                  <Badge className={`text-[9px] ${p.status === 'active' ? 'bg-green-100 text-green-800' : p.status === 'completed' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>{p.status}</Badge>
+                  <Badge className={`text-[9px] ${p.status === 'active' ? 'bg-[#EEF1F8] text-[#0F2D78]' : p.status === 'completed' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>{p.status}</Badge>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(p)}><Pencil className="h-3 w-3" /></Button>
                   <AlertDialog open={deletingId === p.id} onOpenChange={(open) => { if (!open) setDeletingId(null) }}>
                     <AlertDialogTrigger asChild>
@@ -625,7 +625,7 @@ export function Clients() {
 
   const industryColors: Record<string, string> = {
     Government: 'bg-blue-100 text-blue-800',
-    NGO: 'bg-green-100 text-green-800',
+    NGO: 'bg-[#EEF1F8] text-[#0F2D78]',
     Corporate: 'bg-purple-100 text-purple-800',
     Individual: 'bg-amber-100 text-amber-800',
   }
@@ -709,7 +709,7 @@ export function Clients() {
                 <TableCell>{c.industry ? <Badge className={`text-[9px] ${industryColors[c.industry] || 'bg-gray-100 text-gray-800'}`}>{c.industry}</Badge> : <span className="text-xs text-muted-foreground">-</span>}</TableCell>
                 <TableCell className="text-xs">{c.email || '-'}</TableCell>
                 <TableCell className="text-xs">{c.phone || '-'}</TableCell>
-                <TableCell>{c.isActive ? <Badge className="text-[9px] bg-green-100 text-green-800">Active</Badge> : <Badge className="text-[9px] bg-gray-100 text-gray-800">Inactive</Badge>}</TableCell>
+                <TableCell>{c.isActive ? <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78]">Active</Badge> : <Badge className="text-[9px] bg-gray-100 text-gray-800">Inactive</Badge>}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(c)}><Pencil className="h-3 w-3" /></Button>

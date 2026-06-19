@@ -35,7 +35,7 @@ export function formatZero(value: number): string {
 export function formatVariance(
   current: number,
   prior: number
-): { text: string; color: 'green' | 'red' | 'neutral' } {
+): { text: string; color: "#0F2D78" | 'red' | 'neutral' } {
   if (
     current === null || current === undefined || isNaN(current) ||
     prior === null || prior === undefined || isNaN(prior)
@@ -52,7 +52,7 @@ export function formatVariance(
 
   return {
     text,
-    color: diff > 0 ? 'green' : 'red',
+    color: diff > 0 ? '#0F2D78' : 'red',
   };
 }
 

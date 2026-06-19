@@ -133,7 +133,7 @@ async function GET_HANDLER(request: Request) {
     })
     const sm = Object.fromEntries(settings.map(s => [s.key, s.value]))
     const company = {
-      name:    sm.company_name    || 'AcctFin ERP',
+      name:    sm.company_name    || 'AGES Consultants',
       address: sm.company_address || '',
       phone:   sm.company_phone   || '',
       ntn:     sm.company_tax_number || '',
@@ -150,8 +150,8 @@ async function GET_HANDLER(request: Request) {
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:Arial,Helvetica,sans-serif; font-size:11px; color:#111827; background:#fff; padding:20px; }
-.letterhead { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:12px; border-bottom:3px double #1A7A4A; margin-bottom:18px; }
-.co-name { font-size:16px; font-weight:700; color:#1A7A4A; margin-bottom:3px; }
+.letterhead { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:12px; border-bottom:3px double #0F2D78; margin-bottom:18px; }
+.co-name { font-size:16px; font-weight:700; color:#0F2D78; margin-bottom:3px; }
 .co-sub { font-size:10px; color:#6B7280; line-height:1.5; }
 .ref-block { text-align:right; font-size:11px; }
 .to-block { margin-bottom:14px; }
@@ -161,14 +161,14 @@ body { font-family:Arial,Helvetica,sans-serif; font-size:11px; color:#111827; ba
 .subject { font-size:13px; font-weight:700; text-decoration:underline; margin:14px 0 10px; }
 .body-text { font-size:11px; color:#374151; line-height:1.7; margin-bottom:10px; }
 table { width:100%; border-collapse:collapse; margin:14px 0; font-size:10px; }
-thead th { background:#1A7A4A; color:#fff; padding:7px 8px; text-align:left; font-size:9px; font-weight:600; text-transform:uppercase; }
+thead th { background:#0F2D78; color:#fff; padding:7px 8px; text-align:left; font-size:9px; font-weight:600; text-transform:uppercase; }
 thead th:not(:first-child):not(:nth-child(2)) { text-align:right; }
 tbody tr { border-bottom:1px solid #F3F4F6; }
 tbody tr:nth-child(even) { background:#F9FAFB; }
 tbody td { padding:6px 8px; color:#374151; }
 tbody td:not(:first-child):not(:nth-child(2)) { text-align:right; font-family:monospace; }
-.total-row { background:#F0FDF4 !important; font-weight:700; border-top:2px solid #D1D5DB; }
-.amount-box { background:#1A7A4A; color:#fff; border-radius:8px; padding:12px 16px; margin:12px 0; }
+.total-row { background:#EEF1F8 !important; font-weight:700; border-top:2px solid #D1D5DB; }
+.amount-box { background:#0F2D78; color:#fff; border-radius:8px; padding:12px 16px; margin:12px 0; }
 .amount-label { font-size:10px; opacity:.85; margin-bottom:3px; }
 .amount-figure { font-size:18px; font-weight:700; font-family:monospace; }
 .amount-words { font-size:9px; opacity:.8; margin-top:3px; }
@@ -182,10 +182,13 @@ tbody td:not(:first-child):not(:nth-child(2)) { text-align:right; font-family:mo
 </head>
 <body>
 <div class="letterhead">
-  <div>
-    <div class="co-name">${company.name}</div>
-    <div class="co-sub">${company.address}</div>
-    <div class="co-sub">NTN: ${company.ntn}${company.phone ? ' · Tel: ' + company.phone : ''}</div>
+  <div style="display: flex; align-items: center; gap: 12px;">
+    <img src="/images/ages-logo.png" alt="AGES Consultants" style="height: 48px; object-fit: contain;" />
+    <div>
+      <div class="co-name">${company.name}</div>
+      <div class="co-sub">${company.address}</div>
+      <div class="co-sub">NTN: ${company.ntn}${company.phone ? ' · Tel: ' + company.phone : ''}</div>
+    </div>
   </div>
   <div class="ref-block">
     <div>Ref: <strong>${ref}</strong></div>
@@ -225,11 +228,11 @@ tbody td:not(:first-child):not(:nth-child(2)) { text-align:right; font-family:mo
       <td><strong>${row.employeeName}</strong><br><span style="font-size:9px;color:#6B7280;">${row.employeeCode} · ${row.designation}</span></td>
       <td>${row.bankName}</td>
       <td style="font-family:monospace;font-size:10px;">${row.accountNumber}</td>
-      <td style="font-weight:700;color:#15803D;">${fmtPKR(row.netSalary)}</td>
+      <td style="font-weight:700;color:#0A1F54;">${fmtPKR(row.netSalary)}</td>
     </tr>`).join('')}
     <tr class="total-row">
       <td colspan="4">TOTAL — ${rows.length} Employees</td>
-      <td style="color:#15803D;">${fmtPKR(totalNet)}</td>
+      <td style="color:#0A1F54;">${fmtPKR(totalNet)}</td>
     </tr>
   </tbody>
 </table>

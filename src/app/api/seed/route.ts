@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // ============================================================
-// Seed endpoint: AcctFin ERP v1.0.0 — Partnership Firm COA
+// Seed endpoint: AGES Consultants ERP v1.0.0 — Partnership Firm COA
 // Comprehensive Chart of Accounts for a multi-project hydropower
 // consulting firm. All figures in PKR.
 // ============================================================

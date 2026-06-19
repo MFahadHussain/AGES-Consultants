@@ -23,7 +23,7 @@ export function AgingAnalysis() {
       .catch(() => setLoading(false))
   }, [type])
 
-  const bucketColors = ['bg-green-100 text-green-800', 'bg-yellow-100 text-yellow-800', 'bg-orange-100 text-orange-800', 'bg-red-100 text-red-800', 'bg-red-200 text-red-900']
+  const bucketColors = ['bg-[#EEF1F8] text-[#0F2D78]', 'bg-yellow-100 text-yellow-800', 'bg-orange-100 text-orange-800', 'bg-red-100 text-red-800', 'bg-red-200 text-red-900']
 
   return (
     <div className="space-y-4">

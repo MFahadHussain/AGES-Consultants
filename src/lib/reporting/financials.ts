@@ -1,5 +1,5 @@
 /**
- * Financial Statement Engine — AcctFin ERP Statutory Financial Reporting
+ * Financial Statement Engine — AGES Consultants ERP Statutory Financial Reporting
  *
  * Generates Balance Sheet, Profit & Loss, and Cash Flow statements
  * with prior-period comparatives and built-in cross-validation.

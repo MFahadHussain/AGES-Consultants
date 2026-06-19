@@ -97,16 +97,16 @@ const moduleRoutes: Record<ModuleKey, string> = {
 };
 
 const badgeStyles: Record<string, string> = {
-  Active: "bg-green-100 text-green-800",
+  Active: "bg-[#EEF1F8] text-[#0F2D78]",
   Inactive: "bg-gray-100 text-gray-800",
   draft: "bg-yellow-100 text-yellow-800",
   pending: "bg-blue-100 text-blue-800",
-  approved: "bg-green-100 text-green-800",
-  posted: "bg-emerald-100 text-emerald-800",
+  approved: "bg-[#EEF1F8] text-[#0F2D78]",
+  posted: "bg-[#EEF1F8] text-[#0F2D78]",
   rejected: "bg-red-100 text-red-800",
-  active: "bg-green-100 text-green-800",
+  active: "bg-[#EEF1F8] text-[#0F2D78]",
   disposed: "bg-red-100 text-red-800",
-  completed: "bg-emerald-100 text-emerald-800",
+  completed: "bg-[#EEF1F8] text-[#0F2D78]",
   "on-hold": "bg-orange-100 text-orange-800",
   Donor: "bg-pink-100 text-pink-800",
   Location: "bg-cyan-100 text-cyan-800",

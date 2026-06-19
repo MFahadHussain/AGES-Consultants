@@ -47,14 +47,14 @@ function periodLabel(period: string) {
 const BATCH_STATUS: Record<string, { label: string; color: string; bg: string }> = {
   draft:           { label: 'Draft',            color: '#6B7280', bg: '#F3F4F6' },
   reviewed:        { label: 'Reviewed',          color: '#2563EB', bg: '#EFF6FF' },
-  approved:        { label: 'Approved',          color: '#16A34A', bg: '#F0FDF4' },
+  approved:        { label: 'Approved',          color: '#0F2D78', bg: '#EEF1F8' },
   'voucher-created': { label: 'Vouchers Created', color: '#7C3AED', bg: '#F5F3FF' },
 }
 
 const VOUCHER_STATUS: Record<string, { label: string; color: string; bg: string }> = {
   draft:     { label: 'Draft',     color: '#6B7280', bg: '#F3F4F6' },
   submitted: { label: 'Submitted', color: '#2563EB', bg: '#EFF6FF' },
-  approved:  { label: 'Approved',  color: '#16A34A', bg: '#F0FDF4' },
+  approved:  { label: 'Approved',  color: '#0F2D78', bg: '#EEF1F8' },
   posted:    { label: 'Posted',    color: '#7C3AED', bg: '#F5F3FF' },
   reversed:  { label: 'Reversed',  color: '#DC2626', bg: '#FEF2F2' },
   cancelled: { label: 'Cancelled', color: '#9CA3AF', bg: '#F9FAFB' },
@@ -97,7 +97,7 @@ function WorkflowStepper({ steps, current }: { steps: string[]; current: string 
               </span>
             </div>
             {i < steps.length - 1 && (
-              <div className="w-8 h-0.5 mb-4 mx-1" style={{ background: done ? '#16A34A' : '#E5E7EB' }} />
+              <div className="w-8 h-0.5 mb-4 mx-1" style={{ background: done ? '#0F2D78' : '#E5E7EB' }} />
             )}
           </div>
         )
@@ -127,7 +127,7 @@ function KpiCard({ label, value, icon, color, sub }: { label: string; value: str
 // ── Avatar ────────────────────────────────────────────────────
 
 function Avatar({ name, size = 28 }: { name: string; size?: number }) {
-  const colors = ['#1A7A4A', '#2563EB', '#7C3AED', '#D97706', '#DC2626', '#0891B2']
+  const colors = ['#0F2D78', '#2563EB', '#7C3AED', '#D97706', '#DC2626', '#0891B2']
   const color = colors[name.charCodeAt(0) % colors.length]
   return (
     <div className="rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
@@ -440,7 +440,7 @@ export function PayrollIntegration() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#1A7A4A' }} />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#0F2D78' }} />
       </div>
     )
   }
@@ -533,7 +533,7 @@ export function PayrollIntegration() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm">
-              <Plus className="w-4 h-4" style={{ color: '#1A7A4A' }} />
+              <Plus className="w-4 h-4" style={{ color: '#0F2D78' }} />
               Create Payroll Batch
             </DialogTitle>
             <DialogDescription className="text-xs">Create a new payroll batch for a period</DialogDescription>
@@ -552,7 +552,7 @@ export function PayrollIntegration() {
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setCreateBatchOpen(false)}>Cancel</Button>
-            <Button size="sm" onClick={handleCreateBatch} style={{ background: '#1A7A4A', color: '#fff' }}>
+            <Button size="sm" onClick={handleCreateBatch} style={{ background: '#0F2D78', color: '#fff' }}>
               <Plus className="w-3 h-3 mr-1" /> Create Batch
             </Button>
           </DialogFooter>
@@ -625,7 +625,7 @@ function DashboardView({ batches, vouchers, kpi, pendingReview, pendingApproval,
           <Button size="sm" variant="outline" onClick={onViewAllVouchers} className="text-xs h-8">
             <FileText className="w-3 h-3 mr-1" /> Salary Vouchers
           </Button>
-          <Button size="sm" onClick={onCreateBatch} className="text-xs h-8" style={{ background: '#1A7A4A', color: '#fff' }}>
+          <Button size="sm" onClick={onCreateBatch} className="text-xs h-8" style={{ background: '#0F2D78', color: '#fff' }}>
             <Plus className="w-3 h-3 mr-1" /> New Batch
           </Button>
         </div>
@@ -633,9 +633,9 @@ function DashboardView({ batches, vouchers, kpi, pendingReview, pendingApproval,
 
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <KpiCard label="Gross Salary" value={fmtPKR(kpi.gross)} icon={<DollarSign className="w-4 h-4" />} color="#1A7A4A" />
+        <KpiCard label="Gross Salary" value={fmtPKR(kpi.gross)} icon={<DollarSign className="w-4 h-4" />} color="#0F2D78" />
         <KpiCard label="Deductions" value={fmtPKR(kpi.deductions)} icon={<TrendingDown className="w-4 h-4" />} color="#DC2626" />
-        <KpiCard label="Net Pay" value={fmtPKR(kpi.net)} icon={<TrendingUp className="w-4 h-4" />} color="#16A34A" />
+        <KpiCard label="Net Pay" value={fmtPKR(kpi.net)} icon={<TrendingUp className="w-4 h-4" />} color="#0F2D78" />
         <KpiCard label="Social Charges" value={fmtPKR(kpi.sc)} icon={<Shield className="w-4 h-4" />} color="#D97706" />
         <KpiCard label="Income Tax" value={fmtPKR(kpi.tax)} icon={<Receipt className="w-4 h-4" />} color="#2563EB" />
       </div>
@@ -667,12 +667,12 @@ function DashboardView({ batches, vouchers, kpi, pendingReview, pendingApproval,
               </div>
             )}
             {vouchersPendingApproval > 0 && (
-              <div className="rounded-lg p-3 flex items-center justify-between" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+              <div className="rounded-lg p-3 flex items-center justify-between" style={{ background: '#EEF1F8', border: '1px solid #BBF7D0' }}>
                 <div>
                   <div className="text-xs font-semibold" style={{ color: '#14532D' }}>{vouchersPendingApproval} voucher{vouchersPendingApproval > 1 ? 's' : ''} pending approval</div>
-                  <div className="text-[11px] mt-0.5" style={{ color: '#16A34A' }}>Approve to send to Voucher Management</div>
+                  <div className="text-[11px] mt-0.5" style={{ color: '#0F2D78' }}>Approve to send to Voucher Management</div>
                 </div>
-                <FileText className="w-4 h-4" style={{ color: '#16A34A' }} />
+                <FileText className="w-4 h-4" style={{ color: '#0F2D78' }} />
               </div>
             )}
           </div>
@@ -690,7 +690,7 @@ function DashboardView({ batches, vouchers, kpi, pendingReview, pendingApproval,
             <Calendar className="w-10 h-10 mx-auto mb-3" style={{ color: '#D1D5DB' }} />
             <p className="text-sm font-medium" style={{ color: '#6B7280' }}>No payroll batches yet</p>
             <p className="text-xs mt-1 mb-4" style={{ color: '#9CA3AF' }}>Create your first batch to start processing payroll</p>
-            <Button size="sm" onClick={onCreateBatch} style={{ background: '#1A7A4A', color: '#fff' }}>
+            <Button size="sm" onClick={onCreateBatch} style={{ background: '#0F2D78', color: '#fff' }}>
               <Plus className="w-3 h-3 mr-1" /> Create First Batch
             </Button>
           </div>
@@ -729,8 +729,8 @@ function BatchCard({ batch, runningPayroll, processingAction, onOpen, onRunPayro
       <div className="p-4">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: '#F0FDF4' }}>
-              <Calendar className="w-5 h-5" style={{ color: '#1A7A4A' }} />
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: '#EEF1F8' }}>
+              <Calendar className="w-5 h-5" style={{ color: '#0F2D78' }} />
             </div>
             <div>
               <div className="text-sm font-semibold" style={{ color: '#1a1a2e' }}>{batch.name || `Payroll - ${periodLabel(batch.period)}`}</div>
@@ -751,8 +751,8 @@ function BatchCard({ batch, runningPayroll, processingAction, onOpen, onRunPayro
         {batch.totalGross > 0 && (
           <div className="grid grid-cols-3 gap-2 mb-3">
             {[
-              { label: 'Gross', value: fmtPKR(batch.totalGross), color: '#1A7A4A' },
-              { label: 'Net Pay', value: fmtPKR(batch.totalNetPay), color: '#16A34A' },
+              { label: 'Gross', value: fmtPKR(batch.totalGross), color: '#0F2D78' },
+              { label: 'Net Pay', value: fmtPKR(batch.totalNetPay), color: '#0F2D78' },
               { label: 'SC', value: fmtPKR(batch.totalSocialCharges), color: '#D97706' },
             ].map(item => (
               <div key={item.label} className="rounded-lg p-2 text-center" style={{ background: '#F9FAFB' }}>
@@ -777,7 +777,7 @@ function BatchCard({ batch, runningPayroll, processingAction, onOpen, onRunPayro
             </Button>
           )}
           {batch.status === 'reviewed' && (
-            <Button size="sm" className="h-7 text-xs" onClick={() => onAction('approve')} style={{ background: '#1A7A4A', color: '#fff' }}>
+            <Button size="sm" className="h-7 text-xs" onClick={() => onAction('approve')} style={{ background: '#0F2D78', color: '#fff' }}>
               <Shield className="w-3 h-3 mr-1" /> Approve
             </Button>
           )}
@@ -882,9 +882,9 @@ function BatchDetailView({ batch, projects, processingAction, runningPayroll, on
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <KpiCard label="Gross" value={fmtPKR(batch.totalGross || 0)} icon={<DollarSign className="w-4 h-4" />} color="#1A7A4A" sub={`${lines.length} employees`} />
+        <KpiCard label="Gross" value={fmtPKR(batch.totalGross || 0)} icon={<DollarSign className="w-4 h-4" />} color="#0F2D78" sub={`${lines.length} employees`} />
         <KpiCard label="Tax" value={fmtPKR(batch.totalIncomeTax || 0)} icon={<Receipt className="w-4 h-4" />} color="#DC2626" />
-        <KpiCard label="Net Pay" value={fmtPKR(batch.totalNetPay || 0)} icon={<TrendingUp className="w-4 h-4" />} color="#16A34A" />
+        <KpiCard label="Net Pay" value={fmtPKR(batch.totalNetPay || 0)} icon={<TrendingUp className="w-4 h-4" />} color="#0F2D78" />
         <KpiCard label="Social Charges" value={fmtPKR(batch.totalSocialCharges || 0)} icon={<Shield className="w-4 h-4" />} color="#D97706" />
         <KpiCard label="Approved Lines" value={`${approvedCount} / ${lines.length}`} icon={<CheckCircle className="w-4 h-4" />} color="#7C3AED" />
       </div>
@@ -893,7 +893,7 @@ function BatchDetailView({ batch, projects, processingAction, runningPayroll, on
       <div className="rounded-xl p-4 flex items-center justify-between flex-wrap gap-3" style={{ background: '#fff', border: '1px solid #E5E7EB' }}>
         <div className="flex items-center gap-2 flex-wrap">
           {batch.status === 'draft' && (
-            <Button size="sm" onClick={() => onRunPayroll(batch)} disabled={isRunning} style={{ background: '#1A7A4A', color: '#fff' }} className="h-8 text-xs">
+            <Button size="sm" onClick={() => onRunPayroll(batch)} disabled={isRunning} style={{ background: '#0F2D78', color: '#fff' }} className="h-8 text-xs">
               {isRunning ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Play className="w-3 h-3 mr-1" />}
               {isRunning ? 'Calculating...' : 'Run Payroll'}
             </Button>
@@ -911,7 +911,7 @@ function BatchDetailView({ batch, projects, processingAction, runningPayroll, on
             </Button>
           )}
           {batch.status === 'reviewed' && (
-            <Button size="sm" className="h-8 text-xs" onClick={() => onBatchAction('approve', batch.id)} style={{ background: '#1A7A4A', color: '#fff' }}>
+            <Button size="sm" className="h-8 text-xs" onClick={() => onBatchAction('approve', batch.id)} style={{ background: '#0F2D78', color: '#fff' }}>
               <Shield className="w-3 h-3 mr-1" /> Approve Batch
             </Button>
           )}
@@ -1039,9 +1039,9 @@ function EmployeeLineRow({ line, expanded, activeTab, onToggle, onSetTab }: any)
             </span>
           </div>
           <div className="flex items-center gap-3 mt-0.5 text-[11px]" style={{ color: '#6B7280' }}>
-            <span>Gross: <strong style={{ color: '#1A7A4A' }}>{fmtPKR(line.grossSalary)}</strong></span>
+            <span>Gross: <strong style={{ color: '#0F2D78' }}>{fmtPKR(line.grossSalary)}</strong></span>
             <span>Tax: <strong style={{ color: '#DC2626' }}>{fmtPKR(line.incomeTax)}</strong></span>
-            <span>Net: <strong style={{ color: '#16A34A' }}>{fmtPKR(line.netPay)}</strong></span>
+            <span>Net: <strong style={{ color: '#0F2D78' }}>{fmtPKR(line.netPay)}</strong></span>
             <span>SC: <strong style={{ color: '#D97706' }}>{fmtPKR(line.socialCharges)}</strong></span>
           </div>
         </div>
@@ -1087,7 +1087,7 @@ function EmployeeLineRow({ line, expanded, activeTab, onToggle, onSetTab }: any)
                   ].map(([k, v]) => (
                     <div key={k as string} className="flex justify-between text-[11px] py-0.5">
                       <span style={{ color: '#6B7280' }}>{k}</span>
-                      <span className="font-medium" style={{ color: k === 'Gross Total' ? '#1A7A4A' : '#1a1a2e' }}>{v}</span>
+                      <span className="font-medium" style={{ color: k === 'Gross Total' ? '#0F2D78' : '#1a1a2e' }}>{v}</span>
                     </div>
                   ))}
                 </div>
@@ -1128,7 +1128,7 @@ function EmployeeLineRow({ line, expanded, activeTab, onToggle, onSetTab }: any)
                   <Separator className="my-1" />
                   <div className="flex justify-between text-[11px] font-bold">
                     <span style={{ color: '#1a1a2e' }}>Net Pay</span>
-                    <span style={{ color: '#16A34A' }}>{fmtPKR(line.netPay)}</span>
+                    <span style={{ color: '#0F2D78' }}>{fmtPKR(line.netPay)}</span>
                   </div>
                 </div>
               </div>
@@ -1158,12 +1158,12 @@ function EmployeeLineRow({ line, expanded, activeTab, onToggle, onSetTab }: any)
                           <TableCell className="text-[11px] py-1.5">
                             <div className="flex items-center gap-2">
                               <div className="w-16 h-1.5 rounded-full" style={{ background: '#E5E7EB' }}>
-                                <div className="h-full rounded-full" style={{ width: `${Math.round((a.weight || 0) * 100)}%`, background: '#1A7A4A' }} />
+                                <div className="h-full rounded-full" style={{ width: `${Math.round((a.weight || 0) * 100)}%`, background: '#0F2D78' }} />
                               </div>
                               <span className="font-mono">{Math.round((a.weight || 0) * 100)}%</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-[11px] py-1.5 font-mono" style={{ color: '#1A7A4A' }}>{fmtPKR(a.salaryShare || 0)}</TableCell>
+                          <TableCell className="text-[11px] py-1.5 font-mono" style={{ color: '#0F2D78' }}>{fmtPKR(a.salaryShare || 0)}</TableCell>
                           <TableCell className="text-[11px] py-1.5 font-mono" style={{ color: '#D97706' }}>{fmtPKR(a.scShare || 0)}</TableCell>
                         </TableRow>
                       ))}
@@ -1171,7 +1171,7 @@ function EmployeeLineRow({ line, expanded, activeTab, onToggle, onSetTab }: any)
                         <TableCell className="text-[11px] py-1.5 font-bold">TOTAL</TableCell>
                         <TableCell className="text-[11px] py-1.5 font-mono font-bold">{allocs.reduce((s: number, a: any) => s + (a.days || 0), 0)}</TableCell>
                         <TableCell className="text-[11px] py-1.5 font-mono font-bold">100%</TableCell>
-                        <TableCell className="text-[11px] py-1.5 font-mono font-bold" style={{ color: '#1A7A4A' }}>{fmtPKR(allocs.reduce((s: number, a: any) => s + (a.salaryShare || 0), 0))}</TableCell>
+                        <TableCell className="text-[11px] py-1.5 font-mono font-bold" style={{ color: '#0F2D78' }}>{fmtPKR(allocs.reduce((s: number, a: any) => s + (a.salaryShare || 0), 0))}</TableCell>
                         <TableCell className="text-[11px] py-1.5 font-mono font-bold" style={{ color: '#D97706' }}>{fmtPKR(allocs.reduce((s: number, a: any) => s + (a.scShare || 0), 0))}</TableCell>
                       </TableRow>
                     </TableBody>
@@ -1290,7 +1290,7 @@ function VoucherListView({ vouchers, allVouchers, batches, projects, totals, sea
       {/* Summary bar */}
       <div className="flex items-center justify-between text-xs px-1" style={{ color: '#6B7280' }}>
         <span>Showing <strong>{vouchers.length}</strong> of <strong>{allVouchers.length}</strong> vouchers</span>
-        <span>Total Dr: <strong style={{ color: '#1A7A4A', fontFamily: 'monospace' }}>{fmtPKR(totals.dr)}</strong> · Cr: <strong style={{ color: '#1A7A4A', fontFamily: 'monospace' }}>{fmtPKR(totals.cr)}</strong></span>
+        <span>Total Dr: <strong style={{ color: '#0F2D78', fontFamily: 'monospace' }}>{fmtPKR(totals.dr)}</strong> · Cr: <strong style={{ color: '#0F2D78', fontFamily: 'monospace' }}>{fmtPKR(totals.cr)}</strong></span>
       </div>
 
       {/* Voucher Cards */}
@@ -1341,7 +1341,7 @@ function VoucherCard({ voucher: v, processingAction, onView, onAction, onPostGL 
           </div>
           <div className="text-right">
             {isBalanced ? (
-              <div className="flex items-center gap-1 text-[11px]" style={{ color: '#16A34A' }}>
+              <div className="flex items-center gap-1 text-[11px]" style={{ color: '#0F2D78' }}>
                 <CheckCircle className="w-3 h-3" /> Balanced
               </div>
             ) : (
@@ -1361,9 +1361,9 @@ function VoucherCard({ voucher: v, processingAction, onView, onAction, onPostGL 
         {/* Amounts */}
         <div className="grid grid-cols-4 gap-2 mb-3">
           {[
-            { label: 'Gross', value: fmtPKR(v.grossShare || 0), color: '#1A7A4A' },
+            { label: 'Gross', value: fmtPKR(v.grossShare || 0), color: '#0F2D78' },
             { label: 'Tax', value: fmtPKR(v.taxShare || 0), color: '#DC2626' },
-            { label: 'Net', value: fmtPKR(v.netSalaryShare || 0), color: '#16A34A' },
+            { label: 'Net', value: fmtPKR(v.netSalaryShare || 0), color: '#0F2D78' },
             { label: 'SC', value: fmtPKR(v.scShare || 0), color: '#D97706' },
           ].map(item => (
             <div key={item.label} className="rounded-lg p-2 text-center" style={{ background: '#F9FAFB' }}>
@@ -1386,7 +1386,7 @@ function VoucherCard({ voucher: v, processingAction, onView, onAction, onPostGL 
             </Button>
           )}
           {v.status === 'submitted' && (
-            <Button size="sm" className="h-7 text-xs" onClick={() => onAction('approve')} style={{ background: '#1A7A4A', color: '#fff' }}
+            <Button size="sm" className="h-7 text-xs" onClick={() => onAction('approve')} style={{ background: '#0F2D78', color: '#fff' }}
               disabled={processingAction === 'approve' + v.id}>
               {processingAction === 'approve' + v.id ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Shield className="w-3 h-3 mr-1" />}
               Approve
@@ -1444,7 +1444,7 @@ function VoucherDetailView({ voucher: v, processingAction, onBack, onVoucherActi
           <div className="flex items-start justify-between">
             <div>
               <div className="text-base font-bold" style={{ color: '#1a1a2e' }}>SALARY PAYMENT VOUCHER</div>
-              <div className="text-xs mt-1" style={{ color: '#6B7280' }}>AcctFin ERP - Payroll Module</div>
+              <div className="text-xs mt-1" style={{ color: '#6B7280' }}>AGES Consultants ERP - Payroll Module</div>
             </div>
             <div className="text-right">
               <div className="text-sm font-mono font-bold" style={{ color: '#1a1a2e' }}>{v.voucherNumber}</div>
@@ -1487,7 +1487,7 @@ function VoucherDetailView({ voucher: v, processingAction, onBack, onVoucherActi
               </TableHeader>
               <TableBody>
                 {lines.map((line: any) => (
-                  <TableRow key={line.id} style={{ background: line.debit > 0 ? '#F0F9FF' : '#F0FDF4' }}>
+                  <TableRow key={line.id} style={{ background: line.debit > 0 ? '#F0F9FF' : '#EEF1F8' }}>
                     <TableCell className="text-[11px] py-2 font-mono">{line.lineNumber}</TableCell>
                     <TableCell className="text-[11px] py-2 font-mono" style={{ color: '#6B7280' }}>{line.accountCode}</TableCell>
                     <TableCell className="text-[11px] py-2 font-medium" style={{ color: '#1a1a2e' }}>{line.accountName}</TableCell>
@@ -1495,7 +1495,7 @@ function VoucherDetailView({ voucher: v, processingAction, onBack, onVoucherActi
                     <TableCell className="text-[11px] py-2 text-right font-mono" style={{ color: '#2563EB' }}>
                       {line.debit > 0 ? fmt(line.debit) : <span style={{ color: '#D1D5DB' }}>-</span>}
                     </TableCell>
-                    <TableCell className="text-[11px] py-2 text-right font-mono" style={{ color: '#16A34A' }}>
+                    <TableCell className="text-[11px] py-2 text-right font-mono" style={{ color: '#0F2D78' }}>
                       {line.credit > 0 ? fmt(line.credit) : <span style={{ color: '#D1D5DB' }}>-</span>}
                     </TableCell>
                   </TableRow>
@@ -1504,7 +1504,7 @@ function VoucherDetailView({ voucher: v, processingAction, onBack, onVoucherActi
                 <TableRow style={{ background: '#F8FAFC', borderTop: '2px solid #E5E7EB' }}>
                   <TableCell colSpan={4} className="text-[11px] py-2 font-bold">TOTAL</TableCell>
                   <TableCell className="text-[11px] py-2 text-right font-mono font-bold" style={{ color: '#2563EB' }}>{fmt(v.totalDebit || 0)}</TableCell>
-                  <TableCell className="text-[11px] py-2 text-right font-mono font-bold" style={{ color: '#16A34A' }}>{fmt(v.totalCredit || 0)}</TableCell>
+                  <TableCell className="text-[11px] py-2 text-right font-mono font-bold" style={{ color: '#0F2D78' }}>{fmt(v.totalCredit || 0)}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
@@ -1513,7 +1513,7 @@ function VoucherDetailView({ voucher: v, processingAction, onBack, onVoucherActi
           {/* Balance indicator */}
           <div className="mt-3 flex items-center gap-2">
             {isBalanced ? (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium" style={{ background: '#F0FDF4', color: '#16A34A', border: '1px solid #BBF7D0' }}>
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium" style={{ background: '#EEF1F8', color: '#0F2D78', border: '1px solid #BBF7D0' }}>
                 <CheckCircle className="w-3.5 h-3.5" />
                 Voucher is balanced - Dr = Cr = {fmtPKR(v.totalDebit || 0)}
               </div>
@@ -1537,7 +1537,7 @@ function VoucherDetailView({ voucher: v, processingAction, onBack, onVoucherActi
               { label: 'Less: PF', value: `(${fmtPKR(v.pfShare || 0)})`, color: '#DC2626' },
               { label: 'Less: ESSI', value: `(${fmtPKR(v.essiShare || 0)})`, color: '#DC2626' },
               { label: 'Less: Loan Recovery', value: `(${fmtPKR(v.loanShare || 0)})`, color: '#DC2626' },
-              { label: 'Net Salary Payable', value: fmtPKR(v.netSalaryShare || 0), color: '#16A34A', bold: true },
+              { label: 'Net Salary Payable', value: fmtPKR(v.netSalaryShare || 0), color: '#0F2D78', bold: true },
               { label: 'SC (Employer)', value: fmtPKR(v.scShare || 0), color: '#D97706' },
               { label: 'Grand Total Cost', value: fmtPKR((v.totalDebit || 0)), color: '#1a1a2e', bold: true },
             ].filter(item => {
@@ -1567,7 +1567,7 @@ function VoucherDetailView({ voucher: v, processingAction, onBack, onVoucherActi
               </Button>
             )}
             {v.status === 'submitted' && (
-              <Button size="sm" className="h-8 text-xs" onClick={() => onVoucherAction('approve', v.id)} style={{ background: '#1A7A4A', color: '#fff' }}
+              <Button size="sm" className="h-8 text-xs" onClick={() => onVoucherAction('approve', v.id)} style={{ background: '#0F2D78', color: '#fff' }}
                 disabled={processingAction === 'approve' + v.id}>
                 {processingAction === 'approve' + v.id ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Shield className="w-3 h-3 mr-1" />}
                 Approve Voucher
@@ -1641,7 +1641,7 @@ function ApproveAndSendModal({ voucher: v, open, onClose, onConfirm, processing 
               <div className="flex justify-between text-xs">
                 <span style={{ color: '#6B7280' }}>Balance</span>
                 {isBalanced ? (
-                  <span className="flex items-center gap-1" style={{ color: '#16A34A' }}><CheckCircle className="w-3 h-3" /> Balanced</span>
+                  <span className="flex items-center gap-1" style={{ color: '#0F2D78' }}><CheckCircle className="w-3 h-3" /> Balanced</span>
                 ) : (
                   <span className="flex items-center gap-1" style={{ color: '#DC2626' }}><AlertCircle className="w-3 h-3" /> Unbalanced</span>
                 )}
@@ -1653,10 +1653,10 @@ function ApproveAndSendModal({ voucher: v, open, onClose, onConfirm, processing 
               <div className="space-y-1">
                 {lines.map((l: any) => (
                   <div key={l.id} className="flex justify-between text-[11px] font-mono">
-                    <span style={{ color: l.debit > 0 ? '#2563EB' : '#16A34A' }}>
+                    <span style={{ color: l.debit > 0 ? '#2563EB' : '#0F2D78' }}>
                       {l.debit > 0 ? 'Dr' : 'Cr'} {l.accountCode} {l.accountName}
                     </span>
-                    <span style={{ color: l.debit > 0 ? '#2563EB' : '#16A34A' }}>
+                    <span style={{ color: l.debit > 0 ? '#2563EB' : '#0F2D78' }}>
                       Rs {new Intl.NumberFormat('en-PK').format(l.debit > 0 ? l.debit : l.credit)}
                     </span>
                   </div>
@@ -1664,7 +1664,7 @@ function ApproveAndSendModal({ voucher: v, open, onClose, onConfirm, processing 
               </div>
             </div>
 
-            <div className="rounded-lg p-3 text-xs space-y-1" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#14532D' }}>
+            <div className="rounded-lg p-3 text-xs space-y-1" style={{ background: '#EEF1F8', border: '1px solid #BBF7D0', color: '#14532D' }}>
               <div className="font-semibold flex items-center gap-1.5">
                 <CheckCircle className="w-3.5 h-3.5" /> What happens next:
               </div>
@@ -1879,8 +1879,8 @@ function CreateVouchersModal({ batch, projects, onClose, onSuccess }: {
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
         <div className="rounded-2xl w-full max-w-lg p-6 space-y-4" style={{ background: '#fff', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}>
           <div className="text-center">
-            <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: '#F0FDF4' }}>
-              <CheckCircle className="w-7 h-7" style={{ color: '#16A34A' }} />
+            <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: '#EEF1F8' }}>
+              <CheckCircle className="w-7 h-7" style={{ color: '#0F2D78' }} />
             </div>
             <h2 className="text-lg font-bold" style={{ color: '#1a1a2e' }}>{result.created} Voucher{result.created !== 1 ? 's' : ''} Created</h2>
             <p className="text-sm mt-1" style={{ color: '#6B7280' }}>{result.message}</p>
@@ -1905,7 +1905,7 @@ function CreateVouchersModal({ batch, projects, onClose, onSuccess }: {
           )}
 
           <div className="flex gap-2">
-            <Button className="flex-1 h-9 text-sm" onClick={() => onSuccess(result.created)} style={{ background: '#1A7A4A', color: '#fff' }}>
+            <Button className="flex-1 h-9 text-sm" onClick={() => onSuccess(result.created)} style={{ background: '#0F2D78', color: '#fff' }}>
               <Eye className="w-4 h-4 mr-2" /> View Vouchers
             </Button>
             <Button variant="outline" className="h-9 text-sm" onClick={onClose}>Close</Button>
@@ -1946,14 +1946,14 @@ function CreateVouchersModal({ batch, projects, onClose, onSuccess }: {
                 <button key={key} onClick={() => setMode(key)}
                   className="rounded-xl p-4 text-left transition-all border-2"
                   style={{
-                    borderColor: mode === key ? '#1A7A4A' : '#E5E7EB',
-                    background: mode === key ? '#F0FDF4' : '#fff',
+                    borderColor: mode === key ? '#0F2D78' : '#E5E7EB',
+                    background: mode === key ? '#EEF1F8' : '#fff',
                   }}>
                   <div className="flex items-center justify-between mb-2">
-                    <Icon className="w-5 h-5" style={{ color: mode === key ? '#1A7A4A' : '#9CA3AF' }} />
-                    {mode === key && <CheckCircle className="w-4 h-4" style={{ color: '#1A7A4A' }} />}
+                    <Icon className="w-5 h-5" style={{ color: mode === key ? '#0F2D78' : '#9CA3AF' }} />
+                    {mode === key && <CheckCircle className="w-4 h-4" style={{ color: '#0F2D78' }} />}
                   </div>
-                  <div className="text-sm font-semibold" style={{ color: mode === key ? '#1A7A4A' : '#1a1a2e' }}>{title}</div>
+                  <div className="text-sm font-semibold" style={{ color: mode === key ? '#0F2D78' : '#1a1a2e' }}>{title}</div>
                   <div className="text-[11px] mt-1" style={{ color: '#6B7280' }}>{desc}</div>
                 </button>
               ))}
@@ -1968,7 +1968,7 @@ function CreateVouchersModal({ batch, projects, onClose, onSuccess }: {
                   <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: '#6B7280' }}>
                     Step 2 - Select Projects
                   </div>
-                  <button className="text-[11px]" style={{ color: '#1A7A4A' }}
+                  <button className="text-[11px]" style={{ color: '#0F2D78' }}
                     onClick={() => setSelectedProjectIds(
                       selectedProjectIds.size === projectList.length ? new Set() : new Set(projectList.map(p => p.id))
                     )}>
@@ -1988,7 +1988,7 @@ function CreateVouchersModal({ batch, projects, onClose, onSuccess }: {
                     return (
                       <div key={p.id}
                         className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${!hasAlloc ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}`}
-                        style={{ borderBottom: i < filteredProjects.length - 1 ? '1px solid #F3F4F6' : 'none', background: selected ? '#F0FDF4' : 'transparent' }}
+                        style={{ borderBottom: i < filteredProjects.length - 1 ? '1px solid #F3F4F6' : 'none', background: selected ? '#EEF1F8' : 'transparent' }}
                         onClick={() => {
                           if (!hasAlloc) return
                           const next = new Set(selectedProjectIds)
@@ -2007,7 +2007,7 @@ function CreateVouchersModal({ batch, projects, onClose, onSuccess }: {
                           </div>
                         </div>
                         <div className="text-right flex-shrink-0">
-                          <div className="text-xs font-mono font-semibold" style={{ color: '#1A7A4A' }}>{fmtPKR(p.totalGross)}</div>
+                          <div className="text-xs font-mono font-semibold" style={{ color: '#0F2D78' }}>{fmtPKR(p.totalGross)}</div>
                           <div className="text-[10px]" style={{ color: '#9CA3AF' }}>{Math.round(p.weight * 100)}%</div>
                         </div>
                       </div>
@@ -2024,7 +2024,7 @@ function CreateVouchersModal({ batch, projects, onClose, onSuccess }: {
                   <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: '#6B7280' }}>
                     {showProjects ? 'Step 3' : 'Step 2'} - Select Employees
                   </div>
-                  <button className="text-[11px]" style={{ color: '#1A7A4A' }}
+                  <button className="text-[11px]" style={{ color: '#0F2D78' }}
                     onClick={() => setSelectedEmployeeIds(
                       selectedEmployeeIds.size === employeeList.length ? new Set() : new Set(employeeList.map((e: any) => e.id))
                     )}>
@@ -2043,7 +2043,7 @@ function CreateVouchersModal({ batch, projects, onClose, onSuccess }: {
                     return (
                       <div key={e.id}
                         className="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50 transition-colors"
-                        style={{ borderBottom: i < filteredEmployees.length - 1 ? '1px solid #F3F4F6' : 'none', background: selected ? '#F0FDF4' : 'transparent' }}
+                        style={{ borderBottom: i < filteredEmployees.length - 1 ? '1px solid #F3F4F6' : 'none', background: selected ? '#EEF1F8' : 'transparent' }}
                         onClick={() => {
                           const next = new Set(selectedEmployeeIds)
                           if (next.has(e.id)) next.delete(e.id); else next.add(e.id)
@@ -2058,7 +2058,7 @@ function CreateVouchersModal({ batch, projects, onClose, onSuccess }: {
                           </div>
                           <div className="text-[10px] mt-0.5 truncate" style={{ color: '#9CA3AF' }}>{e.projectCodes || 'No projects'}</div>
                         </div>
-                        <div className="text-xs font-mono font-semibold flex-shrink-0" style={{ color: '#1A7A4A' }}>{fmtPKR(e.grossSalary)}</div>
+                        <div className="text-xs font-mono font-semibold flex-shrink-0" style={{ color: '#0F2D78' }}>{fmtPKR(e.grossSalary)}</div>
                       </div>
                     )
                   })}
@@ -2128,17 +2128,17 @@ function CreateVouchersModal({ batch, projects, onClose, onSuccess }: {
                         <TableCell className="text-[11px] py-1.5">
                           <span className="font-mono text-[10px] px-1 py-0.5 rounded" style={{ background: '#EFF6FF', color: '#2563EB' }}>{row.projectCode}</span>
                         </TableCell>
-                        <TableCell className="text-[11px] py-1.5 font-mono" style={{ color: '#1A7A4A' }}>{fmt(row.gross)}</TableCell>
+                        <TableCell className="text-[11px] py-1.5 font-mono" style={{ color: '#0F2D78' }}>{fmt(row.gross)}</TableCell>
                         <TableCell className="text-[11px] py-1.5 font-mono" style={{ color: '#DC2626' }}>{fmt(row.tax)}</TableCell>
-                        <TableCell className="text-[11px] py-1.5 font-mono" style={{ color: '#16A34A' }}>{fmt(row.net)}</TableCell>
+                        <TableCell className="text-[11px] py-1.5 font-mono" style={{ color: '#0F2D78' }}>{fmt(row.net)}</TableCell>
                         <TableCell className="text-[11px] py-1.5 font-mono" style={{ color: '#D97706' }}>{fmt(row.sc)}</TableCell>
                       </TableRow>
                     ))}
                     <TableRow style={{ background: '#F9FAFB', fontWeight: 700, borderTop: '2px solid #E5E7EB' }}>
                       <TableCell className="text-[11px] py-1.5 font-bold" colSpan={2}>TOTAL</TableCell>
-                      <TableCell className="text-[11px] py-1.5 font-mono font-bold" style={{ color: '#1A7A4A' }}>{fmt(preview.totals.gross)}</TableCell>
+                      <TableCell className="text-[11px] py-1.5 font-mono font-bold" style={{ color: '#0F2D78' }}>{fmt(preview.totals.gross)}</TableCell>
                       <TableCell className="text-[11px] py-1.5 font-mono font-bold" style={{ color: '#DC2626' }}>{fmt(preview.totals.tax)}</TableCell>
-                      <TableCell className="text-[11px] py-1.5 font-mono font-bold" style={{ color: '#16A34A' }}>{fmt(preview.totals.net)}</TableCell>
+                      <TableCell className="text-[11px] py-1.5 font-mono font-bold" style={{ color: '#0F2D78' }}>{fmt(preview.totals.net)}</TableCell>
                       <TableCell className="text-[11px] py-1.5 font-mono font-bold" style={{ color: '#D97706' }}>{fmt(preview.totals.sc)}</TableCell>
                     </TableRow>
                   </TableBody>
@@ -2152,7 +2152,7 @@ function CreateVouchersModal({ batch, projects, onClose, onSuccess }: {
         <div className="flex items-center justify-between p-5 border-t" style={{ borderColor: '#E5E7EB' }}>
           <div className="text-xs" style={{ color: '#6B7280' }}>
             {canGenerate ? (
-              <span className="flex items-center gap-1" style={{ color: '#16A34A' }}>
+              <span className="flex items-center gap-1" style={{ color: '#0F2D78' }}>
                 <CheckCircle className="w-3.5 h-3.5" />
                 {preview.rows.length} voucher{preview.rows.length !== 1 ? 's' : ''} ready · Dr = Cr guaranteed
               </span>
@@ -2166,7 +2166,7 @@ function CreateVouchersModal({ batch, projects, onClose, onSuccess }: {
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={onClose}>Cancel</Button>
             <Button size="sm" className="h-8 text-xs" onClick={handleGenerate} disabled={!canGenerate || generating}
-              style={{ background: canGenerate ? '#1A7A4A' : '#D1D5DB', color: '#fff' }}>
+              style={{ background: canGenerate ? '#0F2D78' : '#D1D5DB', color: '#fff' }}>
               {generating ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <FileText className="w-3 h-3 mr-1" />}
               {generating ? 'Generating...' : `Generate ${preview.rows.length > 0 ? preview.rows.length : ''} Voucher${preview.rows.length !== 1 ? 's' : ''}`}
             </Button>

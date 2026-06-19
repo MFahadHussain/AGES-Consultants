@@ -74,12 +74,12 @@ export default function ValidationDashboard({
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               {summary.allPassed ? (
-                <ShieldCheck className="size-6 text-emerald-600" />
+                <ShieldCheck className="size-6 text-[#0F2D78]" />
               ) : (
                 <ShieldAlert className="size-6 text-red-600" />
               )}
               <div>
-                <h3 className={cn('font-semibold text-sm', summary.allPassed ? 'text-emerald-800' : 'text-red-800')}>
+                <h3 className={cn('font-semibold text-sm', summary.allPassed ? 'text-[#0F2D78]' : 'text-red-800')}>
                   {summary.allPassed
                     ? '✓ Approved for Export'
                     : '✗ Validation Failed — Export Blocked'}
@@ -93,7 +93,7 @@ export default function ValidationDashboard({
             </div>
             <div className="flex items-center gap-2">
               {summary.passed > 0 && (
-                <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300 gap-1">
+                <Badge className="bg-[#EEF1F8] text-emerald-700 border-emerald-300 gap-1">
                   <CheckCircle2 className="size-3" /> {summary.passed} Passed
                 </Badge>
               )}
@@ -167,7 +167,7 @@ export default function ValidationDashboard({
                     </td>
                     <td className="px-3 py-2 text-center" style={{ minWidth: 80 }}>
                       {result.status === 'passed' && (
-                        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300 gap-1 text-[10px]">
+                        <Badge className="bg-[#EEF1F8] text-emerald-700 border-emerald-300 gap-1 text-[10px]">
                           <CheckCircle2 className="size-3" /> Pass
                         </Badge>
                       )}
@@ -191,7 +191,7 @@ export default function ValidationDashboard({
                     <td
                       className={cn(
                         'text-right px-3 py-2 text-sm tabular-nums font-mono font-medium',
-                        result.variance > 0 && 'text-emerald-600',
+                        result.variance > 0 && 'text-[#0F2D78]',
                         result.variance < 0 && 'text-red-600',
                         result.variance === 0 && 'text-muted-foreground',
                       )}

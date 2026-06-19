@@ -122,7 +122,7 @@ export function EmployeeCombobox({
                   <div className="flex items-center gap-2 min-w-0">
                     <Check
                       className={cn(
-                        'h-3.5 w-3.5 shrink-0 text-green-600 mr-0.5',
+                        'h-3.5 w-3.5 shrink-0 text-[#0F2D78] mr-0.5',
                         value === emp.id ? 'opacity-100' : 'opacity-0'
                       )}
                     />

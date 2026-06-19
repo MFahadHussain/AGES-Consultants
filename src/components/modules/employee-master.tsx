@@ -109,7 +109,7 @@ function formatCnic(cnic: string | null | undefined) {
 
 const statusConfig: Record<string, { color: string; label: string }> = {
   active: {
-    color: "bg-green-100 text-green-800 border-green-200",
+    color: "bg-[#EEF1F8] text-[#0F2D78] border-[#A5B4D2]",
     label: "Active",
   },
   inactive: {
@@ -1108,31 +1108,31 @@ export function EmployeeMaster() {
         />
       </div>
       {form.baseSalary && parseFloat(form.baseSalary) > 0 && (
-        <div className="p-3 rounded-md bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+        <div className="p-3 rounded-md bg-[#EEF1F8] dark:bg-green-950/20 border border-[#A5B4D2] dark:border-green-800">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-green-700 dark:text-green-300">
+            <span className="text-xs text-[#0A1F54] dark:text-green-300">
               Monthly Salary:
             </span>
-            <span className="text-sm font-bold text-green-800 dark:text-green-200">
+            <span className="text-sm font-bold text-[#0F2D78] dark:text-green-200">
               {formatCurrency(parseFloat(form.baseSalary) || 0)}
             </span>
           </div>
           {form.paymentType === "daily" && (
             <div className="flex items-center justify-between mt-1">
-              <span className="text-[10px] text-green-600">
+              <span className="text-[10px] text-[#0F2D78]">
                 Estimated Daily Rate (30 days):
               </span>
-              <span className="text-xs font-medium text-green-700">
+              <span className="text-xs font-medium text-[#0A1F54]">
                 {formatCurrency((parseFloat(form.baseSalary) || 0) / 30)}
               </span>
             </div>
           )}
           {form.paymentType === "hourly" && (
             <div className="flex items-center justify-between mt-1">
-              <span className="text-[10px] text-green-600">
+              <span className="text-[10px] text-[#0F2D78]">
                 Estimated Hourly Rate (8h/day):
               </span>
-              <span className="text-xs font-medium text-green-700">
+              <span className="text-xs font-medium text-[#0A1F54]">
                 {formatCurrency((parseFloat(form.baseSalary) || 0) / 30 / 8)}
               </span>
             </div>
@@ -1506,9 +1506,9 @@ export function EmployeeMaster() {
           </div>
         )}
         {missingAccounts.length === 0 && (
-          <div className="flex items-center gap-2 p-3 rounded-md bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
-            <Shield className="h-3.5 w-3.5 text-green-600" />
-            <span className="text-[10px] text-green-700 dark:text-green-300 font-medium">
+          <div className="flex items-center gap-2 p-3 rounded-md bg-[#EEF1F8] dark:bg-green-950/20 border border-[#A5B4D2] dark:border-green-800">
+            <Shield className="h-3.5 w-3.5 text-[#0F2D78]" />
+            <span className="text-[10px] text-[#0A1F54] dark:text-green-300 font-medium">
               All accounting accounts configured — employee is ready for salary
               voucher generation
             </span>
@@ -1723,32 +1723,32 @@ export function EmployeeMaster() {
               </p>
               <div className="flex flex-wrap gap-1.5">
                 <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.eobiEnabled ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.eobiEnabled ? "bg-[#EEF1F8] text-[#0A1F54] border-[#A5B4D2]" : "bg-gray-50 text-gray-400 border-gray-200"}`}
                 >
                   EOBI {emp.eobiEnabled ? "✓" : "✗"}
                 </span>
                 <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.essiEnabled ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.essiEnabled ? "bg-[#EEF1F8] text-[#0A1F54] border-[#A5B4D2]" : "bg-gray-50 text-gray-400 border-gray-200"}`}
                 >
                   ESSI {emp.essiEnabled ? "✓" : "✗"}
                 </span>
                 <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.gratuityEnabled ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.gratuityEnabled ? "bg-[#EEF1F8] text-[#0A1F54] border-[#A5B4D2]" : "bg-gray-50 text-gray-400 border-gray-200"}`}
                 >
                   Gratuity {emp.gratuityEnabled ? "✓" : "✗"}
                 </span>
                 <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.pfEnabled ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.pfEnabled ? "bg-[#EEF1F8] text-[#0A1F54] border-[#A5B4D2]" : "bg-gray-50 text-gray-400 border-gray-200"}`}
                 >
                   PF {emp.pfEnabled ? "✓" : "✗"}
                 </span>
                 <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.incomeTaxEnabled !== false ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.incomeTaxEnabled !== false ? "bg-[#EEF1F8] text-[#0A1F54] border-[#A5B4D2]" : "bg-gray-50 text-gray-400 border-gray-200"}`}
                 >
                   Tax {emp.incomeTaxEnabled !== false ? "✓" : "✗"}
                 </span>
                 <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.applyToAllProjects ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.applyToAllProjects ? "bg-[#EEF1F8] text-[#0A1F54] border-[#A5B4D2]" : "bg-gray-50 text-gray-400 border-gray-200"}`}
                 >
                   All Projects {emp.applyToAllProjects ? "✓" : "✗"}
                 </span>
@@ -1759,7 +1759,7 @@ export function EmployeeMaster() {
                 </span>
                 {emp.taxFilingStatus && (
                   <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.taxFilingStatus === "filer" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${emp.taxFilingStatus === "filer" ? "bg-emerald-50 text-emerald-700 border-[#A5B4D2]" : "bg-amber-50 text-amber-700 border-amber-200"}`}
                   >
                     {emp.taxFilingStatus === "filer" ? "Filer" : "Non-Filer"}
                   </span>
@@ -1965,13 +1965,13 @@ export function EmployeeMaster() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-green-500">
+        <Card className="border-l-4 border-l-[#0F2D78]">
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
-              <UserCheck className="h-4 w-4 text-green-500" />
+              <UserCheck className="h-4 w-4 text-[#1E3C87]" />
               <div>
                 <p className="text-[10px] text-muted-foreground">Active</p>
-                <p className="text-sm font-bold text-green-600">
+                <p className="text-sm font-bold text-[#0F2D78]">
                   {activeCount}
                 </p>
               </div>
@@ -2001,7 +2001,7 @@ export function EmployeeMaster() {
                 <p className="text-[10px] text-muted-foreground">
                   Monthly Salary
                 </p>
-                <p className="text-sm font-bold text-emerald-600">
+                <p className="text-sm font-bold text-[#0F2D78]">
                   {formatCurrency(totalMonthlySalary)}
                 </p>
               </div>
@@ -2187,27 +2187,27 @@ export function EmployeeMaster() {
                         <TableCell>
                           <div className="flex flex-wrap gap-0.5">
                             <span
-                              className={`text-[9px] px-1 py-0.5 rounded border ${emp.eobiEnabled ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
+                              className={`text-[9px] px-1 py-0.5 rounded border ${emp.eobiEnabled ? "bg-[#EEF1F8] text-[#0A1F54] border-[#A5B4D2]" : "bg-gray-50 text-gray-400 border-gray-200"}`}
                             >
                               EOBI {emp.eobiEnabled ? "✓" : "✗"}
                             </span>
                             <span
-                              className={`text-[9px] px-1 py-0.5 rounded border ${emp.essiEnabled ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
+                              className={`text-[9px] px-1 py-0.5 rounded border ${emp.essiEnabled ? "bg-[#EEF1F8] text-[#0A1F54] border-[#A5B4D2]" : "bg-gray-50 text-gray-400 border-gray-200"}`}
                             >
                               ESSI {emp.essiEnabled ? "✓" : "✗"}
                             </span>
                             <span
-                              className={`text-[9px] px-1 py-0.5 rounded border ${emp.gratuityEnabled ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
+                              className={`text-[9px] px-1 py-0.5 rounded border ${emp.gratuityEnabled ? "bg-[#EEF1F8] text-[#0A1F54] border-[#A5B4D2]" : "bg-gray-50 text-gray-400 border-gray-200"}`}
                             >
                               Grat {emp.gratuityEnabled ? "✓" : "✗"}
                             </span>
                             <span
-                              className={`text-[9px] px-1 py-0.5 rounded border ${emp.pfEnabled ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
+                              className={`text-[9px] px-1 py-0.5 rounded border ${emp.pfEnabled ? "bg-[#EEF1F8] text-[#0A1F54] border-[#A5B4D2]" : "bg-gray-50 text-gray-400 border-gray-200"}`}
                             >
                               PF {emp.pfEnabled ? "✓" : "✗"}
                             </span>
                             <span
-                              className={`text-[9px] px-1 py-0.5 rounded border ${emp.incomeTaxEnabled !== false ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
+                              className={`text-[9px] px-1 py-0.5 rounded border ${emp.incomeTaxEnabled !== false ? "bg-[#EEF1F8] text-[#0A1F54] border-[#A5B4D2]" : "bg-gray-50 text-gray-400 border-gray-200"}`}
                             >
                               Tax {emp.incomeTaxEnabled !== false ? "✓" : "✗"}
                             </span>

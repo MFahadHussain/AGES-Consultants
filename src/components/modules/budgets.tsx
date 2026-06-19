@@ -22,7 +22,7 @@ function formatCurrency(amount: number) {
 const statusStyles: Record<string, string> = {
   draft: 'bg-yellow-100 text-yellow-800 border-yellow-300',
   approved: 'bg-blue-100 text-blue-800 border-blue-300',
-  active: 'bg-green-100 text-green-800 border-green-300',
+  active: 'bg-[#EEF1F8] text-[#0F2D78] border-green-300',
   rejected: 'bg-red-100 text-red-800 border-red-300',
 }
 
@@ -217,10 +217,10 @@ export function BudgetManagement() {
             <p className="text-sm font-bold">{formatCurrency(totalActual)}</p>
           </CardContent>
         </Card>
-        <Card className={`border-l-4 ${totalVariance >= 0 ? 'border-l-green-500' : 'border-l-red-500'}`}>
+        <Card className={`border-l-4 ${totalVariance >= 0 ? 'border-l-[#0F2D78]' : 'border-l-red-500'}`}>
           <CardContent className="p-3">
             <p className="text-[10px] text-muted-foreground">Total Variance</p>
-            <p className={`text-sm font-bold ${totalVariance < 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(totalVariance)}</p>
+            <p className={`text-sm font-bold ${totalVariance < 0 ? 'text-red-600' : 'text-[#0F2D78]'}`}>{formatCurrency(totalVariance)}</p>
           </CardContent>
         </Card>
       </div>
@@ -269,7 +269,7 @@ export function BudgetManagement() {
                       )}
                       {budget.status === 'approved' && (
                         <Button variant="outline" size="sm" className="h-6 text-[9px] px-2" onClick={() => handleStatusChange(budget.id, 'active')}>
-                          <Play className="h-3 w-3 mr-1 text-green-600" />Activate
+                          <Play className="h-3 w-3 mr-1 text-[#0F2D78]" />Activate
                         </Button>
                       )}
                       {budget.status === 'rejected' && (
@@ -298,7 +298,7 @@ export function BudgetManagement() {
                     </div>
                     <div className="text-center p-2 rounded bg-muted/50">
                       <p className="text-[10px] text-muted-foreground">Variance</p>
-                      <p className={`text-xs font-bold ${variance < 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(variance)}</p>
+                      <p className={`text-xs font-bold ${variance < 0 ? 'text-red-600' : 'text-[#0F2D78]'}`}>{formatCurrency(variance)}</p>
                     </div>
                   </div>
                   {budget.lines?.length > 0 && (
@@ -322,7 +322,7 @@ export function BudgetManagement() {
                               <TableCell className="text-xs">{line.account?.code} - {line.account?.name}</TableCell>
                               <TableCell className="text-xs text-right">{formatCurrency(line.budgetAmount)}</TableCell>
                               <TableCell className="text-xs text-right">{formatCurrency(line.actualAmount)}</TableCell>
-                              <TableCell className={`text-xs text-right ${lineVariance < 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(lineVariance)}</TableCell>
+                              <TableCell className={`text-xs text-right ${lineVariance < 0 ? 'text-red-600' : 'text-[#0F2D78]'}`}>{formatCurrency(lineVariance)}</TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-2">
                                   <Progress value={Math.min(lineUtilization, 100)} className="h-2" />
@@ -376,7 +376,7 @@ export function BudgetManagement() {
                             <TableCell className="text-xs">{line.account?.code} - {line.account?.name}</TableCell>
                             <TableCell className="text-xs text-right">{formatCurrency(line.budgetAmount)}</TableCell>
                             <TableCell className="text-xs text-right">{formatCurrency(line.actualAmount)}</TableCell>
-                            <TableCell className={`text-xs text-right font-semibold ${lineVariance < 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(lineVariance)}</TableCell>
+                            <TableCell className={`text-xs text-right font-semibold ${lineVariance < 0 ? 'text-red-600' : 'text-[#0F2D78]'}`}>{formatCurrency(lineVariance)}</TableCell>
                             <TableCell className="text-xs text-right">
                               <span className={`${lineUtilization > 100 ? 'text-red-600 font-bold' : lineUtilization > 80 ? 'text-amber-600 font-semibold' : ''}`}>
                                 {Math.round(lineUtilization)}%

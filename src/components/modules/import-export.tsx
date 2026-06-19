@@ -464,7 +464,7 @@ export function ImportExport() {
                       isDragOver
                         ? 'border-primary bg-primary/5 scale-[1.02]'
                         : selectedFile
-                        ? 'border-green-300 bg-green-50 dark:bg-green-950/20'
+                        ? 'border-green-300 bg-[#EEF1F8] dark:bg-green-950/20'
                         : 'border-muted-foreground/25 hover:border-primary/50'
                     }`}
                     onDrop={handleDrop}
@@ -474,8 +474,8 @@ export function ImportExport() {
                   >
                     {selectedFile ? (
                       <div className="space-y-1">
-                        <CheckCircle2 className="h-8 w-8 mx-auto text-green-500" />
-                        <p className="text-xs font-medium text-green-700 dark:text-green-400">{selectedFile.name}</p>
+                        <CheckCircle2 className="h-8 w-8 mx-auto text-[#1E3C87]" />
+                        <p className="text-xs font-medium text-[#0A1F54] dark:text-[#96A5C3]">{selectedFile.name}</p>
                         <p className="text-[10px] text-muted-foreground">{Math.round(selectedFile.size / 1024)} KB • {parsedRows.length} rows</p>
                         <Button
                           variant="ghost"
@@ -629,11 +629,11 @@ export function ImportExport() {
 
                     {/* Import Results */}
                     {importResult && (
-                      <Card className={`border-2 ${importResult.success ? 'border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/20' : 'border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20'}`}>
+                      <Card className={`border-2 ${importResult.success ? 'border-[#A5B4D2] bg-[#EEF1F8]/50 dark:border-green-800 dark:bg-green-950/20' : 'border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20'}`}>
                         <CardHeader className="pb-2 pt-3 px-4">
                           <CardTitle className="text-xs flex items-center gap-2">
                             {importResult.success ? (
-                              <CheckCircle2 className="h-4 w-4 text-green-500" />
+                              <CheckCircle2 className="h-4 w-4 text-[#1E3C87]" />
                             ) : (
                               <XCircle className="h-4 w-4 text-red-500" />
                             )}
@@ -647,9 +647,9 @@ export function ImportExport() {
                               <p className="text-[10px] text-muted-foreground">Total</p>
                               <p className="text-sm font-bold">{importResult.totalRows}</p>
                             </div>
-                            <div className="rounded-md border border-green-200 bg-green-50 dark:bg-green-950/30 p-2 text-center">
-                              <p className="text-[10px] text-green-600">Imported</p>
-                              <p className="text-sm font-bold text-green-700 dark:text-green-400">{importResult.imported}</p>
+                            <div className="rounded-md border border-[#A5B4D2] bg-[#EEF1F8] dark:bg-green-950/30 p-2 text-center">
+                              <p className="text-[10px] text-[#0F2D78]">Imported</p>
+                              <p className="text-sm font-bold text-[#0A1F54] dark:text-[#96A5C3]">{importResult.imported}</p>
                             </div>
                             <div className="rounded-md border border-yellow-200 bg-yellow-50 dark:bg-yellow-950/30 p-2 text-center">
                               <p className="text-[10px] text-yellow-600">Skipped</p>
@@ -759,7 +759,7 @@ export function ImportExport() {
                     <SelectContent>
                       <SelectItem value="CSV">
                         <span className="flex items-center gap-2">
-                          <FileText className="h-3.5 w-3.5 text-green-500" />
+                          <FileText className="h-3.5 w-3.5 text-[#1E3C87]" />
                           CSV (Comma Separated)
                         </span>
                       </SelectItem>
@@ -850,7 +850,7 @@ export function ImportExport() {
                             <TableCell className="text-xs font-medium">
                               <div className="flex items-center gap-2">
                                 {dl.format === 'CSV' ? (
-                                  <FileText className="h-3.5 w-3.5 text-green-500" />
+                                  <FileText className="h-3.5 w-3.5 text-[#1E3C87]" />
                                 ) : (
                                   <FileSpreadsheet className="h-3.5 w-3.5 text-blue-500" />
                                 )}
@@ -908,7 +908,7 @@ export function ImportExport() {
                     {allLogs.map((log, i) => (
                       <TableRow key={i}>
                         <TableCell>
-                          <Badge className={`text-[8px] ${log.dir === 'Import' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                          <Badge className={`text-[8px] ${log.dir === 'Import' ? 'bg-blue-100 text-blue-800' : 'bg-[#EEF1F8] text-[#0F2D78]'}`}>
                             {log.dir === 'Import' ? <Upload className="h-2.5 w-2.5 mr-0.5" /> : <Download className="h-2.5 w-2.5 mr-0.5" />}
                             {log.dir}
                           </Badge>
@@ -916,7 +916,7 @@ export function ImportExport() {
                         <TableCell className="text-xs font-medium">{log.type.replace(/_/g, ' ')}</TableCell>
                         <TableCell className="text-xs">{log.format}</TableCell>
                         <TableCell className="text-xs font-mono">{log.records || '-'}</TableCell>
-                        <TableCell className="text-xs font-mono text-green-600">{log.success || '-'}</TableCell>
+                        <TableCell className="text-xs font-mono text-[#0F2D78]">{log.success || '-'}</TableCell>
                         <TableCell className="text-xs font-mono text-red-600">{log.fails || '-'}</TableCell>
                         <TableCell className="text-[10px] text-muted-foreground">
                           {new Date(log.createdAt).toLocaleString()}
@@ -928,12 +928,12 @@ export function ImportExport() {
                                 <AlertTriangle className="h-2.5 w-2.5 mr-0.5" /> Partial
                               </Badge>
                             ) : (
-                              <Badge className="text-[9px] bg-green-100 text-green-800">
+                              <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78]">
                                 <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" /> Complete
                               </Badge>
                             )
                           ) : (
-                            <Badge className="text-[9px] bg-green-100 text-green-800">
+                            <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78]">
                               <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" /> Downloaded
                             </Badge>
                           )}

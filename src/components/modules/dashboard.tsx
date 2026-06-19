@@ -129,12 +129,12 @@ function useCurrentUserRole(): UserRole {
 // Formatting Helpers
 // ============================================================
 
-const COLORS = ["#16a34a", "#dc2626", "#ca8a04", "#0891b2", "#7c3aed"];
+const COLORS = ["#0F2D78", "#dc2626", "#ca8a04", "#0891b2", "#7c3aed"];
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-yellow-100 text-yellow-800",
   pending: "bg-blue-100 text-blue-800",
-  approved: "bg-green-100 text-green-800",
-  posted: "bg-emerald-100 text-emerald-800",
+  approved: "bg-[#EEF1F8] text-[#0F2D78]",
+  posted: "bg-[#EEF1F8] text-[#0F2D78]",
   rejected: "bg-red-100 text-red-800",
 };
 
@@ -422,7 +422,7 @@ function AdminDashboard({
                   </div>
                 </div>
               </div>
-              <div className="h-12 w-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-xl bg-[#EEF1F8] text-[#0F2D78] flex items-center justify-center">
                 <Wallet className="h-6 w-6" />
               </div>
             </div>
@@ -576,7 +576,7 @@ function AdminDashboard({
               {surplus >= 0 ? "Net Surplus" : "Net Deficit"}
             </p>
             <p
-              className={`text-xl font-bold mt-1 ${surplus >= 0 ? "text-emerald-600" : "text-red-600"}`}
+              className={`text-xl font-bold mt-1 ${surplus >= 0 ? "text-[#0F2D78]" : "text-red-600"}`}
             >
               {formatCurrency(Math.abs(surplus))}
             </p>
@@ -611,7 +611,7 @@ function AdminDashboard({
               labelKey="type"
               name1="Debit"
               name2="Credit"
-              color1="#16a34a"
+              color1="#0F2D78"
               color2="#dc2626"
             />
           </CardContent>
@@ -732,7 +732,7 @@ function AdminDashboard({
                       v.voucherType === "BP" || v.voucherType === "CP"
                         ? "bg-red-100 text-red-600"
                         : v.voucherType === "BR" || v.voucherType === "CR"
-                          ? "bg-emerald-100 text-emerald-600"
+                          ? "bg-[#EEF1F8] text-[#0F2D78]"
                           : "bg-blue-100 text-blue-600"
                     }`}
                   >
@@ -781,7 +781,7 @@ function AdminDashboard({
                 label: "Accounts",
                 value: data.counts.accounts,
                 icon: BookOpen,
-                color: "text-emerald-600",
+                color: "text-[#0F2D78]",
                 module: "chart-of-accounts",
               },
               {
@@ -861,7 +861,7 @@ function AdminDashboard({
                   </Badge>
                   Payroll → GL
                 </p>
-                <Badge className="text-[9px] bg-green-100 text-green-800">
+                <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78]">
                   Active
                 </Badge>
               </div>
@@ -879,7 +879,7 @@ function AdminDashboard({
                   </Badge>
                   Fixed Assets → GL
                 </p>
-                <Badge className="text-[9px] bg-green-100 text-green-800">
+                <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78]">
                   Active
                 </Badge>
               </div>
@@ -975,7 +975,7 @@ function ManagerDashboard({
                   {formatCurrency(data.cashPosition + data.cashInHand)}
                 </p>
               </div>
-              <div className="h-12 w-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-xl bg-[#EEF1F8] text-[#0F2D78] flex items-center justify-center">
                 <Wallet className="h-6 w-6" />
               </div>
             </div>
@@ -1058,7 +1058,7 @@ function ManagerDashboard({
               {surplus >= 0 ? "Net Surplus" : "Net Deficit"}
             </p>
             <p
-              className={`text-xl font-bold mt-1 ${surplus >= 0 ? "text-emerald-600" : "text-red-600"}`}
+              className={`text-xl font-bold mt-1 ${surplus >= 0 ? "text-[#0F2D78]" : "text-red-600"}`}
             >
               {formatCurrency(Math.abs(surplus))}
             </p>
@@ -1258,7 +1258,7 @@ function AccountantDashboard({
           onClick={() => onNavigate("vouchers")}
           className="p-4 rounded-xl border-2 border-dashed border-slate-200 hover:border-slate-400 hover:bg-accent/30 transition-colors text-left group"
         >
-          <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2 group-hover:bg-emerald-100 transition-colors">
+          <div className="h-10 w-10 rounded-lg bg-emerald-50 text-[#0F2D78] flex items-center justify-center mb-2 group-hover:bg-[#EEF1F8] transition-colors">
             <FileCheck className="h-5 w-5" />
           </div>
           <p className="text-sm font-semibold">My Drafts</p>
@@ -1305,7 +1305,7 @@ function AccountantDashboard({
                   {formatCurrency(data.cashPosition + data.cashInHand)}
                 </p>
               </div>
-              <div className="h-12 w-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-xl bg-[#EEF1F8] text-[#0F2D78] flex items-center justify-center">
                 <Wallet className="h-6 w-6" />
               </div>
             </div>
@@ -1393,7 +1393,7 @@ function AccountantDashboard({
               {totalIncome - totalExpenses >= 0 ? "Net Surplus" : "Net Deficit"}
             </p>
             <p
-              className={`text-xl font-bold mt-1 ${totalIncome - totalExpenses >= 0 ? "text-emerald-600" : "text-red-600"}`}
+              className={`text-xl font-bold mt-1 ${totalIncome - totalExpenses >= 0 ? "text-[#0F2D78]" : "text-red-600"}`}
             >
               {formatCurrency(Math.abs(totalIncome - totalExpenses))}
             </p>
@@ -1435,7 +1435,7 @@ function AccountantDashboard({
                       v.voucherType === "BP" || v.voucherType === "CP"
                         ? "bg-red-100 text-red-600"
                         : v.voucherType === "BR" || v.voucherType === "CR"
-                          ? "bg-emerald-100 text-emerald-600"
+                          ? "bg-[#EEF1F8] text-[#0F2D78]"
                           : "bg-blue-100 text-blue-600"
                     }`}
                   >
@@ -1499,7 +1499,7 @@ function AccountantDashboard({
                 label: "Accounts",
                 value: data.counts.accounts,
                 icon: BookOpen,
-                color: "text-emerald-600",
+                color: "text-[#0F2D78]",
                 module: "chart-of-accounts",
               },
               {
@@ -1580,11 +1580,11 @@ function AuditorDashboard({
     <div className="space-y-6">
       {/* Compliance Status */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="border-emerald-200 bg-emerald-50/50">
+        <Card className="border-[#A5B4D2] bg-emerald-50/50">
           <CardContent className="p-3 text-center">
-            <CheckCircle2 className="h-6 w-6 text-emerald-600 mx-auto mb-1" />
+            <CheckCircle2 className="h-6 w-6 text-[#0F2D78] mx-auto mb-1" />
             <p className="text-lg font-bold text-emerald-700">{postedCount}</p>
-            <p className="text-[10px] text-emerald-600 font-medium">
+            <p className="text-[10px] text-[#0F2D78] font-medium">
               Posted to GL
             </p>
           </CardContent>
@@ -1686,7 +1686,7 @@ function AuditorDashboard({
               {surplus >= 0 ? "Net Surplus" : "Net Deficit"}
             </p>
             <p
-              className={`text-xl font-bold mt-1 ${surplus >= 0 ? "text-emerald-600" : "text-red-600"}`}
+              className={`text-xl font-bold mt-1 ${surplus >= 0 ? "text-[#0F2D78]" : "text-red-600"}`}
             >
               {formatCurrency(Math.abs(surplus))}
             </p>
@@ -1721,7 +1721,7 @@ function AuditorDashboard({
               labelKey="type"
               name1="Debit"
               name2="Credit"
-              color1="#16a34a"
+              color1="#0F2D78"
               color2="#dc2626"
             />
           </CardContent>
@@ -1834,7 +1834,7 @@ function AuditorDashboard({
                 label: "Chart of Accounts",
                 desc: `${data.counts.accounts} accounts`,
                 icon: BookOpen,
-                color: "text-emerald-600",
+                color: "text-[#0F2D78]",
                 bg: "bg-emerald-50",
                 module: "chart-of-accounts",
               },
@@ -1885,7 +1885,7 @@ function AuditorDashboard({
                 label: "Accounts",
                 value: data.counts.accounts,
                 icon: BookOpen,
-                color: "text-emerald-600",
+                color: "text-[#0F2D78]",
               },
               {
                 label: "Vouchers",
@@ -2091,7 +2091,7 @@ function ViewerDashboard({
               onClick={() => onNavigate("chart-of-accounts")}
               className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-accent/50 transition-colors text-left"
             >
-              <div className="h-9 w-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <div className="h-9 w-9 rounded-lg bg-emerald-50 text-[#0F2D78] flex items-center justify-center shrink-0">
                 <BookOpen className="h-4 w-4" />
               </div>
               <div>

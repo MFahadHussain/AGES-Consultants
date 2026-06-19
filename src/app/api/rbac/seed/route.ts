@@ -254,7 +254,7 @@ async function POST_HANDLER() {
       await db.securityPolicy.create({
         data: {
           name: 'Default Security Policy',
-          description: 'Default security policy for AcctFin ERP',
+          description: 'Default security policy for AGES Consultants ERP',
           isDefault: true,
           isActive: true,
         },
@@ -309,14 +309,14 @@ async function POST_HANDLER() {
     }
 
     // ===== 7. Create/Ensure Admin User =====
-    const adminEmail = 'admin@acctfin.erp'
+    const adminEmail = 'admin@ages.erp'
     const existingAdmin = await db.user.findUnique({ where: { email: adminEmail } })
 
     if (existingAdmin) {
       results.adminUser.message = 'Admin user already exists'
     } else {
       const salt = await bcrypt.genSalt(10)
-      const passwordHash = await bcrypt.hash('Admin@123', salt)
+      const passwordHash = await bcrypt.hash('AGES@2025', salt)
 
       const admin = await db.user.create({
         data: {
@@ -347,7 +347,7 @@ async function POST_HANDLER() {
       }
 
       results.adminUser.created = true
-      results.adminUser.message = 'Admin user created with email: admin@acctfin.erp, password: Admin@123'
+      results.adminUser.message = 'Admin user created with email: admin@ages.erp, password: AGES@2025'
     }
 
     // Audit log

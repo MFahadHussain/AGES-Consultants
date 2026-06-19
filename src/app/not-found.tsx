@@ -12,7 +12,7 @@ export default function NotFound() {
         </p>
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#1A7A4A] text-white rounded-lg hover:bg-[#15693F] transition-colors font-medium text-sm"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0F2D78] text-white rounded-lg hover:bg-[#0A1F54] transition-colors font-medium text-sm"
         >
           <Home className="w-4 h-4" />
           Back to Dashboard

@@ -330,7 +330,7 @@ export function ConsolidatedBalanceSheet({
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-muted-foreground">Accounting Equation:</span>
             {equationHolds(consolidatedData) ? (
-              <Badge className="text-[9px] bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-100">
+              <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78] border-[#A5B4D2] hover:bg-[#EEF1F8]">
                 <CheckCircle2 className="h-3 w-3 mr-1" />Balanced
               </Badge>
             ) : (

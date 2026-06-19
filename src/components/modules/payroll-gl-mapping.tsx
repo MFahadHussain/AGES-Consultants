@@ -173,10 +173,10 @@ export function PayrollGLMapping() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-green-500">
+        <Card className="border-l-4 border-l-[#0F2D78]">
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
+              <CheckCircle className="h-4 w-4 text-[#1E3C87]" />
               <div>
                 <p className="text-[10px] text-muted-foreground">Configured (with Accounts)</p>
                 <p className="text-sm font-bold">{configuredMappings}</p>
@@ -239,7 +239,7 @@ export function PayrollGLMapping() {
                   <TableCell className="text-xs font-medium font-mono">{mapping.componentType}</TableCell>
                   <TableCell className="text-xs">
                     {mapping.debitAccount
-                      ? <span className="text-green-700">{mapping.debitAccount.code} - {mapping.debitAccount.name}</span>
+                      ? <span className="text-[#0A1F54]">{mapping.debitAccount.code} - {mapping.debitAccount.name}</span>
                       : <span className="text-muted-foreground">Not configured</span>}
                   </TableCell>
                   <TableCell className="text-xs">
@@ -249,7 +249,7 @@ export function PayrollGLMapping() {
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground max-w-48 truncate">{mapping.description || '-'}</TableCell>
                   <TableCell>
-                    <Badge className={`text-[9px] ${mapping.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                    <Badge className={`text-[9px] ${mapping.isActive ? 'bg-[#EEF1F8] text-[#0F2D78]' : 'bg-gray-100 text-gray-800'}`}>
                       {mapping.isActive ? 'Active' : 'Inactive'}
                     </Badge>
                   </TableCell>

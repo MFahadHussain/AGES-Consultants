@@ -55,8 +55,8 @@ function generateSlipHTML(data: any, company: any): string {
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family: Arial, Helvetica, sans-serif; font-size:11px; color:#1F2937; background:#fff; padding:16px; }
-.header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:12px; border-bottom:3px solid #1A7A4A; margin-bottom:16px; }
-.co-name { font-size:16px; font-weight:700; color:#1A7A4A; margin-bottom:3px; }
+.header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:12px; border-bottom:3px solid #0F2D78; margin-bottom:16px; }
+.co-name { font-size:16px; font-weight:700; color:#0F2D78; margin-bottom:3px; }
 .co-sub { font-size:10px; color:#6B7280; line-height:1.5; }
 .slip-badge { text-align:right; }
 .slip-title { font-size:14px; font-weight:700; color:#1F2937; }
@@ -73,14 +73,14 @@ body { font-family: Arial, Helvetica, sans-serif; font-size:11px; color:#1F2937;
 .sal-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
 .sal-box { border:1px solid #E5E7EB; border-radius:8px; overflow:hidden; }
 .box-hdr { padding:6px 12px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
-.earn-hdr { background:#DCFCE7; color:#15803D; }
+.earn-hdr { background:#EEF1F8; color:#0A1F54; }
 .dedu-hdr { background:#FEE2E2; color:#DC2626; }
 .sal-row { display:flex; justify-content:space-between; padding:5px 12px; border-top:1px solid #F3F4F6; }
 .sal-label { color:#374151; font-size:10px; }
 .sal-val { font-size:10px; font-weight:500; font-family:monospace; }
 .sal-zero { font-size:10px; color:#D1D5DB; }
 .sal-total { background:#F3F4F6; border-top:2px solid #E5E7EB; font-weight:700; }
-.net-box { background:linear-gradient(135deg,#1A7A4A,#166534); color:#fff; border-radius:10px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+.net-box { background:linear-gradient(135deg,#0F2D78,#166534); color:#fff; border-radius:10px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
 .net-label { font-size:11px; font-weight:500; opacity:.85; }
 .net-words { font-size:9px; opacity:.7; margin-top:3px; max-width:300px; }
 .net-amount { font-size:22px; font-weight:700; font-family:monospace; }
@@ -105,15 +105,17 @@ body { font-family: Arial, Helvetica, sans-serif; font-size:11px; color:#1F2937;
 </head>
 <body>
 <div class="header">
-  <div>
-    <div class="co-name">${company.name}</div>
-    <div class="co-sub">${company.address}</div>
-    <div class="co-sub">NTN: ${company.ntn}${company.phone ? ' · Tel: ' + company.phone : ''}</div>
+  <div style="display: flex; align-items: center; gap: 12px;">
+    <img src="/images/ages-logo.png" alt="AGES Consultants" style="height: 48px; object-fit: contain;" />
+    <div>
+      <div class="co-name">AGES Consultants</div>
+      <div class="co-sub" style="font-size: 11px; font-weight: bold; color: #1F2937;">Salary Slip — ${periodLabel(data.period)}</div>
+      <div class="co-sub">Employee: ${emp.name} | Designation: ${emp.designation || '—'} | Dept: ${emp.department || '—'}</div>
+    </div>
   </div>
   <div class="slip-badge">
     <div class="slip-title">SALARY SLIP</div>
-    <div class="slip-period">${periodLabel(data.period)}</div>
-    <div class="slip-period">Payment: ${fmtDate(new Date())}</div>
+    <div class="slip-period" style="margin-top: 3px;">Payment: ${fmtDate(new Date())}</div>
   </div>
 </div>
 
@@ -199,7 +201,7 @@ ${allocs.length > 0 ? `
         <td>${a.days}</td><td>${w}%</td>
         <td>Rs ${fmtPKR(a.salaryShare)}</td>
         <td style="color:#DC2626;">Rs ${fmtPKR(taxShare)}</td>
-        <td style="color:#16A34A;">Rs ${fmtPKR(netShare)}</td>
+        <td style="color:#0F2D78;">Rs ${fmtPKR(netShare)}</td>
         <td style="color:#D97706;">Rs ${fmtPKR(a.scShare)}</td>
       </tr>`
     }).join('')}
@@ -209,7 +211,7 @@ ${allocs.length > 0 ? `
       <td>100%</td>
       <td>Rs ${fmtPKR(line.grossSalary)}</td>
       <td style="color:#DC2626;">Rs ${fmtPKR(line.incomeTax)}</td>
-      <td style="color:#16A34A;">Rs ${fmtPKR(line.netPay)}</td>
+      <td style="color:#0F2D78;">Rs ${fmtPKR(line.netPay)}</td>
       <td style="color:#D97706;">Rs ${fmtPKR(line.socialCharges)}</td>
     </tr>
   </tbody>
@@ -232,7 +234,7 @@ ${allocs.length > 0 ? `
 </div>
 
 <div class="footer">
-  System-generated salary slip · ${company.name} · ${periodLabel(data.period)} · Generated: ${new Date().toLocaleDateString('en-PK')}
+  This is a computer-generated document by AGES Consultants ERP. No signature required.
 </div>
 </body>
 </html>`
@@ -328,7 +330,7 @@ async function GET_HANDLER(
     const settingsMap = Object.fromEntries(settings.map(s => [s.key, s.value]))
 
     const company = {
-      name:    settingsMap.company_name    || 'AcctFin ERP',
+      name:    settingsMap.company_name    || 'AGES Consultants',
       address: settingsMap.company_address || '',
       phone:   settingsMap.company_phone   || '',
       email:   settingsMap.company_email   || '',

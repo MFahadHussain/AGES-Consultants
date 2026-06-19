@@ -191,7 +191,7 @@ const STATUS_COLORS: Record<string,string> = {
 
 const SC_COMPONENT_COLORS: Record<string,{bg:string;text:string;border:string;icon:string}> = {
   otherPayable: {bg:'bg-sky-50',text:'text-sky-700',border:'border-sky-200',icon:'🏗️'},
-  earnedLeave:  {bg:'bg-emerald-50',text:'text-emerald-700',border:'border-emerald-200',icon:'🏖️'},
+  earnedLeave:  {bg:'bg-emerald-50',text:'text-emerald-700',border:'border-[#A5B4D2]',icon:'🏖️'},
   sickLeave:    {bg:'bg-orange-50',text:'text-orange-700',border:'border-orange-200',icon:'🏥'},
   casualLeave:  {bg:'bg-amber-50',text:'text-amber-700',border:'border-amber-200',icon:'📋'},
 }
@@ -234,19 +234,19 @@ function getRecentMonths(pastCount: number = 12, futureCount: number = 12): stri
 // ── BADGE COMPONENTS ───────────────────────────────────────────────
 
 function SalaryBadge({status}:{status:string}) {
-  const s: Record<string,string> = {Paid:'bg-emerald-50 text-emerald-700 border-emerald-200',Pending:'bg-amber-50 text-amber-700 border-amber-200',Draft:'bg-slate-100 text-slate-500 border-slate-200'}
+  const s: Record<string,string> = {Paid:'bg-emerald-50 text-emerald-700 border-[#A5B4D2]',Pending:'bg-amber-50 text-amber-700 border-amber-200',Draft:'bg-slate-100 text-slate-500 border-slate-200'}
   return <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${s[status]||s.Draft}`}>{status}</span>
 }
 function ScBadge({status}:{status:string}) {
-  const s: Record<string,string> = {Remitted:'bg-emerald-50 text-emerald-700 border-emerald-200',Pending:'bg-amber-50 text-amber-700 border-amber-200',Partial:'bg-blue-50 text-blue-700 border-blue-200'}
+  const s: Record<string,string> = {Remitted:'bg-emerald-50 text-emerald-700 border-[#A5B4D2]',Pending:'bg-amber-50 text-amber-700 border-amber-200',Partial:'bg-blue-50 text-blue-700 border-blue-200'}
   return <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${s[status]||s.Pending}`}>{status}</span>
 }
 function LoanBadge({status}:{status:string}) {
-  const s: Record<string,string> = {Active:'bg-emerald-50 text-emerald-700 border-emerald-200',active:'bg-emerald-50 text-emerald-700 border-emerald-200',Closed:'bg-slate-100 text-slate-500 border-slate-200',closed:'bg-slate-100 text-slate-500 border-slate-200',Overdue:'bg-red-50 text-red-700 border-red-200',written_off:'bg-gray-100 text-gray-500 border-gray-200'}
+  const s: Record<string,string> = {Active:'bg-emerald-50 text-emerald-700 border-[#A5B4D2]',active:'bg-emerald-50 text-emerald-700 border-[#A5B4D2]',Closed:'bg-slate-100 text-slate-500 border-slate-200',closed:'bg-slate-100 text-slate-500 border-slate-200',Overdue:'bg-red-50 text-red-700 border-red-200',written_off:'bg-gray-100 text-gray-500 border-gray-200'}
   return <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${s[status]||s.Active}`}>{status}</span>
 }
 function AdvBadge({status}:{status:string}) {
-  const s: Record<string,string> = {Recovering:'bg-blue-50 text-blue-700 border-blue-200',Cleared:'bg-emerald-50 text-emerald-700 border-emerald-200','Pending Approval':'bg-amber-50 text-amber-700 border-amber-200'}
+  const s: Record<string,string> = {Recovering:'bg-blue-50 text-blue-700 border-blue-200',Cleared:'bg-emerald-50 text-emerald-700 border-[#A5B4D2]','Pending Approval':'bg-amber-50 text-amber-700 border-amber-200'}
   return <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${s[status]||s.Recovering}`}>{status}</span>
 }
 
@@ -1048,7 +1048,7 @@ export function EmployeeProfile() {
           <p className="text-[13px] text-slate-500 mt-2">{emp?.designation || '—'}</p>
           <p className="text-[13px] text-slate-500">{emp?.department || '—'}</p>
           <div className="mt-2.5">
-            <span className={`rounded-full text-[11px] px-3 py-1 font-medium border ${emp?.status==='Active'||emp?.status==='active'?'bg-emerald-50 text-emerald-600 border-emerald-200':'bg-red-50 text-red-600 border-red-200'}`}>{emp?.status || '—'}</span>
+            <span className={`rounded-full text-[11px] px-3 py-1 font-medium border ${emp?.status==='Active'||emp?.status==='active'?'bg-emerald-50 text-[#0F2D78] border-[#A5B4D2]':'bg-red-50 text-red-600 border-red-200'}`}>{emp?.status || '—'}</span>
           </div>
         </div>
         <Separator className="my-4" />
@@ -1095,7 +1095,7 @@ export function EmployeeProfile() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
-                      className={`text-[11px] px-2 py-0.5 rounded-full font-medium border transition-colors cursor-pointer ${item.val ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'}`}
+                      className={`text-[11px] px-2 py-0.5 rounded-full font-medium border transition-colors cursor-pointer ${item.val ? 'bg-emerald-50 text-emerald-700 border-[#A5B4D2] hover:bg-[#EEF1F8]' : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'}`}
                       onClick={isAdmin && empId ? async () => {
                         try {
                           const res = await fetch(`/api/employees?id=${empId}`, {
@@ -1121,7 +1121,7 @@ export function EmployeeProfile() {
                 </Tooltip>
               </TooltipProvider>
             ))}
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp?.taxFilingStatus === 'filer' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : emp?.taxFilingStatus === 'non-filer' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${emp?.taxFilingStatus === 'filer' ? 'bg-emerald-50 text-emerald-700 border-[#A5B4D2]' : emp?.taxFilingStatus === 'non-filer' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
               {emp?.taxFilingStatus === 'filer' ? 'Filer' : emp?.taxFilingStatus === 'non-filer' ? 'Non-Filer' : 'Tax —'}
             </span>
             <span className="text-[11px] px-2 py-0.5 rounded-full font-medium border bg-blue-50 text-blue-700 border-blue-200">
@@ -1367,7 +1367,7 @@ export function EmployeeProfile() {
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-white border border-slate-200 rounded-xl p-4">
           <p className="text-[11px] text-slate-500">Total Paid YTD</p>
-          <p className="text-base font-semibold text-emerald-600">{formatPKR(totalPaidYtd)}</p>
+          <p className="text-base font-semibold text-[#0F2D78]">{formatPKR(totalPaidYtd)}</p>
         </div>
         <div className="bg-white border border-slate-200 rounded-xl p-4">
           <p className="text-[11px] text-slate-500">Total Deducted YTD</p>
@@ -1414,7 +1414,7 @@ export function EmployeeProfile() {
                 </div>
                 <div className="bg-slate-50 rounded-lg p-2">
                   <span className="text-slate-500">Final SC (to ledger)</span>
-                  <p className="font-semibold text-emerald-600">{formatPKR(apiPayrollResult.finalSC)}</p>
+                  <p className="font-semibold text-[#0F2D78]">{formatPKR(apiPayrollResult.finalSC)}</p>
                 </div>
                 <div className="bg-slate-50 rounded-lg p-2">
                   <span className="text-slate-500">SC Base (sal × ratio)</span>
@@ -1460,7 +1460,7 @@ export function EmployeeProfile() {
                 </div>
                 <div className="bg-slate-50 rounded-lg p-2">
                   <span className="text-slate-500">Net Pay</span>
-                  <p className="font-semibold text-emerald-600">{formatPKR(apiPayrollResult.netPay)}</p>
+                  <p className="font-semibold text-[#0F2D78]">{formatPKR(apiPayrollResult.netPay)}</p>
                 </div>
               </div>
               {renderProjectCostDistribution(apiPayrollResult, 'API Calculation')}
@@ -1555,7 +1555,7 @@ export function EmployeeProfile() {
                               </div>
                               <div className="mt-3 pt-3 border-t border-slate-200 text-right">
                                 <span className="text-[12px] text-slate-500 mr-3">Net Pay:</span>
-                                <span className="text-[14px] font-semibold text-emerald-600">{formatPKR(row.netPaid)}</span>
+                                <span className="text-[14px] font-semibold text-[#0F2D78]">{formatPKR(row.netPaid)}</span>
                               </div>
                               {/* YTD Tax Info */}
                               {row.taxBreakdown && (
@@ -1705,7 +1705,7 @@ export function EmployeeProfile() {
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-4">
             <p className="text-[11px] text-slate-500">Total SC Paid</p>
-            <p className="text-base font-semibold text-emerald-600">{formatPKR(totalScPaid)}</p>
+            <p className="text-base font-semibold text-[#0F2D78]">{formatPKR(totalScPaid)}</p>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-4">
             <p className="text-[11px] text-slate-500">Outstanding Balance</p>
@@ -1767,7 +1767,7 @@ export function EmployeeProfile() {
                     <td className="py-2.5 px-3 text-slate-900">Total</td>
                     <td></td><td></td>
                     <td className="py-2.5 px-3 text-right text-slate-900">{formatPKR(totalScAccrued)}</td>
-                    <td className="py-2.5 px-3 text-right text-emerald-600">{formatPKR(totalScPaid)}</td>
+                    <td className="py-2.5 px-3 text-right text-[#0F2D78]">{formatPKR(totalScPaid)}</td>
                     <td className="py-2.5 px-3 text-right text-amber-600">{formatPKR(scOutstanding)}</td>
                     <td></td><td></td>
                   </tr>
@@ -1789,7 +1789,7 @@ export function EmployeeProfile() {
                 Draft SC to GL
               </Button>
               {scDraftGLVoucher && (
-                <Badge className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1">
+                <Badge className="text-[11px] bg-emerald-50 text-emerald-700 border border-[#A5B4D2] px-3 py-1">
                   ✓ {scDraftGLVoucher.voucherNumber} created
                 </Badge>
               )}
@@ -2024,7 +2024,7 @@ export function EmployeeProfile() {
           {/* Stats Row */}
           <div className="flex flex-wrap gap-2">
             {[
-              {label:'Present',count:attPresent,color:'bg-emerald-50 text-emerald-700 border-emerald-200'},
+              {label:'Present',count:attPresent,color:'bg-emerald-50 text-emerald-700 border-[#A5B4D2]'},
               {label:'Absent',count:attAbsent,color:'bg-red-50 text-red-700 border-red-200'},
               {label:'Leave',count:attLeave,color:'bg-orange-50 text-orange-700 border-orange-200'},
               {label:'Weekend Work',count:attWeekend,color:'bg-blue-50 text-blue-700 border-blue-200'},
@@ -2146,7 +2146,7 @@ export function EmployeeProfile() {
     const daysUntil = Math.ceil((exp.getTime() - now.getTime()) / (1000*60*60*24))
     if (daysUntil < 0) return { label: 'Expired', color: 'bg-red-100 text-red-700 border-red-200', icon: AlertTriangle }
     if (daysUntil <= 90) return { label: `Expiring ${daysUntil}d`, color: 'bg-amber-100 text-amber-700 border-amber-200', icon: AlertTriangle }
-    return { label: 'Valid', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle }
+    return { label: 'Valid', color: 'bg-[#EEF1F8] text-emerald-700 border-[#A5B4D2]', icon: CheckCircle }
   }
 
   // Helper: get file type icon color
@@ -2308,7 +2308,7 @@ export function EmployeeProfile() {
         {/* Document Health Summary */}
         <div className="flex items-center gap-4 p-3 rounded-xl bg-gradient-to-r from-slate-50 to-white border">
           <div className="flex items-center gap-1.5">
-            <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+            <CheckCircle className="h-3.5 w-3.5 text-[#0F2D78]" />
             <span className="text-[11px] font-semibold text-emerald-700">{docSummary.valid} Valid</span>
           </div>
           {docSummary.expiring > 0 && (
@@ -2543,7 +2543,7 @@ export function EmployeeProfile() {
                     <Label className="text-xs">Expiry Date <span className="text-red-500">*</span></Label>
                     <Input type="date" className="h-8 text-xs" value={uploadForm.expiryDate} onChange={e => setUploadForm(prev => ({...prev, expiryDate: e.target.value}))} />
                     {['CNIC_FRONT','CNIC_BACK'].includes(docTypes.find(d => d.id === uploadForm.documentTypeId)?.code || '') && uploadForm.issueDate && (
-                      <p className="text-[10px] text-emerald-600 mt-0.5">Auto-suggested: 10 years from issue</p>
+                      <p className="text-[10px] text-[#0F2D78] mt-0.5">Auto-suggested: 10 years from issue</p>
                     )}
                   </div>
                 )}

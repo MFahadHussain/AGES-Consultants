@@ -44,7 +44,7 @@ interface AuditResponse {
 
 // ── Action badge config ───────────────────────────────────────
 const ACTION_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
-  CREATE:            { color: '#16A34A', bg: '#F0FDF4', label: 'Create' },
+  CREATE:            { color: '#0F2D78', bg: '#EEF1F8', label: 'Create' },
   UPDATE:            { color: '#2563EB', bg: '#EFF6FF', label: 'Update' },
   DELETE:            { color: '#DC2626', bg: '#FEF2F2', label: 'Delete' },
   APPROVE:           { color: '#0891B2', bg: '#ECFEFF', label: 'Approve' },
@@ -89,7 +89,7 @@ function SeverityBadge({ severity }: { severity: string }) {
 }
 
 function UserAvatar({ name }: { name: string }) {
-  const colors = ['#1A7A4A', '#2563EB', '#7C3AED', '#D97706', '#DC2626', '#0891B2']
+  const colors = ['#0F2D78', '#2563EB', '#7C3AED', '#D97706', '#DC2626', '#0891B2']
   const color = colors[name.charCodeAt(0) % colors.length]
   const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
   return (
@@ -270,7 +270,7 @@ function AuditDetailDrawer({ log, onClose }: { log: AuditLog; onClose: () => voi
                     <span className="text-[10px] font-mono" style={{ color: '#6B7280' }}>JSON</span>
                   </div>
                   <pre className="text-[11px] font-mono p-3 overflow-auto max-h-48 leading-relaxed"
-                    style={{ background: '#fff', color: '#1A7A4A', whiteSpace: 'pre-wrap' }}>
+                    style={{ background: '#fff', color: '#0F2D78', whiteSpace: 'pre-wrap' }}>
                     {typeof log.details === 'string' ? log.details : JSON.stringify(log.details, null, 2)}
                   </pre>
                 </div>
@@ -278,9 +278,9 @@ function AuditDetailDrawer({ log, onClose }: { log: AuditLog; onClose: () => voi
             )}
 
             {/* Immutability notice */}
-            <div className="flex items-start gap-2 p-3 rounded-xl" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
-              <Lock className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#16A34A' }} />
-              <p className="text-[10px] leading-relaxed" style={{ color: '#15803D' }}>
+            <div className="flex items-start gap-2 p-3 rounded-xl" style={{ background: '#EEF1F8', border: '1px solid #BBF7D0' }}>
+              <Lock className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#0F2D78' }} />
+              <p className="text-[10px] leading-relaxed" style={{ color: '#0A1F54' }}>
                 This audit record is immutable and cannot be modified or deleted by any user.
               </p>
             </div>
@@ -368,7 +368,7 @@ export function AuditTrail() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-xl font-semibold flex items-center gap-2" style={{ color: '#1a1a2e' }}>
-              <Shield className="w-5 h-5" style={{ color: '#1A7A4A' }} />
+              <Shield className="w-5 h-5" style={{ color: '#0F2D78' }} />
               Audit Trail
             </h1>
             <p className="text-sm mt-0.5" style={{ color: '#6B7280' }}>
@@ -389,7 +389,7 @@ export function AuditTrail() {
 
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <KpiCard label="Total Events" value={total} icon={<FileText className="w-4 h-4" />} color="#1A7A4A" bg="#F0FDF4" />
+          <KpiCard label="Total Events" value={total} icon={<FileText className="w-4 h-4" />} color="#0F2D78" bg="#EEF1F8" />
           <KpiCard label="Critical" value={severityCounts.critical || 0} icon={<AlertCircle className="w-4 h-4" />} color="#DC2626" bg="#FEF2F2" />
           <KpiCard label="Warnings" value={severityCounts.warning || 0} icon={<AlertTriangle className="w-4 h-4" />} color="#D97706" bg="#FFFBEB" />
           <KpiCard label="Info" value={severityCounts.info || 0} icon={<Info className="w-4 h-4" />} color="#2563EB" bg="#EFF6FF" />
@@ -490,7 +490,7 @@ export function AuditTrail() {
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-16">
-                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" style={{ color: '#1A7A4A' }} />
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" style={{ color: '#0F2D78' }} />
                       <p className="text-sm" style={{ color: '#6B7280' }}>Loading audit logs...</p>
                     </TableCell>
                   </TableRow>

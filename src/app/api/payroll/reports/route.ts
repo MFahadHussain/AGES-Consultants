@@ -1,6 +1,6 @@
 import { withAudit } from '@/lib/audit-wrapper'
 // ============================================================================
-// Payroll Reports API — AcctFin ERP v1.0.0
+// Payroll Reports API — AGES Consultants ERP v1.0.0
 // ============================================================================
 // 14 Report Types:
 //   1.  payroll-summary    — Monthly Payroll Summary

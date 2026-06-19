@@ -451,13 +451,13 @@ export function AllowancesModule() {
                         {a.allowanceType === 'percentage' ? `${a.value}%` : `PKR ${a.value.toLocaleString()}`}
                       </TableCell>
                       <TableCell className="text-xs text-center">
-                        {a.isTaxable ? <span className="text-green-600">Yes</span> : <span className="text-gray-400">No</span>}
+                        {a.isTaxable ? <span className="text-[#0F2D78]">Yes</span> : <span className="text-gray-400">No</span>}
                       </TableCell>
                       <TableCell className="text-xs text-center">
                         {a.isProjectSpecific ? <span className="text-violet-600">Yes</span> : <span className="text-gray-400">No</span>}
                       </TableCell>
                       <TableCell className="text-xs text-center">
-                        <Badge className={`text-[9px] ${a.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                        <Badge className={`text-[9px] ${a.isActive ? 'bg-[#EEF1F8] text-[#0F2D78]' : 'bg-gray-100 text-gray-600'}`}>
                           {a.isActive ? 'Active' : 'Inactive'}
                         </Badge>
                       </TableCell>
@@ -557,7 +557,7 @@ export function AllowancesModule() {
                         {ea.effectiveDate ? new Date(ea.effectiveDate).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' }) : '-'}
                       </TableCell>
                       <TableCell className="text-xs text-center">
-                        <Badge className={`text-[9px] ${ea.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                        <Badge className={`text-[9px] ${ea.isActive ? 'bg-[#EEF1F8] text-[#0F2D78]' : 'bg-gray-100 text-gray-600'}`}>
                           {ea.isActive ? 'Active' : 'Inactive'}
                         </Badge>
                       </TableCell>
@@ -659,7 +659,7 @@ export function AllowancesModule() {
                   checked={allowForm.isSocialCharges} 
                   onCheckedChange={v => setAllowForm(p => ({ ...p, isSocialCharges: v }))} 
                 />
-                <Label className="text-xs font-semibold text-emerald-600 dark:text-emerald-500">Social Charges</Label>
+                <Label className="text-xs font-semibold text-[#0F2D78] dark:text-emerald-500">Social Charges</Label>
               </div>
             </div>
             {allowForm.isInclusive && (

@@ -96,8 +96,8 @@ interface KpiData {
 }
 
 const actionColors: Record<string, string> = {
-  CREATE: 'bg-green-100 text-green-800', UPDATE: 'bg-blue-100 text-blue-800',
-  DELETE: 'bg-red-100 text-red-800', APPROVE: 'bg-emerald-100 text-emerald-800',
+  CREATE: 'bg-[#EEF1F8] text-[#0F2D78]', UPDATE: 'bg-blue-100 text-blue-800',
+  DELETE: 'bg-red-100 text-red-800', APPROVE: 'bg-[#EEF1F8] text-[#0F2D78]',
   REJECT: 'bg-rose-100 text-rose-800', LOGIN: 'bg-slate-100 text-slate-800',
   LOGOUT: 'bg-slate-100 text-slate-800', EXPORT: 'bg-amber-100 text-amber-800',
   PERMISSION_CHANGE: 'bg-purple-100 text-purple-800', PASSWORD_CHANGE: 'bg-orange-100 text-orange-800',
@@ -112,7 +112,7 @@ const severityDots: Record<string, string> = {
 }
 
 const statusColors: Record<string, string> = {
-  success: 'bg-green-100 text-green-800', failed: 'bg-red-100 text-red-800',
+  success: 'bg-[#EEF1F8] text-[#0F2D78]', failed: 'bg-red-100 text-red-800',
   locked: 'bg-orange-100 text-orange-800', expired_token: 'bg-gray-100 text-gray-800',
 }
 
@@ -438,7 +438,7 @@ export function SecurityCenter() {
 
   const pStrength = getPasswordStrength()
   const strengthLabel = pStrength < 40 ? 'Weak' : pStrength < 70 ? 'Medium' : pStrength < 90 ? 'Strong' : 'Very Strong'
-  const strengthColor = pStrength < 40 ? 'bg-red-500' : pStrength < 70 ? 'bg-amber-500' : pStrength < 90 ? 'bg-green-500' : 'bg-emerald-600'
+  const strengthColor = pStrength < 40 ? 'bg-red-500' : pStrength < 70 ? 'bg-amber-500' : pStrength < 90 ? 'bg-[#1E3C87]' : 'bg-[#0F2D78]'
 
   return (
     <div className="space-y-4">
@@ -476,8 +476,8 @@ export function SecurityCenter() {
                 <Card className="border-l-4 border-l-emerald-500">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-1">
-                      <Users className="h-4 w-4 text-emerald-600" />
-                      {kpi.activeUsersTrend >= 0 ? <ArrowUpRight className="h-3 w-3 text-green-600" /> : <ArrowDownRight className="h-3 w-3 text-red-600" />}
+                      <Users className="h-4 w-4 text-[#0F2D78]" />
+                      {kpi.activeUsersTrend >= 0 ? <ArrowUpRight className="h-3 w-3 text-[#0F2D78]" /> : <ArrowDownRight className="h-3 w-3 text-red-600" />}
                     </div>
                     <p className="text-2xl font-bold">{kpi.activeUsers}</p>
                     <p className="text-xs text-muted-foreground">Active Users</p>
@@ -591,7 +591,7 @@ export function SecurityCenter() {
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="outline" className="w-full justify-start text-sm" size="sm">
-                          <Lock className="h-3.5 w-3.5 mr-2 text-green-500" /> Unlock All Accounts
+                          <Lock className="h-3.5 w-3.5 mr-2 text-[#1E3C87]" /> Unlock All Accounts
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
@@ -650,7 +650,7 @@ export function SecurityCenter() {
                       <div className="px-4 pb-4 space-y-2">
                         {recentLogs.filter(l => l.severity === 'critical' || l.severity === 'warning').length === 0 ? (
                           <div className="text-center py-8">
-                            <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                            <CheckCircle2 className="h-8 w-8 text-[#1E3C87] mx-auto mb-2" />
                             <p className="text-sm text-muted-foreground">No security alerts</p>
                           </div>
                         ) : recentLogs
@@ -763,7 +763,7 @@ export function SecurityCenter() {
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <Label className="text-xs font-medium">Password Strength Requirement</Label>
-                      <Badge className={`text-[10px] ${pStrength >= 70 ? 'bg-green-100 text-green-800' : pStrength >= 40 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'}`}>
+                      <Badge className={`text-[10px] ${pStrength >= 70 ? 'bg-[#EEF1F8] text-[#0F2D78]' : pStrength >= 40 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'}`}>
                         {strengthLabel} ({pStrength}%)
                       </Badge>
                     </div>
@@ -812,7 +812,7 @@ export function SecurityCenter() {
                     ) : policyForm.lockoutThreshold >= 10 ? (
                       <Badge className="bg-amber-100 text-amber-800 text-[10px]">Lenient — Risk of brute-force attacks</Badge>
                     ) : (
-                      <Badge className="bg-green-100 text-green-800 text-[10px]">Balanced</Badge>
+                      <Badge className="bg-[#EEF1F8] text-[#0F2D78] text-[10px]">Balanced</Badge>
                     )}
                   </div>
                 </CardContent>
@@ -1023,7 +1023,7 @@ export function SecurityCenter() {
                             {new Date(s.expiresAt).toLocaleString()}
                           </TableCell>
                           <TableCell>
-                            <Badge className={`text-[9px] ${s.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                            <Badge className={`text-[9px] ${s.isActive ? 'bg-[#EEF1F8] text-[#0F2D78]' : 'bg-gray-100 text-gray-800'}`}>
                               {s.isActive ? 'Active' : 'Expired'}
                             </Badge>
                           </TableCell>
@@ -1215,7 +1215,7 @@ export function SecurityCenter() {
                   <div className="flex items-center gap-1 flex-wrap mb-3">
                     {wf.steps?.map((s, i) => (
                       <div key={s.id || i} className="flex items-center gap-1">
-                        <div className={`px-2 py-1 rounded text-[10px] border ${s.stepType === 'auto' ? 'bg-slate-50 border-slate-200' : s.stepType === 'role' ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+                        <div className={`px-2 py-1 rounded text-[10px] border ${s.stepType === 'auto' ? 'bg-slate-50 border-slate-200' : s.stepType === 'role' ? 'bg-emerald-50 border-[#A5B4D2]' : 'bg-amber-50 border-amber-200'}`}>
                           <span className="font-medium">{s.stepNumber}.</span> {s.stepName}
                           {s.isParallel && <span className="ml-1 text-purple-600">∥</span>}
                           {s.escalationMinutes && <Timer className="inline h-2.5 w-2.5 ml-1 text-amber-500" />}
@@ -1292,7 +1292,7 @@ export function SecurityCenter() {
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
-                              <Button size="sm" variant="outline" className="h-7 text-xs text-green-700" onClick={() => handleApproveInstance(inst.id, 'approved')}>
+                              <Button size="sm" variant="outline" className="h-7 text-xs text-[#0A1F54]" onClick={() => handleApproveInstance(inst.id, 'approved')}>
                                 <CheckCircle2 className="h-3 w-3 mr-1" /> Approve
                               </Button>
                               <Button size="sm" variant="outline" className="h-7 text-xs text-red-700" onClick={() => handleApproveInstance(inst.id, 'rejected')}>

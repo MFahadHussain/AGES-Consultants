@@ -73,7 +73,7 @@ function KpiCard({ title, current, prior, marginLabel, marginValue }: KpiCardPro
           <span
             className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
               delta.direction === 'up'
-                ? 'bg-emerald-100 text-emerald-700'
+                ? 'bg-[#EEF1F8] text-emerald-700'
                 : delta.direction === 'down'
                   ? 'bg-red-100 text-red-700'
                   : 'bg-muted text-muted-foreground'

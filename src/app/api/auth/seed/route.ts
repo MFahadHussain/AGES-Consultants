@@ -14,15 +14,15 @@ async function hashPassword(password: string): Promise<string> {
 
 async function POST_HANDLER() {
   try {
-    const defaultPasswordHash = await hashPassword('AcctFin@2025')
+    const defaultPasswordHash = await hashPassword('AGES@2025')
 
     const users = [
-      { email: 'admin@acctfin.com', name: 'Fahad Hussain', role: 'admin', passwordHash: defaultPasswordHash },
-      { email: 'manager@acctfin.com', name: 'Ahmed Khan', role: 'manager', passwordHash: defaultPasswordHash },
-      { email: 'accountant@acctfin.com', name: 'Sara Ali', role: 'accountant', passwordHash: defaultPasswordHash },
-      { email: 'auditor@acctfin.com', name: 'Usman Malik', role: 'auditor', passwordHash: defaultPasswordHash },
-      { email: 'viewer@acctfin.com', name: 'Ayesha Noor', role: 'viewer', passwordHash: defaultPasswordHash },
-      { email: 'ahussain@acctfin.com', name: 'Ali Hussain', role: 'accountant', passwordHash: defaultPasswordHash, isActive: false },
+      { email: 'admin@agesconsultants.com', name: 'Fahad Hussain', role: 'admin', passwordHash: defaultPasswordHash },
+      { email: 'manager@agesconsultants.com', name: 'Ahmed Khan', role: 'manager', passwordHash: defaultPasswordHash },
+      { email: 'accountant@agesconsultants.com', name: 'Sara Ali', role: 'accountant', passwordHash: defaultPasswordHash },
+      { email: 'auditor@agesconsultants.com', name: 'Usman Malik', role: 'auditor', passwordHash: defaultPasswordHash },
+      { email: 'viewer@agesconsultants.com', name: 'Ayesha Noor', role: 'viewer', passwordHash: defaultPasswordHash },
+      { email: 'ahussain@agesconsultants.com', name: 'Ali Hussain', role: 'accountant', passwordHash: defaultPasswordHash, isActive: false },
     ]
 
     let created = 0
@@ -49,7 +49,7 @@ async function POST_HANDLER() {
       message: 'Default users seeded',
       created,
       skipped,
-      defaultPassword: 'AcctFin@2025',
+      defaultPassword: 'AGES@2025',
       note: 'All users have the same default password. Change in production.',
     })
   } catch (error) {

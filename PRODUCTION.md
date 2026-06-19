@@ -1,4 +1,4 @@
-# AcctFin ERP - Production Deployment Guide
+# AGES Consultants ERP - Production Deployment Guide
 
 ## Table of Contents
 1. [Architecture Overview](#architecture-overview)
@@ -166,8 +166,8 @@ server {
 
 1. Generate certificates:
    ```bash
-   openssl req -new -x509 -days 365 -nodes -text \
-     -out server.crt -keyout server.key -subj "/CN=acctfin-db"
+    openssl req -new -x509 -days 365 -nodes -text \
+      -out server.crt -keyout server.key -subj "/CN=ages-db"
    ```
 
 2. Update `postgresql.conf`:
@@ -191,7 +191,7 @@ server {
 Add to crontab:
 ```bash
 # Daily backup at 2 AM
-0 2 * * * /path/to/acctfin-erp/scripts/backup-pg.sh --full >> /var/log/acctfin-backup.log 2>&1
+0 2 * * * /path/to/ages-consultants-erp/scripts/backup-pg.sh --full >> /var/log/ages-backup.log 2>&1
 ```
 
 ### Manual Backup
@@ -211,10 +211,10 @@ Add to crontab:
 
 ```bash
 # Restore from backup (with confirmation)
-./scripts/restore-pg.sh ./backups/acctfin_erp_full_20250101_020000.dump
+./scripts/restore-pg.sh ./backups/ages_erp_full_20250101_020000.dump
 
 # Drop and recreate database before restore
-./scripts/restore-pg.sh ./backups/acctfin_erp_full_20250101_020000.dump --drop-existing
+./scripts/restore-pg.sh ./backups/ages_erp_full_20250101_020000.dump --drop-existing
 ```
 
 ### WAL Archiving

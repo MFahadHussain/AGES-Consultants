@@ -15,6 +15,7 @@ import {
   ChevronDown, ChevronUp, XCircle, Download
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { BRAND } from '@/lib/config/branding'
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
@@ -692,7 +693,7 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
       </style>
       </head>
       <body>
-        <h1>AcctFin ERP — Salary Voucher</h1>
+        <h1>${BRAND.companyName} ERP — Salary Voucher</h1>
         <p><strong>Voucher No:</strong> ${voucher.voucherNumber} | <strong>Employee:</strong> ${voucher.employeeName} (${voucher.employeeCode}) | <strong>Project:</strong> ${voucher.projectName} [${voucher.projectCode}] | <strong>Period:</strong> ${voucher.period}</p>
         <table>
           <tr><th>#</th><th>Account Code</th><th>Account Name</th><th class="right">Debit (PKR)</th><th class="right">Credit (PKR)</th><th>Description</th></tr>
@@ -772,10 +773,10 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
         </div>
 
         {/* Success banner */}
-        <Card className="border-emerald-200 bg-emerald-50/50">
+        <Card className="border-[#A5B4D2] bg-emerald-50/50">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <CheckCircle className="h-8 w-8 text-emerald-600" />
+              <CheckCircle className="h-8 w-8 text-[#0F2D78]" />
               <div>
                 <h3 className="text-lg font-bold text-emerald-900">
                   {generatedVouchers.length} Salary Voucher{generatedVouchers.length !== 1 ? 's' : ''} Created
@@ -791,7 +792,7 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
         {/* Bulk actions */}
         <div className="flex items-center gap-2 flex-wrap">
           {draftCount > 0 && (
-            <Button size="sm" onClick={handlePostAll} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button size="sm" onClick={handlePostAll} className="bg-[#0F2D78] hover:bg-emerald-700">
               <Send className="h-3.5 w-3.5 mr-1" /> Post All to GL ({draftCount})
             </Button>
           )}
@@ -869,7 +870,7 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
                             className={`text-[9px] border ${
                               v.status === 'draft'
                                 ? 'bg-amber-100 text-amber-800 border-amber-200'
-                                : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                : 'bg-[#EEF1F8] text-[#0F2D78] border-[#A5B4D2]'
                             }`}
                           >
                             {v.status === 'draft' ? 'DRAFT' : 'POSTED'}
@@ -928,7 +929,7 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
                                 </TableHeader>
                                 <TableBody>
                                   {v.entries.map((entry, idx) => (
-                                    <TableRow key={idx} className={entry.debit > 0 ? 'bg-red-50/20' : 'bg-green-50/20'}>
+                                    <TableRow key={idx} className={entry.debit > 0 ? 'bg-red-50/20' : 'bg-[#EEF1F8]/20'}>
                                       <TableCell className="text-[10px] py-1 font-mono">{entry.lineNumber}</TableCell>
                                       <TableCell className="text-[10px] py-1 font-mono">{entry.accountCode}</TableCell>
                                       <TableCell className="text-[10px] py-1 font-medium">{entry.accountName}</TableCell>
@@ -958,7 +959,7 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
                               <Badge className="text-[9px] bg-red-50 text-red-800 border border-red-200">
                                 Tax: {formatCurrency(v.breakdown.tax)}
                               </Badge>
-                              <Badge className="text-[9px] bg-green-50 text-green-800 border border-green-200">
+                              <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78] border border-[#A5B4D2]">
                                 Net: {formatCurrency(v.breakdown.netSalary)}
                               </Badge>
                               <Badge className="text-[9px] bg-orange-50 text-orange-800 border border-orange-200">
@@ -968,7 +969,7 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
                                 Weight: {v.breakdown.weightPct}
                               </Badge>
                               {v.balanced ? (
-                                <Badge className="text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78] border border-[#A5B4D2]">
                                   <CheckCircle className="h-3 w-3 mr-1" />Balanced
                                 </Badge>
                               ) : (
@@ -1466,7 +1467,7 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
                             </TableCell>
                             <TableCell
                               className={`text-xs py-1.5 text-right font-mono font-semibold ${
-                                row.negativeNet ? 'text-red-600' : 'text-green-600'
+                                row.negativeNet ? 'text-red-600' : 'text-[#0F2D78]'
                               }`}
                             >
                               {formatCurrency(row.netSalary)}
@@ -1490,7 +1491,7 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
                           <TableCell className="text-xs py-1.5 text-right font-mono text-red-600">
                             {formatCurrency(group.rows.reduce((s, r) => s + r.tax, 0))}
                           </TableCell>
-                          <TableCell className="text-xs py-1.5 text-right font-mono text-green-600">
+                          <TableCell className="text-xs py-1.5 text-right font-mono text-[#0F2D78]">
                             {formatCurrency(group.rows.reduce((s, r) => s + r.netSalary, 0))}
                           </TableCell>
                           <TableCell className="text-xs py-1.5 text-right font-mono text-orange-600">
@@ -1513,7 +1514,7 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
                       <TableCell className="text-xs py-2 text-right font-mono text-red-600">
                         {formatCurrency(grandTotals.tax)}
                       </TableCell>
-                      <TableCell className="text-xs py-2 text-right font-mono text-green-600">
+                      <TableCell className="text-xs py-2 text-right font-mono text-[#0F2D78]">
                         {formatCurrency(grandTotals.netSalary)}
                       </TableCell>
                       <TableCell className="text-xs py-2 text-right font-mono text-orange-600">
@@ -1545,7 +1546,7 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
                       No project or employee selected
                     </span>
                   ) : (
-                    <span className="text-emerald-600 flex items-center gap-1">
+                    <span className="text-[#0F2D78] flex items-center gap-1">
                       <CheckCircle className="h-3.5 w-3.5" />
                       Ready to generate {previewRows.length} voucher(s)
                     </span>
@@ -1567,7 +1568,7 @@ export function SalaryVoucherCreation({ onBack }: { onBack: () => void }) {
                     size="sm"
                     onClick={handleGenerate}
                     disabled={hasBlockingErrors || hasNoSelection || generating || !financialYearId}
-                    className="bg-emerald-600 hover:bg-emerald-700"
+                    className="bg-[#0F2D78] hover:bg-emerald-700"
                   >
                     {generating ? (
                       <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />

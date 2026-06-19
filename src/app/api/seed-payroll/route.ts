@@ -45,11 +45,11 @@ const DEFAULT_GL_COMPONENT_TYPES = [
 
 // --- Sample Employees ---
 const SAMPLE_EMPLOYEES = [
-  { employeeCode: 'EMP-0001', name: 'Ahmed Khan',      designation: 'Manager',     department: 'IT',             baseSalary: 150000, cnic: '33100-1234567-1', gender: 'Male',   employmentType: 'Permanent', category: 'Management', contactNo: '0300-1234567', email: 'ahmed.khan@acctfin.pk' },
-  { employeeCode: 'EMP-0002', name: 'Fatima Ali',      designation: 'Accountant',  department: 'Finance',        baseSalary: 120000, cnic: '33100-2345678-2', gender: 'Female', employmentType: 'Permanent', category: 'Staff',      contactNo: '0301-2345678', email: 'fatima.ali@acctfin.pk' },
-  { employeeCode: 'EMP-0003', name: 'Muhammad Raza',   designation: 'Engineer',    department: 'Engineering',    baseSalary: 180000, cnic: '33100-3456789-3', gender: 'Male',   employmentType: 'Permanent', category: 'Staff',      contactNo: '0302-3456789', email: 'm.raza@acctfin.pk' },
-  { employeeCode: 'EMP-0004', name: 'Sara Ahmed',      designation: 'HR Officer',  department: 'HR',             baseSalary: 100000, cnic: '33100-4567890-4', gender: 'Female', employmentType: 'Permanent', category: 'Officer',    contactNo: '0303-4567890', email: 'sara.ahmed@acctfin.pk' },
-  { employeeCode: 'EMP-0005', name: 'Ali Hassan',      designation: 'Admin',       department: 'Administration', baseSalary: 80000,  cnic: '33100-5678901-5', gender: 'Male',   employmentType: 'Permanent', category: 'Staff',      contactNo: '0304-5678901', email: 'ali.hassan@acctfin.pk' },
+  { employeeCode: 'EMP-0001', name: 'Ahmed Khan',      designation: 'Manager',     department: 'IT',             baseSalary: 150000, cnic: '33100-1234567-1', gender: 'Male',   employmentType: 'Permanent', category: 'Management', contactNo: '0300-1234567', email: 'ahmed.khan@ages.pk' },
+  { employeeCode: 'EMP-0002', name: 'Fatima Ali',      designation: 'Accountant',  department: 'Finance',        baseSalary: 120000, cnic: '33100-2345678-2', gender: 'Female', employmentType: 'Permanent', category: 'Staff',      contactNo: '0301-2345678', email: 'fatima.ali@ages.pk' },
+  { employeeCode: 'EMP-0003', name: 'Muhammad Raza',   designation: 'Engineer',    department: 'Engineering',    baseSalary: 180000, cnic: '33100-3456789-3', gender: 'Male',   employmentType: 'Permanent', category: 'Staff',      contactNo: '0302-3456789', email: 'm.raza@ages.pk' },
+  { employeeCode: 'EMP-0004', name: 'Sara Ahmed',      designation: 'HR Officer',  department: 'HR',             baseSalary: 100000, cnic: '33100-4567890-4', gender: 'Female', employmentType: 'Permanent', category: 'Officer',    contactNo: '0303-4567890', email: 'sara.ahmed@ages.pk' },
+  { employeeCode: 'EMP-0005', name: 'Ali Hassan',      designation: 'Admin',       department: 'Administration', baseSalary: 80000,  cnic: '33100-5678901-5', gender: 'Male',   employmentType: 'Permanent', category: 'Staff',      contactNo: '0304-5678901', email: 'ali.hassan@ages.pk' },
 ]
 
 // ============================================================

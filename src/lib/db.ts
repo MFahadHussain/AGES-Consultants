@@ -23,14 +23,14 @@ let _systemUserId: string | null = null
 export async function getSystemUserId(): Promise<string> {
   if (_systemUserId) return _systemUserId
 
-  const existing = await db.user.findFirst({ where: { email: 'system@acctfin.erp' } })
+  const existing = await db.user.findFirst({ where: { email: 'system@ages.erp' } })
   if (existing) {
     _systemUserId = existing.id
     return _systemUserId
   }
 
   const created = await db.user.create({
-    data: { email: 'system@acctfin.erp', name: 'System', role: 'admin', isActive: true },
+    data: { email: 'system@ages.erp', name: 'System', role: 'admin', isActive: true },
   })
   _systemUserId = created.id
   return _systemUserId

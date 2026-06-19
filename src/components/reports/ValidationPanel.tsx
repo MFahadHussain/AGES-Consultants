@@ -92,7 +92,7 @@ export default function ValidationPanel({
         </div>
         <div className="flex items-center gap-2">
           {data.allPassed ? (
-            <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100">
+            <Badge className="bg-[#EEF1F8] text-emerald-700 border-[#A5B4D2] hover:bg-[#EEF1F8]">
               <CheckCircle2 className="size-3" />
               All checks passed
             </Badge>
@@ -144,7 +144,7 @@ export default function ValidationPanel({
                 </TableCell>
                 <TableCell className="text-center">
                   {rule.status === 'pass' ? (
-                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100 gap-1">
+                    <Badge className="bg-[#EEF1F8] text-emerald-700 border-[#A5B4D2] hover:bg-[#EEF1F8] gap-1">
                       <CheckCircle2 className="size-3" />
                       Pass
                     </Badge>
@@ -196,7 +196,7 @@ export default function ValidationPanel({
                               className={
                                 rule.variance !== 0
                                   ? 'font-bold text-red-600'
-                                  : 'text-emerald-600'
+                                  : 'text-[#0F2D78]'
                               }
                             >
                               Var: {formatAmount(rule.variance)}

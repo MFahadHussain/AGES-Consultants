@@ -449,10 +449,10 @@ export function ProjectAssignments() {
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-green-500">
+        <Card className="border-l-4 border-l-[#0F2D78]">
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
-              <UserCheck className="h-4 w-4 text-green-500" />
+              <UserCheck className="h-4 w-4 text-[#1E3C87]" />
               <div>
                 <p className="text-[10px] text-muted-foreground">Active Assignments</p>
                 <p className="text-sm font-bold">{activeAssignments}</p>
@@ -685,7 +685,7 @@ export function ProjectAssignments() {
                         <Badge
                           className={`text-[9px] ${
                             a.isActive
-                              ? 'bg-green-100 text-green-800'
+                              ? 'bg-[#EEF1F8] text-[#0F2D78]'
                               : 'bg-gray-100 text-gray-800'
                           }`}
                         >
@@ -706,7 +706,7 @@ export function ProjectAssignments() {
                                 >
                                   <Power
                                     className={`h-3 w-3 ${
-                                      a.isActive ? 'text-orange-500' : 'text-green-500'
+                                      a.isActive ? 'text-orange-500' : 'text-[#1E3C87]'
                                     }`}
                                   />
                                 </Button>
@@ -922,7 +922,7 @@ export function ProjectAssignments() {
                           <span>After adding:</span>
                           <span
                             className={`font-mono font-bold ${
-                              newTotal > 100 ? 'text-red-600' : 'text-green-600'
+                              newTotal > 100 ? 'text-red-600' : 'text-[#0F2D78]'
                             }`}
                           >
                             {newTotal}%
@@ -976,7 +976,7 @@ export function ProjectAssignments() {
 
             {/* Active toggle hint */}
             <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-              <Badge className={`text-[9px] ${form.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+              <Badge className={`text-[9px] ${form.isActive ? 'bg-[#EEF1F8] text-[#0F2D78]' : 'bg-gray-100 text-gray-800'}`}>
                 {form.isActive ? 'Active' : 'Inactive'}
               </Badge>
               <span>
@@ -1151,7 +1151,7 @@ export function ProjectAssignments() {
                             <span>Total after update:</span>
                             <span
                               className={`font-mono font-bold ${
-                                newTotal > 100 ? 'text-red-600' : 'text-green-600'
+                                newTotal > 100 ? 'text-red-600' : 'text-[#0F2D78]'
                               }`}
                             >
                               {newTotal}%
@@ -1200,7 +1200,7 @@ export function ProjectAssignments() {
                 <Badge
                   className={`text-[9px] ${
                     form.isActive
-                      ? 'bg-green-100 text-green-800'
+                      ? 'bg-[#EEF1F8] text-[#0F2D78]'
                       : 'bg-gray-100 text-gray-800'
                   }`}
                 >

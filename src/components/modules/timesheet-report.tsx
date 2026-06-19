@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Printer, Calendar } from 'lucide-react'
 import { EmployeeCombobox } from '@/components/ui/employee-combobox'
 import { useRouter } from 'next/navigation'
+import { BRAND } from '@/lib/config/branding'
 
 export interface TimesheetDayData {
   status: string
@@ -333,7 +334,7 @@ export function TimesheetReportClient({
             <Button
               onClick={handlePrint}
               disabled={viewType === 'project' ? !selectedProject : !selectedEmployee}
-              className="h-8 text-xs px-4 bg-[#1A7A4A] hover:bg-[#15633a] text-white flex items-center gap-1.5 shadow-sm transition-all"
+              className="h-8 text-xs px-4 bg-[#0F2D78] hover:bg-[#15633a] text-white flex items-center gap-1.5 shadow-sm transition-all"
             >
               <Printer className="h-3.5 w-3.5" />
               Print Timesheet
@@ -360,7 +361,7 @@ export function TimesheetReportClient({
             <div className="pb-4 border-b border-slate-100 print:border-b-2 print:border-black space-y-3 print:w-full">
               <div className="flex justify-between items-center print:w-full">
                 <div>
-                  <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest leading-none">AGES ERP SYSTEM</h2>
+                  <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest leading-none">{BRAND.companyName} ERP</h2>
                   <h1 className="text-lg font-extrabold text-slate-900 print:text-black mt-1 leading-none">
                     {viewType === 'project' ? 'PROJECT TIMESHEET REPORT' : 'MONTHLY STAFF TIMESHEET REPORT'}
                   </h1>
@@ -408,7 +409,7 @@ export function TimesheetReportClient({
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="font-semibold text-slate-500 print:text-black">Status:</span>
-                    <span className="font-bold border-b border-slate-400 print:border-black pb-0.5 px-1 min-w-[80px] text-emerald-600 print:text-black">
+                    <span className="font-bold border-b border-slate-400 print:border-black pb-0.5 px-1 min-w-[80px] text-[#0F2D78] print:text-black">
                       {selectedEmployee.status.toUpperCase()}
                     </span>
                   </div>

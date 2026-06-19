@@ -4,6 +4,8 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 
+import { BRAND } from "@/lib/config/branding";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -16,10 +18,28 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | AcctFin ERP",
-    default: "AcctFin ERP",
+    default: "AGES Consultants ERP",
+    template: "%s | AGES Consultants",
   },
-  description: "Enterprise Accounting & Financial Management System",
+  description: "Accounting & Financial Management System by AGES Consultants",
+  applicationName: "AGES Consultants ERP",
+  authors: [{ name: "AGES Consultants" }],
+  keywords: ["ERP", "Accounting", "Finance", "AGES Consultants"],
+  openGraph: {
+    title: "AGES Consultants ERP",
+    description: "Accounting & Financial Management System",
+    siteName: "AGES Consultants ERP",
+    images: [{ url: "/og-image.png" }],
+  },
+  twitter: {
+    title: "AGES Consultants ERP",
+    description: "Accounting & Financial Management System",
+    images: ["/og-image.png"],
+  },
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
   robots: { index: false, follow: false },
 };
 

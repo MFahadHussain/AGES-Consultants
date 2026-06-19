@@ -27,8 +27,8 @@ import { RecordHistory } from '@/components/shared/record-history'
 const voucherTypes = [
   { value: 'BP', label: 'Bank Payment', color: 'bg-red-100 text-red-800' },
   { value: 'CP', label: 'Cash Payment', color: 'bg-orange-100 text-orange-800' },
-  { value: 'BR', label: 'Bank Receipt', color: 'bg-emerald-100 text-emerald-800' },
-  { value: 'CR', label: 'Cash Receipt', color: 'bg-green-100 text-green-800' },
+  { value: 'BR', label: 'Bank Receipt', color: 'bg-[#EEF1F8] text-[#0F2D78]' },
+  { value: 'CR', label: 'Cash Receipt', color: 'bg-[#EEF1F8] text-[#0F2D78]' },
   { value: 'JV', label: 'Journal Voucher', color: 'bg-blue-100 text-blue-800' },
   { value: 'BILL', label: 'Bill', color: 'bg-purple-100 text-purple-800' },
 ]
@@ -36,8 +36,8 @@ const voucherTypes = [
 const statusConfig: Record<string, { color: string; label: string; icon: any; step: number }> = {
   draft: { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', label: 'Draft', icon: Pencil, step: 1 },
   pending: { color: 'bg-blue-100 text-blue-800 border-blue-200', label: 'Pending', icon: Clock, step: 2 },
-  approved: { color: 'bg-green-100 text-green-800 border-green-200', label: 'Approved', icon: CheckCircle2, step: 3 },
-  posted: { color: 'bg-emerald-100 text-emerald-800 border-emerald-200', label: 'Posted', icon: Lock, step: 4 },
+  approved: { color: 'bg-[#EEF1F8] text-[#0F2D78] border-[#A5B4D2]', label: 'Approved', icon: CheckCircle2, step: 3 },
+  posted: { color: 'bg-[#EEF1F8] text-[#0F2D78] border-[#A5B4D2]', label: 'Posted', icon: Lock, step: 4 },
   rejected: { color: 'bg-red-100 text-red-800 border-red-200', label: 'Rejected', icon: XCircle, step: 0 },
 }
 
@@ -69,7 +69,7 @@ const stepRoles: Record<string, string> = {
 
 const categoryColors: Record<string, string> = {
   invoice: 'bg-blue-100 text-blue-800',
-  receipt: 'bg-green-100 text-green-800',
+  receipt: 'bg-[#EEF1F8] text-[#0F2D78]',
   contract: 'bg-purple-100 text-purple-800',
   other: 'bg-gray-100 text-gray-800',
 }
@@ -88,7 +88,7 @@ function FileIcon({ mimeType }: { mimeType?: string | null }) {
   if (!mimeType) return <File className="h-4 w-4" />
   if (mimeType.startsWith('image/')) return <FileImage className="h-4 w-4 text-blue-500" />
   if (mimeType.includes('pdf')) return <FileText className="h-4 w-4 text-red-500" />
-  if (mimeType.includes('sheet') || mimeType.includes('excel') || mimeType.includes('xls')) return <FileSpreadsheet className="h-4 w-4 text-green-500" />
+  if (mimeType.includes('sheet') || mimeType.includes('excel') || mimeType.includes('xls')) return <FileSpreadsheet className="h-4 w-4 text-[#1E3C87]" />
   if (mimeType.includes('word') || mimeType.includes('doc')) return <FileText className="h-4 w-4 text-indigo-500" />
   return <File className="h-4 w-4 text-gray-500" />
 }
@@ -124,7 +124,7 @@ function WorkflowSteps({ currentStatus, currentRole }: { currentStatus: string; 
           return (
             <div key={step} className="flex items-center gap-1">
               <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold ${
-                isCompleted ? 'bg-emerald-100 text-emerald-800' :
+                isCompleted ? 'bg-[#EEF1F8] text-[#0F2D78]' :
                 isCurrent && isActionable && !isRejectedStep ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-400' :
                 isCurrent && !isRejectedStep ? config.color :
                 'bg-gray-100 text-gray-400'
@@ -649,7 +649,7 @@ export function VoucherManagement() {
         </div>
         <div className="flex items-center justify-between mt-2 p-2 rounded bg-muted/50">
           <div className="flex gap-4 text-xs"><span>Total Debit: <strong>{formatCurrency(totalDebit)}</strong></span><span>Total Credit: <strong>{formatCurrency(totalCredit)}</strong></span></div>
-          <Badge className={isBalanced ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>{isBalanced ? 'Balanced ✓' : 'Out of Balance ✗'}</Badge>
+          <Badge className={isBalanced ? 'bg-[#EEF1F8] text-[#0F2D78]' : 'bg-red-100 text-red-800'}>{isBalanced ? 'Balanced ✓' : 'Out of Balance ✗'}</Badge>
         </div>
       </div>
       <div>
@@ -660,11 +660,11 @@ export function VoucherManagement() {
         <Textarea className="text-xs font-medium italic" rows={2} placeholder="Amount in words will be auto-generated..." value={form.amountInWords || autoAmountInWords} onChange={e => setForm(p => ({ ...p, amountInWords: e.target.value }))} />
       </div>
       {!editOpen && hasPermission('quick_post', currentRole) && (
-        <div className="flex items-center gap-3 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
-          <input type="checkbox" id="autoPost" checked={form.autoPost} onChange={e => setForm(p => ({ ...p, autoPost: e.target.checked }))} className="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500" />
+        <div className="flex items-center gap-3 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-[#A5B4D2] dark:border-emerald-800">
+          <input type="checkbox" id="autoPost" checked={form.autoPost} onChange={e => setForm(p => ({ ...p, autoPost: e.target.checked }))} className="h-4 w-4 rounded border-emerald-300 text-[#0F2D78] focus:ring-emerald-500" />
           <div>
-            <Label htmlFor="autoPost" className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 cursor-pointer">Auto Post to General Ledger</Label>
-            <p className="text-[10px] text-emerald-600 dark:text-emerald-400">{form.autoPost ? 'Voucher will be immediately posted to GL (Admin only)' : 'Voucher will be saved as draft — submit for approval workflow'}</p>
+            <Label htmlFor="autoPost" className="text-xs font-semibold text-[#0F2D78] dark:text-emerald-300 cursor-pointer">Auto Post to General Ledger</Label>
+            <p className="text-[10px] text-[#0F2D78] dark:text-emerald-400">{form.autoPost ? 'Voucher will be immediately posted to GL (Admin only)' : 'Voucher will be saved as draft — submit for approval workflow'}</p>
           </div>
         </div>
       )}
@@ -810,8 +810,8 @@ export function VoucherManagement() {
                     {(v.status === 'draft' || v.status === 'rejected') && hasPermission('delete', currentRole) && <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" title="Delete" onClick={() => handleDeleteClick(v.id, v.voucherNo || v.voucherNumber)}><Trash2 className="h-3 w-3" /></Button>}
                     <Separator orientation="vertical" className="h-5 mx-0.5" />
                     {v.status === 'draft' && hasPermission('submit', currentRole) && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-blue-600" onClick={() => handleStatusChange(v.id, 'submit')}>Submit</Button>}
-                    {v.status === 'pending' && hasPermission('approve', currentRole) && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-green-600" onClick={() => handleStatusChange(v.id, 'approve')}>Approve</Button>}
-                    {v.status === 'approved' && hasPermission('post', currentRole) && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-emerald-600" onClick={() => handleStatusChange(v.id, 'post')}>Post</Button>}
+                    {v.status === 'pending' && hasPermission('approve', currentRole) && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-[#0F2D78]" onClick={() => handleStatusChange(v.id, 'approve')}>Approve</Button>}
+                    {v.status === 'approved' && hasPermission('post', currentRole) && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-[#0F2D78]" onClick={() => handleStatusChange(v.id, 'post')}>Post</Button>}
                     {(v.status === 'draft' || v.status === 'pending') && hasPermission('quick_post', currentRole) && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-emerald-700 font-semibold" onClick={() => handleStatusChange(v.id, 'quick_post')}>Quick Post</Button>}
                     {v.status === 'posted' && hasPermission('revoke', currentRole) && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-amber-600" onClick={() => handleStatusChange(v.id, 'revoke')}>Revoke</Button>}
                     {v.status !== 'rejected' && v.status !== 'posted' && hasPermission('reject', currentRole) && <Button variant="ghost" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => { setRejectVoucherId(v.id); setRejectOpen(true) }}>Reject</Button>}
@@ -931,8 +931,8 @@ export function VoucherManagement() {
                     <span className="text-xs text-muted-foreground">Actions:</span>
                     <Badge className={`text-[8px] ${roleColors[currentRole]}`}>{roleLabels[currentRole]}</Badge>
                     {detailVoucher.status === 'draft' && hasPermission('submit', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-blue-600" onClick={() => handleStatusChange(detailVoucher.id, 'submit')}><Clock className="h-3 w-3 mr-1" />Submit<span className="hidden sm:inline ml-1 text-muted-foreground">→ Pending</span></Button>}
-                    {detailVoucher.status === 'pending' && hasPermission('approve', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-green-600" onClick={() => handleStatusChange(detailVoucher.id, 'approve')}><CheckCircle2 className="h-3 w-3 mr-1" />Approve<span className="hidden sm:inline ml-1 text-muted-foreground">→ Approved</span></Button>}
-                    {detailVoucher.status === 'approved' && hasPermission('post', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-emerald-600" onClick={() => handleStatusChange(detailVoucher.id, 'post')}><Lock className="h-3 w-3 mr-1" />Post to GL<span className="hidden sm:inline ml-1 text-muted-foreground">→ Posted</span></Button>}
+                    {detailVoucher.status === 'pending' && hasPermission('approve', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-[#0F2D78]" onClick={() => handleStatusChange(detailVoucher.id, 'approve')}><CheckCircle2 className="h-3 w-3 mr-1" />Approve<span className="hidden sm:inline ml-1 text-muted-foreground">→ Approved</span></Button>}
+                    {detailVoucher.status === 'approved' && hasPermission('post', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-[#0F2D78]" onClick={() => handleStatusChange(detailVoucher.id, 'post')}><Lock className="h-3 w-3 mr-1" />Post to GL<span className="hidden sm:inline ml-1 text-muted-foreground">→ Posted</span></Button>}
                     {(detailVoucher.status === 'draft' || detailVoucher.status === 'pending') && hasPermission('quick_post', currentRole) && <Button variant="default" size="sm" className="h-7 text-[10px]" onClick={() => handleStatusChange(detailVoucher.id, 'quick_post')}><CheckCircle2 className="h-3 w-3 mr-1" />Quick Post<span className="hidden sm:inline ml-1 opacity-70">(Admin Only)</span></Button>}
                     <Separator orientation="vertical" className="h-5" />
                     {detailVoucher.status !== 'rejected' && detailVoucher.status !== 'posted' && hasPermission('reject', currentRole) && <Button variant="outline" size="sm" className="h-7 text-[10px] text-destructive" onClick={() => { setDetailOpen(false); setRejectVoucherId(detailVoucher.id); setRejectOpen(true) }}><XCircle className="h-3 w-3 mr-1" />Reject</Button>}
@@ -950,8 +950,8 @@ export function VoucherManagement() {
               )}
               {detailVoucher.status === 'posted' && (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 flex-wrap">
-                    <Lock className="h-4 w-4 text-emerald-600" />
+                  <div className="flex items-center gap-2 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-[#A5B4D2] dark:border-emerald-800 flex-wrap">
+                    <Lock className="h-4 w-4 text-[#0F2D78]" />
                     <span className="text-xs font-semibold text-emerald-700">Posted to General Ledger — Locked</span>
                     <Badge className={`text-[8px] ${roleColors[currentRole]}`}>{roleLabels[currentRole]}</Badge>
                     <Separator orientation="vertical" className="h-5" />
@@ -1017,8 +1017,8 @@ export function VoucherManagement() {
                       <div key={i} className="relative pb-3">
                         <div className={`absolute -left-[17px] top-1 h-3 w-3 rounded-full border-2 ${
                           a.action === 'REJECT' ? 'border-red-400 bg-red-100' :
-                          a.action === 'POST' || a.action === 'QUICK_POST' ? 'border-emerald-400 bg-emerald-100' :
-                          a.action === 'APPROVE' ? 'border-green-400 bg-green-100' :
+                          a.action === 'POST' || a.action === 'QUICK_POST' ? 'border-emerald-400 bg-[#EEF1F8]' :
+                          a.action === 'APPROVE' ? 'border-[#0F2D78] bg-[#EEF1F8]' :
                           a.action === 'SUBMIT' ? 'border-blue-400 bg-blue-100' :
                           a.action === 'REVOKE' ? 'border-amber-400 bg-amber-100' :
                           'border-gray-400 bg-gray-100'
@@ -1057,7 +1057,7 @@ export function VoucherManagement() {
                             <div className="flex items-center gap-2 text-[9px] text-muted-foreground">
                               <span>{formatFileSize(att.fileSize || 0)}</span>
                               {att.category && <Badge className={`text-[7px] ${categoryColors[att.category] || 'bg-gray-100 text-gray-800'}`}>{att.category}</Badge>}
-                              {att.isVerified && <Badge className="text-[7px] bg-emerald-100 text-emerald-800">✓ Verified</Badge>}
+                              {att.isVerified && <Badge className="text-[7px] bg-[#EEF1F8] text-[#0F2D78]">✓ Verified</Badge>}
                               <span>{new Date(att.createdAt).toLocaleDateString()}</span>
                             </div>
                           </div>

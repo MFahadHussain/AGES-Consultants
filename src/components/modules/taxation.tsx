@@ -295,7 +295,7 @@ export function Taxation() {
                       <TableCell className="text-xs text-right font-semibold text-destructive">{formatCurrency(c.taxAmount)}</TableCell>
                       <TableCell>
                         {c.postedToGL ? (
-                          <Badge className="text-[9px] bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Posted</Badge>
+                          <Badge className="text-[9px] bg-[#EEF1F8] text-[#0F2D78]"><CheckCircle className="h-3 w-3 mr-1" />Posted</Badge>
                         ) : (
                           <Badge className="text-[9px] bg-yellow-100 text-yellow-800">Draft</Badge>
                         )}

@@ -275,7 +275,7 @@ function getPasswordStrength(password: string): { score: number; label: string; 
   if (score < 30) return { score, label: 'Weak', color: 'bg-red-500' }
   if (score < 55) return { score, label: 'Fair', color: 'bg-amber-500' }
   if (score < 80) return { score, label: 'Strong', color: 'bg-emerald-500' }
-  return { score, label: 'Very Strong', color: 'bg-emerald-600' }
+  return { score, label: 'Very Strong', color: 'bg-[#0F2D78]' }
 }
 
 function getRoleBadge(user: UserRecord) {
@@ -312,7 +312,7 @@ function getRoleBadge(user: UserRecord) {
     case 'manager':
       return <Badge variant="outline" className="border-blue-200 text-blue-700 bg-blue-50 text-[10px] px-2 py-0.5">Manager</Badge>
     case 'accountant':
-      return <Badge variant="outline" className="border-emerald-200 text-emerald-700 bg-emerald-50 text-[10px] px-2 py-0.5">Accountant</Badge>
+      return <Badge variant="outline" className="border-[#A5B4D2] text-emerald-700 bg-emerald-50 text-[10px] px-2 py-0.5">Accountant</Badge>
     case 'auditor':
       return <Badge variant="outline" className="border-amber-200 text-amber-700 bg-amber-50 text-[10px] px-2 py-0.5">Auditor</Badge>
     case 'viewer':
@@ -398,7 +398,7 @@ function KPICards({ users, loading }: { users: UserRecord[]; loading: boolean })
 
   const cards = [
     { title: 'Total Users', value: totalUsers, icon: Users, color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-200' },
-    { title: 'Active', value: activeUsers, icon: UserCheck, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+    { title: 'Active', value: activeUsers, icon: UserCheck, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-[#A5B4D2]' },
     { title: 'Locked', value: lockedUsers, icon: UserX, color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
     { title: 'New This Month', value: newThisMonth, icon: UserPlus, color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
   ]
@@ -694,22 +694,22 @@ function UserFormModal({
                         <span className={`text-[10px] font-medium ${
                           passwordStrength.score < 30 ? 'text-red-500' :
                           passwordStrength.score < 55 ? 'text-amber-500' :
-                          'text-emerald-600'
+                          'text-[#0F2D78]'
                         }`}>
                           {passwordStrength.label}
                         </span>
                       </div>
                       <div className="flex gap-3 text-[10px] text-muted-foreground">
-                        <span className={form.password.length >= 8 ? 'text-emerald-600' : ''}>
+                        <span className={form.password.length >= 8 ? 'text-[#0F2D78]' : ''}>
                           {form.password.length >= 8 ? '✓' : '○'} 8+ chars
                         </span>
-                        <span className={/[A-Z]/.test(form.password) ? 'text-emerald-600' : ''}>
+                        <span className={/[A-Z]/.test(form.password) ? 'text-[#0F2D78]' : ''}>
                           {/[A-Z]/.test(form.password) ? '✓' : '○'} Uppercase
                         </span>
-                        <span className={/[0-9]/.test(form.password) ? 'text-emerald-600' : ''}>
+                        <span className={/[0-9]/.test(form.password) ? 'text-[#0F2D78]' : ''}>
                           {/[0-9]/.test(form.password) ? '✓' : '○'} Number
                         </span>
-                        <span className={/[^A-Za-z0-9]/.test(form.password) ? 'text-emerald-600' : ''}>
+                        <span className={/[^A-Za-z0-9]/.test(form.password) ? 'text-[#0F2D78]' : ''}>
                           {/[^A-Za-z0-9]/.test(form.password) ? '✓' : '○'} Special
                         </span>
                       </div>
@@ -849,7 +849,7 @@ function UserFormModal({
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant={form.isActive ? 'default' : 'secondary'} className={`text-[10px] ${form.isActive ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100' : 'bg-slate-100 text-slate-500'}`}>
+                  <Badge variant={form.isActive ? 'default' : 'secondary'} className={`text-[10px] ${form.isActive ? 'bg-[#EEF1F8] text-emerald-700 hover:bg-[#EEF1F8]' : 'bg-slate-100 text-slate-500'}`}>
                     {form.isActive ? 'Active' : 'Inactive'}
                   </Badge>
                   <Switch
@@ -1106,7 +1106,7 @@ function UserDetailPanel({
                     <UserX className="h-4 w-4 mr-2" /> Deactivate
                   </DropdownMenuItem>
                 ) : (
-                  <DropdownMenuItem onClick={() => onAction('activate', user)} className="text-emerald-600">
+                  <DropdownMenuItem onClick={() => onAction('activate', user)} className="text-[#0F2D78]">
                     <UserCheck className="h-4 w-4 mr-2" /> Activate
                   </DropdownMenuItem>
                 )}
@@ -1220,7 +1220,7 @@ function UserDetailPanel({
                 <div className="space-y-2">{[1, 2].map(i => <Skeleton key={i} className="h-16 w-full" />)}</div>
               ) : sessions.length > 0 ? (
                 sessions.map(s => (
-                  <div key={s.id} className={`p-3 rounded-lg border ${s.isActive ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-slate-50/30 opacity-60'}`}>
+                  <div key={s.id} className={`p-3 rounded-lg border ${s.isActive ? 'border-[#A5B4D2] bg-emerald-50/30' : 'border-slate-200 bg-slate-50/30 opacity-60'}`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Monitor className="h-4 w-4 text-slate-500" />
@@ -1273,7 +1273,7 @@ function UserDetailPanel({
                       lh.loginStatus === 'success' ? 'bg-emerald-50' : 'bg-red-50'
                     }`}>
                       {lh.loginStatus === 'success' ? (
-                        <LogIn className="h-4 w-4 text-emerald-600" />
+                        <LogIn className="h-4 w-4 text-[#0F2D78]" />
                       ) : (
                         <AlertCircle className="h-4 w-4 text-red-500" />
                       )}
@@ -2387,7 +2387,7 @@ export function UserManagement() {
                                 <UserX className="h-4 w-4 mr-2" /> Deactivate
                               </DropdownMenuItem>
                             ) : (
-                              <DropdownMenuItem onClick={() => handleUserAction('activate', user)} className="text-emerald-600">
+                              <DropdownMenuItem onClick={() => handleUserAction('activate', user)} className="text-[#0F2D78]">
                                 <UserCheck className="h-4 w-4 mr-2" /> Activate
                               </DropdownMenuItem>
                             )}

@@ -46,7 +46,7 @@ export function RecordHistory({ entityId }: { entityId: string }) {
   }
 
   const actionColors: Record<string, string> = {
-    CREATE: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+    CREATE: 'text-[#0F2D78] bg-emerald-50 border-[#A5B4D2]',
     UPDATE: 'text-blue-600 bg-blue-50 border-blue-200',
     DELETE: 'text-red-600 bg-red-50 border-red-200',
     APPROVE: 'text-teal-600 bg-teal-50 border-teal-200',

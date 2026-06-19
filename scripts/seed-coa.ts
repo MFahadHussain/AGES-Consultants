@@ -1,5 +1,5 @@
 /**
- * Seed script: Replace the entire Chart of Accounts with the new AcctFin ERP COA.
+ * Seed script: Replace the entire Chart of Accounts with the new AGES Consultants ERP COA.
  *
  * Usage:  bun run scripts/seed-coa.ts
  */

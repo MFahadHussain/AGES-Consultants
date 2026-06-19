@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
+import { ReportHeader } from '@/components/reports/ReportHeader'
 import {
   BarChart3,
   Building2,
@@ -56,7 +57,7 @@ interface ReportTypeDef {
 }
 
 const CATEGORY_COLORS: Record<ReportCategory, { border: string; bg: string; text: string; badge: string }> = {
-  Summary: { border: 'border-l-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', badge: 'bg-emerald-100 text-emerald-800' },
+  Summary: { border: 'border-l-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', badge: 'bg-[#EEF1F8] text-[#0F2D78]' },
   Tax: { border: 'border-l-sky-500', bg: 'bg-sky-50', text: 'text-sky-700', badge: 'bg-sky-100 text-sky-800' },
   Audit: { border: 'border-l-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', badge: 'bg-amber-100 text-amber-800' },
   Operational: { border: 'border-l-purple-500', bg: 'bg-purple-50', text: 'text-purple-700', badge: 'bg-purple-100 text-purple-800' },
@@ -107,7 +108,7 @@ const REPORT_COLUMNS: Record<string, ColumnDef[]> = {
     { key: 'totalDeductions', label: 'Total Ded.', align: 'right', format: 'currency' },
     { key: 'netPay', label: 'Net Pay', align: 'right', format: 'currency' },
     { key: 'employerCost', label: 'Employer Cost', align: 'right', format: 'currency' },
-    { key: 'lineStatus', label: 'Status', format: 'badge', badgeColors: { draft: 'bg-amber-100 text-amber-800', approved: 'bg-emerald-100 text-emerald-800' } },
+    { key: 'lineStatus', label: 'Status', format: 'badge', badgeColors: { draft: 'bg-amber-100 text-amber-800', approved: 'bg-[#EEF1F8] text-[#0F2D78]' } },
   ],
   'project-cost': [
     { key: 'projectCode', label: 'Project Code', align: 'center' },
@@ -155,7 +156,7 @@ const REPORT_COLUMNS: Record<string, ColumnDef[]> = {
     { key: 'employerCost', label: 'Er. Cost', align: 'right', format: 'currency' },
     { key: 'payableDays', label: 'Pay Days', align: 'center', format: 'number' },
     { key: 'absentDays', label: 'Absent', align: 'center', format: 'number' },
-    { key: 'lineStatus', label: 'Line Status', format: 'badge', badgeColors: { draft: 'bg-amber-100 text-amber-800', approved: 'bg-emerald-100 text-emerald-800' } },
+    { key: 'lineStatus', label: 'Line Status', format: 'badge', badgeColors: { draft: 'bg-amber-100 text-amber-800', approved: 'bg-[#EEF1F8] text-[#0F2D78]' } },
   ],
   'ytd-earnings': [
     { key: 'employeeCode', label: 'Emp Code', align: 'center' },
@@ -177,7 +178,7 @@ const REPORT_COLUMNS: Record<string, ColumnDef[]> = {
     { key: 'netPay', label: 'Net Pay', align: 'right', format: 'currency' },
     { key: 'payableDays', label: 'Pay Days', align: 'center', format: 'number' },
     { key: 'absentDays', label: 'Absent', align: 'center', format: 'number' },
-    { key: 'lineStatus', label: 'Status', format: 'badge', badgeColors: { draft: 'bg-amber-100 text-amber-800', approved: 'bg-emerald-100 text-emerald-800' } },
+    { key: 'lineStatus', label: 'Status', format: 'badge', badgeColors: { draft: 'bg-amber-100 text-amber-800', approved: 'bg-[#EEF1F8] text-[#0F2D78]' } },
   ],
   'attendance-impact': [
     { key: 'employeeCode', label: 'Emp Code', align: 'center' },
@@ -210,7 +211,7 @@ const REPORT_COLUMNS: Record<string, ColumnDef[]> = {
     { key: 'expectedTax', label: 'Expected Tax', align: 'right', format: 'currency' },
     { key: 'actualTaxDeducted', label: 'Actual Tax', align: 'right', format: 'currency' },
     { key: 'difference', label: 'Difference', align: 'right', format: 'currency' },
-    { key: 'status', label: 'Status', format: 'badge', badgeColors: { matched: 'bg-emerald-100 text-emerald-800', under_deduction: 'bg-amber-100 text-amber-800', over_deduction: 'bg-red-100 text-red-800' } },
+    { key: 'status', label: 'Status', format: 'badge', badgeColors: { matched: 'bg-[#EEF1F8] text-[#0F2D78]', under_deduction: 'bg-amber-100 text-amber-800', over_deduction: 'bg-red-100 text-red-800' } },
   ],
   'social-contributions': [
     { key: 'employeeCode', label: 'Emp Code', align: 'center' },
@@ -542,16 +543,12 @@ export function PayrollReports() {
 
       {/* Print Header */}
       <div className="hidden print:block print:mb-4">
-        <div className="text-center border-b pb-3 mb-3">
-          <h1 className="text-xl font-bold">AcctFin ERP</h1>
-          <h2 className="text-sm font-semibold mt-1">{currentReportDef?.name || 'Payroll Report'}</h2>
-          <p className="text-xs text-muted-foreground mt-1">
-            Generated: {new Date().toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' })}
-            {reportParams.month && ` | Period: ${reportParams.month}`}
-            {reportParams.fiscalYear && ` | FY: ${reportParams.fiscalYear}`}
-            {(reportMeta as any)?.employee && ` | Employee: ${(reportMeta as any).employee.name}`}
-          </p>
-        </div>
+        <ReportHeader
+          title={currentReportDef?.name || 'Payroll Report'}
+          subtitle={(reportMeta as any)?.employee ? `Employee: ${(reportMeta as any).employee.name}` : undefined}
+          dateRange={reportParams.month ? { from: reportParams.month, to: reportParams.month } : undefined}
+          fiscalYear={reportParams.fiscalYear}
+        />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
